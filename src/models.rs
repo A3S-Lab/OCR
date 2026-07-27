@@ -3,12 +3,6 @@ use std::path::PathBuf;
 use a3s_use_core::{Artifact, Readiness};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum OcrProviderKind {
-    PpOcrV6,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OcrRequest {
@@ -37,21 +31,28 @@ pub struct OcrBoundingBox {
 pub struct OcrBlock {
     pub page: u32,
     pub text: String,
-    #[schemars(description = "PP-OCRv6 text recognition confidence from 0 through 1")]
-    pub confidence: f32,
-    #[schemars(description = "PP-OCRv6 DB text detection confidence from 0 through 1")]
-    pub detection_confidence: f32,
-    #[schemars(description = "Four PP-OCRv6 polygon vertices in source-image coordinates")]
-    pub polygon: [OcrPoint; 4],
-    pub bounding_box: OcrBoundingBox,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "Provider recognition confidence from 0 through 1, when available")]
+    pub confidence: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        description = "Provider text-detection confidence from 0 through 1, when available"
+    )]
+    pub detection_confidence: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "Four polygon vertices in source-image coordinates, when available")]
+    pub polygon: Option<[OcrPoint; 4]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bounding_box: Option<OcrBoundingBox>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OcrResult {
-    pub provider: OcrProviderKind,
+    pub provider: String,
     pub engine: String,
-    pub model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     #[schemars(with = "OcrArtifactSchema")]
     pub source: Artifact,
     pub text: String,
@@ -67,7 +68,7 @@ pub struct OcrDiagnostic {
     #[schemars(with = "OcrReadinessSchema")]
     pub readiness: Readiness,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<OcrProviderKind>,
+    pub provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub engine: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

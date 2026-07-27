@@ -1,186 +1,108 @@
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::path::Path;
+use std::sync::Arc;
 
-use a3s_use_core::{Artifact, Readiness, UseError, UseResult};
+use a3s_use_core::{Artifact, UseError, UseResult};
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncReadExt;
 
-use crate::assets::{ocr_status, resolve_model_assets, OcrInstallSource};
-use crate::config::MODEL_FAMILY;
-use crate::engine::{EngineBlock, PpOcrV6Engine};
-use crate::models::{
-    OcrBlock, OcrBoundingBox, OcrDiagnostic, OcrPoint, OcrProviderKind, OcrRequest, OcrResult,
-};
-use crate::preprocess::decode_image;
+use crate::models::{OcrDiagnostic, OcrRequest, OcrResult};
+use crate::provider::{OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput};
 
 const MAX_INPUT_BYTES: u64 = 32 * 1024 * 1024;
-const ENGINE_NAME: &str = "onnx-runtime";
 
+/// Provider-neutral OCR client.
+///
+/// The client owns source validation and evidence. Recognition is delegated to
+/// one injected [`OcrProvider`].
 #[derive(Clone)]
 pub struct OcrClient {
-    loaded: Arc<Mutex<Option<LoadedEngine>>>,
-}
-
-struct LoadedEngine {
-    model_dir: PathBuf,
-    engine: PpOcrV6Engine,
+    provider: Arc<dyn OcrProvider>,
+    descriptor: OcrProviderDescriptor,
 }
 
 impl OcrClient {
-    pub fn from_env() -> UseResult<Self> {
+    pub fn with_provider<P>(provider: P) -> UseResult<Self>
+    where
+        P: OcrProvider + 'static,
+    {
+        Self::from_provider(Arc::new(provider))
+    }
+
+    pub fn from_provider(provider: Arc<dyn OcrProvider>) -> UseResult<Self> {
+        let descriptor = provider.descriptor();
+        descriptor.validate()?;
         Ok(Self {
-            loaded: Arc::new(Mutex::new(None)),
+            provider,
+            descriptor,
         })
     }
 
+    #[cfg(feature = "ppocr-v6")]
+    pub fn from_env() -> UseResult<Self> {
+        Self::with_provider(crate::PpOcrV6Provider::from_env()?)
+    }
+
+    pub fn provider(&self) -> &OcrProviderDescriptor {
+        &self.descriptor
+    }
+
     pub fn diagnostic(&self) -> OcrDiagnostic {
-        let status = ocr_status();
-        let (readiness, suggestions) = if status.available {
-            (Readiness::Ready, Vec::new())
-        } else if status.source == OcrInstallSource::Missing {
-            (
-                Readiness::Missing,
-                vec![
-                    "Run 'a3s install use/ocr' to install the pinned local model bundle."
-                        .to_string(),
-                ],
-            )
-        } else {
-            (
-                Readiness::Broken,
-                vec![
-                    "Run 'a3s install use/ocr --force' to restore the pinned local model bundle."
-                        .to_string(),
-                ],
-            )
-        };
+        let status = self.provider.diagnostic();
         OcrDiagnostic {
-            readiness,
-            provider: Some(OcrProviderKind::PpOcrV6),
-            engine: Some(ENGINE_NAME.to_string()),
-            model: Some(status.model),
+            readiness: status.readiness,
+            provider: Some(self.descriptor.id.clone()),
+            engine: Some(self.descriptor.engine.clone()),
+            model: status.model,
             model_dir: status.model_dir,
-            sends_source_off_device: false,
-            message: if status.available {
-                "Local PP-OCRv6 detection and recognition models are ready.".to_string()
-            } else {
-                status.detail
-            },
-            suggestions,
+            sends_source_off_device: self.descriptor.sends_source_off_device,
+            message: status.message,
+            suggestions: status.suggestions,
         }
     }
 
     pub async fn extract(&self, request: OcrRequest) -> UseResult<OcrResult> {
-        let source = read_source(&request.path).await?;
-        let loaded = Arc::clone(&self.loaded);
-        tokio::task::spawn_blocking(move || {
-            let image = decode_image(&source.bytes)?;
-            let assets = resolve_model_assets()?;
-            let mut loaded = loaded.lock().map_err(|_| {
-                UseError::new(
-                    "use.ocr.runtime_failed",
-                    "The local PP-OCRv6 engine lock is poisoned.",
-                )
-            })?;
-            let should_load = loaded
-                .as_ref()
-                .map(|loaded| loaded.model_dir != assets.root)
-                .unwrap_or(true);
-            if should_load {
-                *loaded = Some(LoadedEngine {
-                    model_dir: assets.root.clone(),
-                    engine: PpOcrV6Engine::load(&assets)?,
-                });
+        let input = read_source(&request.path).await?;
+        let source = input.source().clone();
+        let output = self.provider.recognize(input).await?;
+        validate_provider_output(&output)?;
+        Ok(OcrResult {
+            provider: self.descriptor.id.clone(),
+            engine: self.descriptor.engine.clone(),
+            model: output.model,
+            source,
+            text: output.text,
+            blocks: output.blocks,
+            warnings: output.warnings,
+        })
+    }
+}
+
+fn validate_provider_output(output: &OcrProviderOutput) -> UseResult<()> {
+    for block in &output.blocks {
+        if block.page == 0 {
+            return Err(provider_output_error(
+                "OCR providers must number pages starting at 1.",
+            ));
+        }
+        for (name, value) in [
+            ("confidence", block.confidence),
+            ("detection confidence", block.detection_confidence),
+        ] {
+            if value.is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value)) {
+                return Err(provider_output_error(format!(
+                    "OCR provider {name} must be between 0 and 1."
+                )));
             }
-            let engine = loaded.as_mut().ok_or_else(|| {
-                UseError::new(
-                    "use.ocr.runtime_failed",
-                    "The local PP-OCRv6 engine failed to initialize.",
-                )
-            })?;
-            let blocks = engine.engine.extract(&image)?;
-            build_result(source.artifact, blocks)
-        })
-        .await
-        .map_err(|error| {
-            UseError::new(
-                "use.ocr.runtime_failed",
-                format!("The local PP-OCRv6 inference task failed: {error}"),
-            )
-        })?
+        }
     }
+    Ok(())
 }
 
-fn build_result(source: Artifact, blocks: Vec<EngineBlock>) -> UseResult<OcrResult> {
-    let blocks = blocks
-        .into_iter()
-        .map(|block| {
-            let [first, second, third, fourth] = block.polygon;
-            let polygon = [
-                ocr_point(first)?,
-                ocr_point(second)?,
-                ocr_point(third)?,
-                ocr_point(fourth)?,
-            ];
-            let min_x = polygon.iter().map(|point| point.x).min().unwrap_or(0);
-            let max_x = polygon.iter().map(|point| point.x).max().unwrap_or(0);
-            let min_y = polygon.iter().map(|point| point.y).min().unwrap_or(0);
-            let max_y = polygon.iter().map(|point| point.y).max().unwrap_or(0);
-            Ok(OcrBlock {
-                page: 1,
-                text: block.text,
-                confidence: block.confidence,
-                detection_confidence: block.detection_confidence,
-                polygon,
-                bounding_box: OcrBoundingBox {
-                    x: min_x,
-                    y: min_y,
-                    width: max_x.saturating_sub(min_x),
-                    height: max_y.saturating_sub(min_y),
-                },
-            })
-        })
-        .collect::<UseResult<Vec<_>>>()?;
-    let text = blocks
-        .iter()
-        .filter(|block| !block.text.trim().is_empty())
-        .map(|block| block.text.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
-    Ok(OcrResult {
-        provider: OcrProviderKind::PpOcrV6,
-        engine: ENGINE_NAME.to_string(),
-        model: MODEL_FAMILY.to_string(),
-        source,
-        text,
-        blocks,
-        warnings: Vec::new(),
-    })
+fn provider_output_error(message: impl Into<String>) -> UseError {
+    UseError::new("use.ocr.provider_output_invalid", message)
 }
 
-fn ocr_point(point: imageproc::point::Point<f32>) -> UseResult<OcrPoint> {
-    Ok(OcrPoint {
-        x: finite_coordinate(point.x)?,
-        y: finite_coordinate(point.y)?,
-    })
-}
-
-fn finite_coordinate(value: f32) -> UseResult<u32> {
-    if !value.is_finite() || value < 0.0 || value > u32::MAX as f32 {
-        return Err(UseError::new(
-            "use.ocr.provider_output_invalid",
-            "PP-OCRv6 returned an invalid polygon coordinate.",
-        ));
-    }
-    Ok(value.round() as u32)
-}
-
-struct SourceImage {
-    artifact: Artifact,
-    bytes: Vec<u8>,
-}
-
-async fn read_source(path: &Path) -> UseResult<SourceImage> {
+async fn read_source(path: &Path) -> UseResult<OcrInput> {
     let canonical = tokio::fs::canonicalize(path).await.map_err(|error| {
         UseError::new(
             "use.ocr.source_unreadable",
@@ -254,15 +176,15 @@ async fn read_source(path: &Path) -> UseResult<SourceImage> {
         )
     })?;
     let digest = Sha256::digest(&bytes);
-    Ok(SourceImage {
-        artifact: Artifact {
+    Ok(OcrInput::new(
+        Artifact {
             path: canonical,
             media_type: media_type.to_string(),
             size: bytes.len() as u64,
             sha256: format!("{digest:x}"),
         },
         bytes,
-    })
+    ))
 }
 
 fn detect_image_type(bytes: &[u8]) -> Option<&'static str> {
@@ -285,7 +207,49 @@ fn detect_image_type(bytes: &[u8]) -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
+    use a3s_use_core::Readiness;
+    use async_trait::async_trait;
+
+    use crate::{OcrBlock, OcrProviderStatus};
+
     use super::*;
+
+    struct FixtureProvider;
+
+    #[async_trait]
+    impl OcrProvider for FixtureProvider {
+        fn descriptor(&self) -> OcrProviderDescriptor {
+            OcrProviderDescriptor::new("fixture-tesseract", "tesseract", true).unwrap()
+        }
+
+        fn diagnostic(&self) -> OcrProviderStatus {
+            OcrProviderStatus {
+                readiness: Readiness::Ready,
+                model: Some("eng".to_string()),
+                model_dir: None,
+                message: "ready".to_string(),
+                suggestions: Vec::new(),
+            }
+        }
+
+        async fn recognize(&self, input: OcrInput) -> UseResult<OcrProviderOutput> {
+            assert_eq!(input.source().media_type, "image/bmp");
+            assert!(input.bytes().starts_with(b"BM"));
+            Ok(OcrProviderOutput {
+                model: Some("eng".to_string()),
+                text: "fixture text".to_string(),
+                blocks: vec![OcrBlock {
+                    page: 1,
+                    text: "fixture text".to_string(),
+                    confidence: None,
+                    detection_confidence: None,
+                    polygon: None,
+                    bounding_box: None,
+                }],
+                warnings: Vec::new(),
+            })
+        }
+    }
 
     #[test]
     fn detects_supported_image_signatures() {
@@ -297,11 +261,29 @@ mod tests {
         assert_eq!(detect_image_type(b"not an image"), None);
     }
 
-    #[test]
-    fn diagnostic_never_discloses_an_off_device_provider() {
-        let diagnostic = OcrClient::from_env().unwrap().diagnostic();
-        assert_eq!(diagnostic.provider, Some(OcrProviderKind::PpOcrV6));
-        assert!(!diagnostic.sends_source_off_device);
-        assert_eq!(diagnostic.engine.as_deref(), Some(ENGINE_NAME));
+    #[tokio::test]
+    async fn injected_provider_receives_validated_source_and_owns_recognition() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("scan.bmp");
+        std::fs::write(&source, base64_free_white_bmp()).unwrap();
+        let client = OcrClient::with_provider(FixtureProvider).unwrap();
+
+        let result = client.extract(OcrRequest { path: source }).await.unwrap();
+
+        assert_eq!(result.provider, "fixture-tesseract");
+        assert_eq!(result.engine, "tesseract");
+        assert_eq!(result.model.as_deref(), Some("eng"));
+        assert_eq!(result.text, "fixture text");
+        assert_eq!(result.blocks[0].confidence, None);
+        assert!(client.diagnostic().sends_source_off_device);
+    }
+
+    fn base64_free_white_bmp() -> Vec<u8> {
+        vec![
+            0x42, 0x4d, 0x3a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x36, 0x00, 0x00, 0x00,
+            0x28, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+            0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00,
+        ]
     }
 }

@@ -2,14 +2,22 @@
 
 ## Repository
 
-This repository owns the typed `a3s-use-ocr` Rust library, standalone binary,
-standard MCP server, packaged Skill, and pinned PP-OCRv6 model provenance.
+This repository owns the provider-oriented `a3s-use-ocr` Rust library,
+standalone binary, standard MCP server, packaged Skill, and the default
+PP-OCRv6 provider.
 
 ## Boundaries
 
-- Keep one OCR provider: local `PP-OCRv6_small` through ONNX Runtime.
-- Do not add Python, PaddlePaddle, remote OCR APIs, or off-device fallbacks.
-- Keep image inputs bounded and bind results to canonical source evidence.
+- Keep `OcrProvider` object-safe, `Send + Sync`, and independent of concrete
+  provider dependencies.
+- Inject providers as typed objects. Do not add raw backend-name switches or a
+  global mutable provider registry.
+- Keep source validation, bounds, media-type detection, and canonical evidence
+  in `OcrClient`; providers must not replace source provenance.
+- Keep PP-OCRv6 as one optional default provider. Its implementation remains
+  local through ONNX Runtime and must not add Python or PaddlePaddle.
+- Every provider descriptor must declare whether it sends source bytes off
+  device; SDK and MCP surfaces must preserve that policy.
 - Preserve the `a3s-use-ocr` crate, binary, MCP, and Skill identities.
 - A3S Use owns the built-in `ocr` route and product component policy.
 - `a3s-use-core` owns shared machine contracts; depend on its released crate.

@@ -61,7 +61,7 @@ impl CommandOutput {
 #[command(
     name = "a3s-use-ocr",
     version,
-    about = "Typed built-in OCR for A3S Use",
+    about = "Provider-oriented OCR for A3S (PP-OCRv6 is the default provider)",
     arg_required_else_help = true
 )]
 struct Cli {
@@ -75,7 +75,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Inspect local PP-OCRv6 readiness without reading an image.
+    /// Inspect the configured OCR provider without reading an image.
     Doctor,
     /// Extract text and layout evidence from one local image.
     Extract { path: PathBuf },

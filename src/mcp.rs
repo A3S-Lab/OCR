@@ -15,12 +15,19 @@ pub struct OcrMcpServer {
 
 impl OcrMcpServer {
     pub fn new(client: OcrClient) -> Self {
+        let mut tool_router = Self::tool_router();
+        if let Some(route) = tool_router.map.get_mut("ocr_extract") {
+            if let Some(annotations) = route.attr.annotations.as_mut() {
+                annotations.open_world_hint = Some(client.provider().sends_source_off_device);
+            }
+        }
         Self {
             client,
-            tool_router: Self::tool_router(),
+            tool_router,
         }
     }
 
+    #[cfg(feature = "ppocr-v6")]
     pub fn from_env() -> UseResult<Self> {
         Ok(Self::new(OcrClient::from_env()?))
     }
@@ -43,7 +50,7 @@ impl OcrMcpServer {
 impl OcrMcpServer {
     #[tool(
         name = "ocr_doctor",
-        description = "Inspect local PP-OCRv6 model readiness without reading an image or making a network request",
+        description = "Inspect the configured OCR provider without reading an image",
         output_schema = rmcp::handler::server::tool::cached_schema_for_type::<OcrDiagnostic>(),
         annotations(
             read_only_hint = true,
@@ -58,7 +65,7 @@ impl OcrMcpServer {
 
     #[tool(
         name = "ocr_extract",
-        description = "Extract text, polygons, bounding boxes, and confidence from one bounded local image with PP-OCRv6; source bytes remain on this device",
+        description = "Extract text and available layout evidence from one bounded local image through the configured OCR provider",
         output_schema = rmcp::handler::server::tool::cached_schema_for_type::<OcrResult>(),
         annotations(
             read_only_hint = true,
@@ -78,6 +85,12 @@ impl OcrMcpServer {
 #[tool_handler]
 impl ServerHandler for OcrMcpServer {
     fn get_info(&self) -> ServerInfo {
+        let provider = self.client.provider();
+        let data_policy = if provider.sends_source_off_device {
+            "This provider may send source bytes off device; preserve that policy boundary."
+        } else {
+            "This provider keeps source bytes on device."
+        };
         ServerInfo {
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation {
@@ -85,12 +98,12 @@ impl ServerHandler for OcrMcpServer {
                 title: Some("A3S Use OCR".to_string()),
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 icons: None,
-                website_url: Some("https://github.com/A3S-Lab/Use".to_string()),
+                website_url: Some("https://github.com/A3S-Lab/OCR".to_string()),
             },
-            instructions: Some(
-                "Call ocr_doctor first. Use ocr_extract only for a local image path supplied by the task. PP-OCRv6 detection and recognition run locally through ONNX Runtime and never send source bytes off device. Preserve the source SHA-256 and distinguish OCR text from verified source text."
-                    .to_string(),
-            ),
+            instructions: Some(format!(
+                "Call ocr_doctor first. Use ocr_extract only for a local image path supplied by the task. The configured provider is '{}' using '{}'. {data_policy} Preserve the source SHA-256 and distinguish OCR text from verified source text.",
+                provider.id, provider.engine
+            )),
             ..Default::default()
         }
     }
@@ -130,7 +143,36 @@ fn mcp_error(action: &str, error: impl std::fmt::Display) -> UseError {
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
+
     use super::*;
+    use crate::{
+        OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
+        Readiness,
+    };
+
+    struct RemoteFixtureProvider;
+
+    #[async_trait]
+    impl OcrProvider for RemoteFixtureProvider {
+        fn descriptor(&self) -> OcrProviderDescriptor {
+            OcrProviderDescriptor::new("remote-fixture", "fixture-api", true).unwrap()
+        }
+
+        fn diagnostic(&self) -> OcrProviderStatus {
+            OcrProviderStatus {
+                readiness: Readiness::Ready,
+                model: None,
+                model_dir: None,
+                message: "ready".to_string(),
+                suggestions: Vec::new(),
+            }
+        }
+
+        async fn recognize(&self, _input: OcrInput) -> UseResult<OcrProviderOutput> {
+            Ok(OcrProviderOutput::default())
+        }
+    }
 
     #[test]
     fn server_exposes_typed_annotated_ocr_tools() {
@@ -165,6 +207,25 @@ mod tests {
                 .as_ref()
                 .and_then(|annotations| annotations.open_world_hint),
             Some(false)
+        );
+    }
+
+    #[test]
+    fn server_projects_an_injected_providers_data_boundary() {
+        let client = OcrClient::with_provider(RemoteFixtureProvider).unwrap();
+        let server = OcrMcpServer::new(client);
+        let extract = server
+            .tool_router
+            .list_all()
+            .into_iter()
+            .find(|tool| tool.name == "ocr_extract")
+            .unwrap();
+
+        assert_eq!(
+            extract
+                .annotations
+                .and_then(|annotations| annotations.open_world_hint),
+            Some(true)
         );
     }
 }
