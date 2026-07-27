@@ -1,9 +1,14 @@
 # A3S Use OCR
 
-`a3s-use-ocr` implements the first-party built-in OCR domain for A3S Use. A3S
-Code receives it as `mcp__use_ocr__*` through the release-matched Use registry,
-without installing a separate extension. The native CLI and standard stdio MCP
-share one local PP-OCRv6 implementation.
+`a3s-use-ocr` is the independently maintained OCR engine used by A3S Use. The
+repository publishes a typed Rust library, a standalone development CLI,
+standard stdio MCP, the `a3s-use-ocr` Skill, and a content-bound release asset
+bundle. A3S Use links the crate as its first-party built-in `ocr` route; moving
+the source to this repository does not turn OCR into a generic extension.
+
+A3S Code receives the release-matched capability as `mcp__use_ocr__*` without
+installing a separate extension. The native CLI and standard MCP server share
+one local PP-OCRv6 implementation.
 
 There is one OCR provider:
 
@@ -22,6 +27,19 @@ a3s install use/ocr --force
 `A3S_OCR_MODEL_DIR` can point development builds at an explicit model bundle.
 `A3S_USE_OCR_HOME` overrides the managed model root for packaging, tests, or an
 isolated installation. Neither setting selects another OCR backend.
+
+## Build
+
+```bash
+cargo fmt --all -- --check
+cargo test --locked
+cargo clippy --all-targets --locked -- -D warnings
+cargo build --release --locked
+```
+
+The library depends on the stable `a3s-use-core` machine contracts. A3S Use
+pins an exact OCR release when assembling its built-in capability and release
+assets.
 
 ## Workflow
 
@@ -47,5 +65,20 @@ a3s use ocr extract ./scan.png --json
 a3s use mcp serve ocr
 ```
 
+The standalone development binary accepts the equivalent domain arguments:
+
+```bash
+a3s-use-ocr doctor --json
+a3s-use-ocr extract ./scan.png --json
+a3s-use-ocr serve --mcp
+```
+
 Supported inputs are bounded local PNG, JPEG, WebP, GIF, BMP, and TIFF files.
 URLs and PDF rasterization are outside this crate.
+
+## Release ownership
+
+This repository owns OCR source, tests, model provenance, Skill content, crate
+publication, and platform archives. A3S Use owns the built-in route, capability
+projection, component policy, and final product assembly. Releases are joined
+only through immutable versions and SHA-256-bound artifacts.
