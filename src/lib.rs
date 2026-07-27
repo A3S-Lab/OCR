@@ -42,3 +42,21 @@ pub use provider::{
 };
 
 pub use a3s_use_core::{Artifact, Readiness, UseError, UseResult};
+
+/// Source-tree Skill root used by development hosts.
+///
+/// Installed products should use their release-packaged Skill directory. This
+/// path is intentionally only a fallback for source builds and tests.
+pub fn source_skill_root() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("skills")
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn source_skill_is_owned_by_this_repository() {
+        assert!(super::source_skill_root()
+            .join("a3s-use-ocr/SKILL.md")
+            .is_file());
+    }
+}
