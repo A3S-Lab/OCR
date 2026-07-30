@@ -3,7 +3,8 @@
 //! [`OcrClient`] owns bounded source validation and evidence while recognition
 //! is delegated to an injected [`OcrProvider`]. The optional PP-OCRv6 feature
 //! supplies the local default used by A3S Use without making that model the
-//! library's architectural boundary.
+//! library's architectural boundary. The optional Unlimited-OCR feature
+//! connects a typed provider to an externally managed vLLM server.
 
 #[cfg(feature = "ppocr-v6")]
 mod assets;
@@ -26,6 +27,8 @@ mod ppocr_v6;
 #[cfg(feature = "ppocr-v6")]
 mod preprocess;
 mod provider;
+#[cfg(feature = "unlimited-ocr")]
+mod unlimited_ocr;
 
 #[cfg(feature = "ppocr-v6")]
 pub use assets::{ocr_status, OcrInstallSource, OcrRuntimeStatus};
@@ -39,6 +42,10 @@ pub use models::{OcrBlock, OcrBoundingBox, OcrDiagnostic, OcrPoint, OcrRequest, 
 pub use ppocr_v6::{PpOcrV6Provider, PP_OCR_V6_PROVIDER_ID};
 pub use provider::{
     OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
+};
+#[cfg(feature = "unlimited-ocr")]
+pub use unlimited_ocr::{
+    UnlimitedOcrConfig, UnlimitedOcrProvider, UNLIMITED_OCR_MODEL, UNLIMITED_OCR_PROVIDER_ID,
 };
 
 pub use a3s_use_core::{Artifact, Readiness, UseError, UseResult};

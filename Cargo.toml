@@ -9,7 +9,7 @@ authors = ["A3S Lab"]
 rust-version = "1.82"
 description = "Provider-oriented optical character recognition interfaces for A3S"
 readme = "README.md"
-keywords = ["ocr", "onnx", "pp-ocrv6", "a3s"]
+keywords = ["ocr", "onnx", "pp-ocrv6", "unlimited-ocr", "a3s"]
 categories = ["computer-vision", "multimedia::images"]
 
 [lib]
@@ -28,6 +28,7 @@ required-features = ["ppocr-v6"]
 
 [features]
 default = ["ppocr-v6", "mcp", "cli"]
+unlimited-ocr = ["dep:base64", "dep:reqwest", "dep:serde_json"]
 ppocr-v6 = [
     "dep:clipper2",
     "dep:fs2",
@@ -45,6 +46,7 @@ cli = ["ppocr-v6", "mcp", "dep:clap"]
 [dependencies]
 a3s-use-core = "0.2.0"
 async-trait = "0.1"
+base64 = { version = "0.22", optional = true }
 clap = { version = "4", features = ["derive"], optional = true }
 clipper2 = { version = "=0.5.3", default-features = false, optional = true }
 fs2 = { version = "0.4", optional = true }

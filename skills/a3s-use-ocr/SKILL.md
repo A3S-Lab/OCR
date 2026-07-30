@@ -1,6 +1,6 @@
 ---
 name: a3s-use-ocr
-description: Extract text and layout evidence from local image files through the built-in A3S Use PP-OCRv6 domain. Use when an agent needs optical character recognition for a PNG, JPEG, WebP, GIF, BMP, or TIFF image and must preserve the source digest, confidence, polygon, and bounding-box evidence.
+description: Extract text and available layout evidence from local image files through the configured A3S Use OCR provider. Use when an agent needs optical character recognition for a PNG, JPEG, WebP, GIF, BMP, or TIFF image and must preserve the source digest, provider identity, data policy, and any returned confidence or geometry.
 ---
 
 # A3S Use OCR
@@ -13,19 +13,28 @@ file through another tool.
 ## Workflow
 
 1. Call `mcp__use_ocr__ocr_doctor`.
-2. Confirm that `pp-ocr-v6`, `onnx-runtime`, and `PP-OCRv6_small` are ready.
+2. Confirm the provider, engine, model, readiness, and
+   `sendsSourceOffDevice` policy. PP-OCRv6 should be ready before extraction;
+   an externally managed provider may report `unknown` until extraction checks
+   endpoint reachability.
 3. Call `mcp__use_ocr__ocr_extract` with the exact local image path from the
    task.
 4. Preserve the returned source path, media type, size, and SHA-256. Treat the
    decoded text, recognition/detection confidence, polygons, and bounding boxes
    as OCR evidence rather than verified source text.
 
-The engine runs detection, reading-order sorting, perspective crop correction,
-tall-crop rotation, recognition, and CTC decoding locally. It does not require
-Python or PaddlePaddle and never sends the source image off the device. If the
-doctor reports missing or damaged models, return its typed error and explicit
-`a3s install use/ocr` suggestion to the parent; never install or repair models
-from inside the `use` worker.
+For the default PP-OCRv6 provider, the engine runs detection, reading-order
+sorting, perspective crop correction, tall-crop rotation, recognition, and CTC
+decoding locally. It does not require Python or PaddlePaddle and never sends the
+source image off the device. If its doctor reports missing or damaged models,
+return the typed error and explicit `a3s install use/ocr` suggestion to the
+parent; never install or repair models from inside the `use` worker.
+
+An Unlimited-OCR provider calls an operator-managed vLLM endpoint. Honor the
+reported source-transfer policy before extraction. Its Markdown output may not
+include calibrated confidence or source-pixel geometry; preserve its warning
+instead of inventing those fields. The worker must not start, install, or repair
+the external model server.
 
 In a CLI-only host, equivalent commands are:
 

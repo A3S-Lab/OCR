@@ -23,6 +23,7 @@ version = "0.3.0"
 dependencies = [
  "a3s-use-core",
  "async-trait",
+ "base64",
  "clap",
  "clipper2",
  "fs2",

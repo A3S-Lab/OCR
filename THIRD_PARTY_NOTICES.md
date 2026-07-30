@@ -1,5 +1,20 @@
 # Third-Party Notices
 
+## Baidu Unlimited-OCR
+
+The optional `unlimited-ocr` feature interoperates with an externally managed
+`baidu/Unlimited-OCR` vLLM server through its OpenAI-compatible API. The crate
+does not redistribute the model, its custom Python code, vLLM, or container
+images.
+
+Unlimited-OCR is licensed under the MIT License.
+
+Upstream repositories:
+
+- <https://github.com/baidu/Unlimited-OCR>
+- <https://huggingface.co/baidu/Unlimited-OCR>
+- <https://recipes.vllm.ai/baidu/Unlimited-OCR>
+
 ## PaddlePaddle/PaddleOCR PP-OCRv6 Models
 
 A3S OCR release archives redistribute the official `PP-OCRv6_small_det` and
