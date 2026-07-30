@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="440" viewBox="0 0 1200 440"
+     role="img" aria-labelledby="title desc">
+  <title id="title">A3S OCR — text extraction with canonical source evidence</title>
+  <desc id="desc">A bounded image is validated and hashed by OcrClient, routed to either the local PP-OCRv6 provider or a typed Unlimited-OCR vLLM provider, and returned with path, media type, size, and SHA-256 evidence.</desc>
+
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1200" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0b1118"/>
+      <stop offset="0.7" stop-color="#101923"/>
+      <stop offset="1" stop-color="#13182a"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="60" y1="50" x2="500" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#64a0ff"/>
+      <stop offset="1" stop-color="#6557e8"/>
+    </linearGradient>
+    <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0L8 4L0 8Z" fill="#64a0ff"/>
+    </marker>
+    <marker id="arrow-muted" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0L8 4L0 8Z" fill="#617185"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="440" rx="24" fill="url(#background)"/>
+  <path d="M520 34V406" stroke="#263544" stroke-width="2"/>
+
+  <g id="identity" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <g transform="translate(60 50)" fill="none" stroke-linecap="square">
+      <path d="M0 15V0H15M47 0H62V15M62 47V62H47M15 62H0V47" stroke="#64a0ff" stroke-width="4"/>
+      <rect x="14" y="15" width="34" height="7" rx="2" fill="#eef5fc" stroke="none"/>
+      <rect x="14" y="29" width="26" height="6" rx="2" fill="#91a0b2" stroke="none"/>
+      <rect x="14" y="42" width="34" height="6" rx="2" fill="#48d6a7" stroke="none"/>
+    </g>
+
+    <text x="142" y="76" fill="#91a0b2" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="2.2">A3S / EVIDENCE-AWARE OCR</text>
+    <text x="60" y="176" fill="#f3f7fb" font-size="72" font-weight="760" letter-spacing="-2.6">A3S OCR</text>
+    <text x="60" y="232" fill="#f3f7fb" font-size="29" font-weight="680">Recognize text.</text>
+    <text x="60" y="270" fill="url(#brand)" font-size="29" font-weight="720">Keep the source attached.</text>
+
+    <text x="60" y="315" fill="#91a0b2" font-size="21" font-weight="520">Typed providers, bounded local inputs,</text>
+    <text x="60" y="344" fill="#91a0b2" font-size="21" font-weight="520">and canonical SHA-256 evidence.</text>
+
+    <g transform="translate(60 374)" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" font-weight="700">
+      <rect width="116" height="34" rx="6" fill="#132031" stroke="#36577a"/>
+      <circle cx="18" cy="17" r="4" fill="#64a0ff"/>
+      <text x="31" y="23" fill="#d8e8fa">RUST 1.82+</text>
+
+      <rect x="128" width="146" height="34" rx="6" fill="#12241f" stroke="#2e6a56"/>
+      <circle cx="146" cy="17" r="4" fill="#48d6a7"/>
+      <text x="159" y="23" fill="#c8f4e5">LOCAL FIRST</text>
+
+      <rect x="286" width="112" height="34" rx="6" fill="#181d28" stroke="#384555"/>
+      <circle cx="304" cy="17" r="4" fill="#91a0b2"/>
+      <text x="317" y="23" fill="#d8e1eb">MIT</text>
+    </g>
+  </g>
+
+  <g id="ocr-contract" transform="translate(540 38)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <g id="source-document">
+      <rect x="0" y="18" width="188" height="244" rx="10" fill="#111a24" stroke="#3a4b5d" stroke-width="2"/>
+      <text x="18" y="48" fill="#91a0b2" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" font-weight="700" letter-spacing="1.2">SOURCE / 01</text>
+      <text x="18" y="77" fill="#f3f7fb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700">scan.png</text>
+
+      <path d="M18 103H167M18 122H145M18 141H160M18 178H167M18 197H135M18 216H158" stroke="#617185" stroke-width="6" stroke-linecap="round"/>
+      <rect x="12" y="91" width="164" height="62" rx="4" fill="none" stroke="#48d6a7" stroke-width="2"/>
+      <rect x="12" y="166" width="164" height="63" rx="4" fill="none" stroke="#64a0ff" stroke-width="2"/>
+
+      <path d="M-8 32V10H14M174 10H196V32M196 248V270H174M14 270H-8V248" fill="none" stroke="#64a0ff" stroke-width="3"/>
+    </g>
+
+    <path d="M204 140H244" stroke="#64a0ff" stroke-width="2" marker-end="url(#arrow-blue)"/>
+
+    <g id="client" transform="translate(254 102)">
+      <rect width="150" height="78" rx="9" fill="#142338" stroke="#4f78ad" stroke-width="2"/>
+      <text x="75" y="33" text-anchor="middle" fill="#f3f7fb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700">OcrClient</text>
+      <text x="75" y="59" text-anchor="middle" fill="#8db9f4" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">validate + hash</text>
+    </g>
+
+    <path d="M404 141H420V92H424M420 141V211H424" fill="none" stroke="#617185" stroke-width="2" marker-end="url(#arrow-muted)"/>
+    <circle cx="420" cy="141" r="5" fill="#64a0ff"/>
+
+    <g id="providers" transform="translate(434 43)">
+      <rect width="176" height="94" rx="9" fill="#11231d" stroke="#379673" stroke-width="2"/>
+      <text x="16" y="29" fill="#79e2be" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" letter-spacing="1">DEFAULT / LOCAL</text>
+      <text x="16" y="59" fill="#f3f7fb" font-size="22" font-weight="720">PP-OCRv6</text>
+      <text x="16" y="81" fill="#93b9aa" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">ONNX Runtime</text>
+
+      <rect y="119" width="176" height="94" rx="9" fill="#201b15" stroke="#a77b37" stroke-width="2"/>
+      <text x="16" y="148" fill="#f3c875" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" letter-spacing="1">OPTIONAL / TYPED</text>
+      <text x="16" y="178" fill="#f3f7fb" font-size="22" font-weight="720">Unlimited-OCR</text>
+      <text x="16" y="200" fill="#c5a873" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">vLLM endpoint</text>
+    </g>
+
+    <g id="evidence-ledger" transform="translate(0 298)">
+      <rect width="610" height="92" rx="10" fill="#101a25" stroke="#33485e" stroke-width="2"/>
+      <rect x="0" y="0" width="8" height="92" rx="4" fill="#48d6a7"/>
+      <text x="26" y="33" fill="#91a0b2" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" font-weight="700" letter-spacing="1.4">CANONICAL SOURCE EVIDENCE</text>
+      <text x="26" y="64" fill="#f3f7fb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700">path · media type · size · SHA-256</text>
+      <circle cx="569" cy="46" r="20" fill="#123126" stroke="#48d6a7" stroke-width="2"/>
+      <path d="M560 46L567 53L579 38" fill="none" stroke="#48d6a7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>
