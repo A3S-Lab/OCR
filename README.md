@@ -90,7 +90,7 @@ The provider owns recognition. `OcrClient` owns the evidence envelope.
 | Owned by `OcrClient` | Owned by the provider |
 | --- | --- |
 | Canonical path, detected media type, byte size, SHA-256 | Recognition text and model identity |
-| Input bounds and supported image signatures | Optional confidence, polygons, and bounding boxes |
+| Input bounds and supported image signatures | Optional confidence, category, polygons, and bounding boxes |
 | Provider-output validation | Readiness messages and provider-specific warnings |
 | Final `OcrResult` assembly | Declared off-device source policy |
 
@@ -98,9 +98,9 @@ The stable result shape keeps the source next to the OCR evidence:
 
 ~~~jsonc
 {
-  "provider": "pp-ocr-v6",
-  "engine": "onnx-runtime",
-  "model": "PP-OCRv6_small",
+  "provider": "unlimited-ocr",
+  "engine": "vllm-openai",
+  "model": "baidu/Unlimited-OCR",
   "source": {
     "path": "/canonical/path/to/scan.png",
     "mediaType": "image/png",
@@ -112,18 +112,24 @@ The stable result shape keeps the source next to the OCR evidence:
     {
       "page": 1,
       "text": "...",
-      "confidence": 0.98,
-      "detectionConfidence": 0.97,
-      "polygon": [{"x": 12, "y": 24}, {"x": 220, "y": 24}, {"x": 220, "y": 58}, {"x": 12, "y": 58}],
-      "boundingBox": {"x": 12, "y": 24, "width": 208, "height": 34}
+      "category": {"rawLabel": "title", "role": "title"},
+      "boundingBox": {"x": 12, "y": 24, "width": 208, "height": 74},
+      "boundingBoxes": [
+        {"x": 12, "y": 24, "width": 208, "height": 34},
+        {"x": 12, "y": 64, "width": 180, "height": 34}
+      ]
     }
   ],
   "warnings": []
 }
 ~~~
 
-Confidence and geometry are optional. OCR output is evidence derived from the
-source, not verified source text.
+Category, confidence, and geometry are optional. `category.rawLabel` preserves
+a bounded provider label without declaring the provider taxonomy closed;
+`category.role` is a conservative provider-neutral interpretation. Component
+boxes retain exact provider geometry, while `boundingBox` is their compatibility
+envelope. OCR output is evidence derived from the source, not verified source
+text.
 
 ## Providers
 
@@ -197,14 +203,20 @@ forms reviewed in the upstream model implementation:
 Unlimited-OCR coordinates use the closed `0..=999` basis documented by the
 [upstream postprocessor](https://huggingface.co/baidu/Unlimited-OCR/blob/07dea832e22aefee32ad281d4b80551282e1c168/modeling_unlimitedocr.py#L62-L111).
 A3S OCR resolves the verified input dimensions and maps valid non-image
-grounding into typed source-pixel `OcrBlock` boxes. Multiple boxes for one
-generated block are represented by their bounded union. The adapter evaluates
-no model text as code, fabricates no confidence, and emits no geometry for
-missing, malformed, out-of-range, empty, image-only, or EXIF-transformed
-grounding. This follows the upstream loader's EXIF-transpose behavior without
-mislabeling transformed coordinates as untransformed source pixels. Degraded
-grounding remains visible through one bounded warning while the generated text
-is preserved.
+grounding into typed source-pixel `OcrBlock` evidence. Every valid component
+box is preserved in model order and `boundingBox` remains the bounded union for
+compatibility. The bounded raw label is retained next to a conservative role:
+explicit titles, headings, paragraphs, tables, captions, equations, running
+headers/footers, footnotes, page numbers, and code receive matching roles;
+other valid labels remain `unknown` rather than being promoted. The upstream
+taxonomy is intentionally treated as open.
+
+The adapter evaluates no model text as code, fabricates no confidence, and
+emits no geometry for missing, malformed, out-of-range, empty, image-only, or
+EXIF-transformed grounding. It never trusts generated image paths. This follows
+the upstream loader's EXIF-transpose behavior without mislabeling transformed
+coordinates as untransformed source pixels. Degraded grounding remains visible
+through one bounded warning while the generated text is preserved.
 Diagnostics report `unknown` until extraction checks endpoint reachability
 because the synchronous diagnostic interface does not perform network I/O.
 
@@ -281,11 +293,14 @@ the MCP host instead of looking like a local-only read.
   `OcrClient`.
 - Pages start at 1; returned confidence values must be finite and between 0 and
   1.
+- Provider labels and component-box lists are bounded; a component list must
+  exactly agree with its compatibility envelope.
 - PP-OCRv6 never transfers source bytes off device.
 - Unlimited-OCR remote endpoints are HTTPS-only and explicitly marked as
   off-device.
-- Unlimited-OCR source boxes are emitted only from valid `0..=999` grounding
-  and decoded source-image dimensions; malformed markers never become boxes.
+- Unlimited-OCR source boxes and categories are emitted only from valid,
+  bounded `0..=999` grounding and decoded source-image dimensions; malformed
+  markers never become boxes or semantic claims.
 - Model installation, repair, and external server deployment are never hidden
   inside extraction.
 

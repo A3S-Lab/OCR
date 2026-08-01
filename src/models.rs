@@ -26,11 +26,46 @@ pub struct OcrBoundingBox {
     pub height: u32,
 }
 
+/// Conservative provider-neutral meaning for one OCR block.
+///
+/// Provider taxonomies may be open-ended. [`OcrBlockCategory::raw_label`]
+/// preserves the bounded provider label while this enum exposes only roles
+/// that OCR evidence can support without inventing document structure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum OcrBlockRole {
+    Text,
+    Title,
+    Heading,
+    Paragraph,
+    Table,
+    Caption,
+    EquationBlock,
+    EquationInline,
+    Header,
+    Footer,
+    Footnote,
+    PageNumber,
+    CodeBlock,
+    Unknown,
+}
+
+/// Lossless provider label paired with its conservative canonical role.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrBlockCategory {
+    #[schemars(description = "Bounded provider label preserved without closing its taxonomy")]
+    pub raw_label: String,
+    pub role: OcrBlockRole,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OcrBlock {
     pub page: u32,
     pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<OcrBlockCategory>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(description = "Provider recognition confidence from 0 through 1, when available")]
     pub confidence: Option<f32>,
@@ -44,6 +79,11 @@ pub struct OcrBlock {
     pub polygon: Option<[OcrPoint; 4]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounding_box: Option<OcrBoundingBox>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(
+        description = "Ordered provider-supplied component boxes in source-image coordinates"
+    )]
+    pub bounding_boxes: Vec<OcrBoundingBox>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]

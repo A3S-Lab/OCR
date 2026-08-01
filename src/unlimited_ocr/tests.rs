@@ -57,6 +57,13 @@ fn parses_reviewed_grounding_forms_into_source_pixel_blocks() {
     assert_eq!(parsed.blocks[0].page, 1);
     assert_eq!(parsed.blocks[0].text, "# Heading\ncontinued");
     assert_eq!(
+        parsed.blocks[0]
+            .category
+            .as_ref()
+            .map(|category| (category.raw_label.as_str(), category.role,)),
+        Some(("title", crate::OcrBlockRole::Title))
+    );
+    assert_eq!(
         parsed.blocks[0].bounding_box,
         Some(crate::OcrBoundingBox {
             x: 0,
@@ -65,7 +72,23 @@ fn parses_reviewed_grounding_forms_into_source_pixel_blocks() {
             height: 50,
         })
     );
+    assert_eq!(
+        parsed.blocks[0].bounding_boxes,
+        [crate::OcrBoundingBox {
+            x: 0,
+            y: 0,
+            width: 1_000,
+            height: 50,
+        }]
+    );
     assert_eq!(parsed.blocks[1].text, "Body := value");
+    assert_eq!(
+        parsed.blocks[1]
+            .category
+            .as_ref()
+            .map(|category| (category.raw_label.as_str(), category.role,)),
+        Some(("text", crate::OcrBlockRole::Text))
+    );
     assert_eq!(
         parsed.blocks[1].bounding_box,
         Some(crate::OcrBoundingBox {
@@ -75,9 +98,61 @@ fn parses_reviewed_grounding_forms_into_source_pixel_blocks() {
             height: 75,
         })
     );
+    assert_eq!(
+        parsed.blocks[1].bounding_boxes,
+        [
+            crate::OcrBoundingBox {
+                x: 100,
+                y: 100,
+                width: 300,
+                height: 50,
+            },
+            crate::OcrBoundingBox {
+                x: 500,
+                y: 125,
+                width: 400,
+                height: 50,
+            },
+        ]
+    );
     assert!(parsed.blocks.iter().all(|block| block.confidence.is_none()
         && block.detection_confidence.is_none()
         && block.polygon.is_none()));
+}
+
+#[test]
+fn preserves_open_labels_with_conservative_canonical_roles() {
+    let raw = concat!(
+        "<|det|>equation_isolated [0, 0, 100, 100]<|/det|>E = mc^2\n",
+        "<|det|>figure_caption [0, 200, 100, 300]<|/det|>Figure 1\n",
+        "<|det|>vendor-special [0, 400, 100, 500]<|/det|>Opaque"
+    );
+    let parsed = parse_model_output(
+        raw,
+        Some(GroundingGeometry {
+            width: 999,
+            height: 999,
+        }),
+    )
+    .unwrap();
+
+    assert!(parsed.warnings.is_empty());
+    assert_eq!(parsed.blocks.len(), 3);
+    assert_eq!(
+        parsed
+            .blocks
+            .iter()
+            .map(|block| {
+                let category = block.category.as_ref().unwrap();
+                (category.raw_label.as_str(), category.role)
+            })
+            .collect::<Vec<_>>(),
+        [
+            ("equation_isolated", crate::OcrBlockRole::EquationBlock),
+            ("figure_caption", crate::OcrBlockRole::Caption),
+            ("vendor-special", crate::OcrBlockRole::Unknown),
+        ]
+    );
 }
 
 #[test]

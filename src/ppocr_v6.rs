@@ -134,6 +134,7 @@ fn build_output(blocks: Vec<EngineBlock>) -> UseResult<OcrProviderOutput> {
             Ok(OcrBlock {
                 page: 1,
                 text: block.text,
+                category: None,
                 confidence: Some(block.confidence),
                 detection_confidence: Some(block.detection_confidence),
                 polygon: Some(polygon),
@@ -143,6 +144,7 @@ fn build_output(blocks: Vec<EngineBlock>) -> UseResult<OcrProviderOutput> {
                     width: max_x.saturating_sub(min_x),
                     height: max_y.saturating_sub(min_y),
                 }),
+                bounding_boxes: Vec::new(),
             })
         })
         .collect::<UseResult<Vec<_>>>()?;

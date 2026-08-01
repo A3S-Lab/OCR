@@ -20,8 +20,8 @@ file through another tool.
 3. Call `mcp__use_ocr__ocr_extract` with the exact local image path from the
    task.
 4. Preserve the returned source path, media type, size, and SHA-256. Treat the
-   decoded text, recognition/detection confidence, polygons, and bounding boxes
-   as OCR evidence rather than verified source text.
+   decoded text, bounded category, recognition/detection confidence, polygons,
+   and bounding boxes as OCR evidence rather than verified source text.
 
 For the default PP-OCRv6 provider, the engine runs detection, reading-order
 sorting, perspective crop correction, tall-crop rotation, recognition, and CTC
@@ -32,11 +32,12 @@ parent; never install or repair models from inside the `use` worker.
 
 An Unlimited-OCR provider calls an operator-managed vLLM endpoint. Honor the
 reported source-transfer policy before extraction. It preserves Markdown and
-maps valid upstream `0..=999` text grounding into typed source-pixel bounding
-boxes. It does not fabricate calibrated confidence, image regions, or geometry
-for missing, malformed, empty, out-of-range, or EXIF-transformed markers;
-preserve its warning in those cases. The worker must not start, install, or
-repair the external model server.
+maps valid upstream `0..=999` text grounding into typed source-pixel component
+boxes plus a compatibility envelope. Preserve its bounded raw label and
+conservative role; `unknown` labels must not be promoted. It does not fabricate
+calibrated confidence, image regions, or geometry for missing, malformed,
+empty, out-of-range, or EXIF-transformed markers; preserve its warning in those
+cases. The worker must not start, install, or repair the external model server.
 
 In a CLI-only host, equivalent commands are:
 

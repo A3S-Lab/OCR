@@ -7,7 +7,7 @@ const MAX_COORDINATE_BOXES_PER_MARKER: usize = 128;
 
 pub(super) struct ParsedCoordinates {
     pub bounds: NormalizedBox,
-    pub box_count: usize,
+    pub boxes: Vec<NormalizedBox>,
 }
 
 pub(super) fn parse_coordinates(raw: &str) -> Result<ParsedCoordinates, CoordinateParseError> {
@@ -22,7 +22,7 @@ pub(super) enum CoordinateParseError {
 struct CoordinateParser<'a> {
     bytes: &'a [u8],
     position: usize,
-    box_count: usize,
+    boxes: Vec<NormalizedBox>,
     bounds: Option<NormalizedBox>,
 }
 
@@ -31,7 +31,7 @@ impl<'a> CoordinateParser<'a> {
         Self {
             bytes: raw.as_bytes(),
             position: 0,
-            box_count: 0,
+            boxes: Vec::new(),
             bounds: None,
         }
     }
@@ -65,7 +65,7 @@ impl<'a> CoordinateParser<'a> {
         let bounds = self.bounds.ok_or(CoordinateParseError::Invalid)?;
         Ok(ParsedCoordinates {
             bounds,
-            box_count: self.box_count,
+            boxes: self.boxes,
         })
     }
 
@@ -86,11 +86,7 @@ impl<'a> CoordinateParser<'a> {
         if left >= right || top >= bottom {
             return Err(CoordinateParseError::Invalid);
         }
-        self.box_count = self
-            .box_count
-            .checked_add(1)
-            .ok_or(CoordinateParseError::Limit)?;
-        if self.box_count > MAX_COORDINATE_BOXES_PER_MARKER {
+        if self.boxes.len() >= MAX_COORDINATE_BOXES_PER_MARKER {
             return Err(CoordinateParseError::Limit);
         }
         let current = NormalizedBox {
@@ -99,6 +95,7 @@ impl<'a> CoordinateParser<'a> {
             right,
             bottom,
         };
+        self.boxes.push(current);
         self.bounds = Some(match self.bounds {
             Some(bounds) => bounds.union(current),
             None => current,
@@ -147,7 +144,7 @@ impl<'a> CoordinateParser<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct NormalizedBox {
     left: u16,
     top: u16,

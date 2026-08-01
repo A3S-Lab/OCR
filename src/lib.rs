@@ -37,7 +37,10 @@ pub use client::OcrClient;
 pub use install::{install_ppocr_v6, repair_ppocr_v6, uninstall_managed_ppocr_v6};
 #[cfg(feature = "mcp")]
 pub use mcp::OcrMcpServer;
-pub use models::{OcrBlock, OcrBoundingBox, OcrDiagnostic, OcrPoint, OcrRequest, OcrResult};
+pub use models::{
+    OcrBlock, OcrBlockCategory, OcrBlockRole, OcrBoundingBox, OcrDiagnostic, OcrPoint, OcrRequest,
+    OcrResult,
+};
 #[cfg(feature = "ppocr-v6")]
 pub use ppocr_v6::{PpOcrV6Provider, PP_OCR_V6_PROVIDER_ID};
 pub use provider::{

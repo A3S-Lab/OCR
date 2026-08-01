@@ -5,10 +5,10 @@ use image::{metadata::Orientation, ImageDecoder, ImageReader};
 
 mod coordinates;
 
-use crate::OcrBlock;
+use crate::{OcrBlock, OcrBlockCategory, OcrBlockRole};
 
 use super::{provider_output_error, STOP_TOKEN};
-use coordinates::{parse_coordinates, CoordinateParseError, NormalizedBox};
+use coordinates::{parse_coordinates, CoordinateParseError};
 
 const REF_OPEN: &str = "<|ref|>";
 const REF_CLOSE: &str = "<|/ref|>";
@@ -92,7 +92,7 @@ pub(super) fn parse_model_output(
             malformed = true;
             continue;
         }
-        let Some(bounds) = marker.bounds else {
+        let Some(coordinates) = marker.coordinates.as_ref() else {
             malformed = true;
             continue;
         };
@@ -108,17 +108,34 @@ pub(super) fn parse_model_output(
             malformed = true;
             continue;
         };
-        let Some(bounding_box) = bounds.to_source_pixels(geometry.width, geometry.height) else {
+        let Some(bounding_box) = coordinates
+            .bounds
+            .to_source_pixels(geometry.width, geometry.height)
+        else {
+            malformed = true;
+            continue;
+        };
+        let Some(bounding_boxes) = coordinates
+            .boxes
+            .iter()
+            .map(|bounds| bounds.to_source_pixels(geometry.width, geometry.height))
+            .collect::<Option<Vec<_>>>()
+        else {
             malformed = true;
             continue;
         };
         blocks.push(OcrBlock {
             page: 1,
             text,
+            category: Some(OcrBlockCategory {
+                raw_label: label.to_string(),
+                role: canonical_role(label),
+            }),
             confidence: None,
             detection_confidence: None,
             polygon: None,
             bounding_box: Some(bounding_box),
+            bounding_boxes,
         });
     }
 
@@ -141,7 +158,7 @@ struct ScannedGrounding {
 struct GroundingMarker {
     text_start: usize,
     label: Option<String>,
-    bounds: Option<NormalizedBox>,
+    coordinates: Option<coordinates::ParsedCoordinates>,
 }
 
 fn scan_grounding(raw: &str) -> UseResult<ScannedGrounding> {
@@ -253,7 +270,7 @@ fn build_marker(
     let coordinates = parse_bounded_coordinates(raw_coordinates)?;
     if let Some(coordinates) = coordinates {
         *coordinate_boxes = coordinate_boxes
-            .checked_add(coordinates.box_count)
+            .checked_add(coordinates.boxes.len())
             .ok_or_else(grounding_limit_error)?;
         if *coordinate_boxes > MAX_COORDINATE_BOXES {
             return Err(grounding_limit_error());
@@ -263,7 +280,7 @@ fn build_marker(
             GroundingMarker {
                 text_start,
                 label,
-                bounds: Some(coordinates.bounds),
+                coordinates: Some(coordinates),
             },
             invalid,
         ))
@@ -272,7 +289,7 @@ fn build_marker(
             GroundingMarker {
                 text_start,
                 label,
-                bounds: None,
+                coordinates: None,
             },
             true,
         ))
@@ -304,6 +321,34 @@ fn parse_label(raw: &str) -> Option<String> {
         return None;
     }
     Some(label.to_string())
+}
+
+fn canonical_role(label: &str) -> OcrBlockRole {
+    let normalized = label.to_ascii_lowercase().replace('-', "_");
+    match normalized.as_str() {
+        "text" | "text_line" => OcrBlockRole::Text,
+        "title" | "document_title" => OcrBlockRole::Title,
+        "heading" | "section_title" => OcrBlockRole::Heading,
+        "paragraph" | "text_block" => OcrBlockRole::Paragraph,
+        "table" | "html_table" | "latex_table" => OcrBlockRole::Table,
+        "equation_caption"
+        | "figure_caption"
+        | "table_caption"
+        | "code_txt_caption"
+        | "code_algorithm_caption" => OcrBlockRole::Caption,
+        "equation" | "equation_isolated" | "display_formula" | "formula" => {
+            OcrBlockRole::EquationBlock
+        }
+        "equation_inline" | "inline_formula" => OcrBlockRole::EquationInline,
+        "header" => OcrBlockRole::Header,
+        "footer" => OcrBlockRole::Footer,
+        "figure_footnote" | "table_footnote" | "page_footnote" | "footnote" => {
+            OcrBlockRole::Footnote
+        }
+        "page_number" => OcrBlockRole::PageNumber,
+        "code" | "code_txt" | "code_algorithm" => OcrBlockRole::CodeBlock,
+        _ => OcrBlockRole::Unknown,
+    }
 }
 
 fn parse_bounded_coordinates(raw: &str) -> UseResult<Option<coordinates::ParsedCoordinates>> {

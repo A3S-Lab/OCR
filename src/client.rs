@@ -5,10 +5,12 @@ use a3s_use_core::{Artifact, UseError, UseResult};
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncReadExt;
 
-use crate::models::{OcrDiagnostic, OcrRequest, OcrResult};
+use crate::models::{OcrBlock, OcrBoundingBox, OcrDiagnostic, OcrRequest, OcrResult};
 use crate::provider::{OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput};
 
 const MAX_INPUT_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_BLOCK_CATEGORY_LABEL_BYTES: usize = 128;
+const MAX_COMPONENT_BOXES_PER_BLOCK: usize = 128;
 
 /// Provider-neutral OCR client.
 ///
@@ -94,8 +96,94 @@ fn validate_provider_output(output: &OcrProviderOutput) -> UseResult<()> {
                 )));
             }
         }
+        validate_block_category(block)?;
+        validate_block_geometry(block)?;
     }
     Ok(())
+}
+
+fn validate_block_category(block: &OcrBlock) -> UseResult<()> {
+    let Some(category) = &block.category else {
+        return Ok(());
+    };
+    let label = category.raw_label.as_bytes();
+    if label.is_empty()
+        || label.len() > MAX_BLOCK_CATEGORY_LABEL_BYTES
+        || !label
+            .first()
+            .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_')
+        || !label
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        return Err(provider_output_error(
+            "OCR provider block labels must contain 1 through 128 ASCII letters, digits, underscores, or hyphens and start with a letter or underscore.",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_block_geometry(block: &OcrBlock) -> UseResult<()> {
+    if block.bounding_boxes.len() > MAX_COMPONENT_BOXES_PER_BLOCK {
+        return Err(provider_output_error(
+            "OCR provider blocks must not contain more than 128 component boxes.",
+        ));
+    }
+    if let Some(bounds) = block.bounding_box {
+        validate_box(bounds)?;
+    }
+    for bounds in &block.bounding_boxes {
+        validate_box(*bounds)?;
+    }
+    if !block.bounding_boxes.is_empty()
+        && block.bounding_box != component_envelope(&block.bounding_boxes)?
+    {
+        return Err(provider_output_error(
+            "An OCR provider block bounding box must equal the envelope of its component boxes.",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_box(bounds: OcrBoundingBox) -> UseResult<()> {
+    if bounds.width == 0
+        || bounds.height == 0
+        || bounds.x.checked_add(bounds.width).is_none()
+        || bounds.y.checked_add(bounds.height).is_none()
+    {
+        return Err(provider_output_error(
+            "OCR provider bounding boxes must cover a positive representable area.",
+        ));
+    }
+    Ok(())
+}
+
+fn component_envelope(boxes: &[OcrBoundingBox]) -> UseResult<Option<OcrBoundingBox>> {
+    let mut left = u32::MAX;
+    let mut top = u32::MAX;
+    let mut right = 0_u32;
+    let mut bottom = 0_u32;
+    for bounds in boxes {
+        left = left.min(bounds.x);
+        top = top.min(bounds.y);
+        right =
+            right.max(bounds.x.checked_add(bounds.width).ok_or_else(|| {
+                provider_output_error("An OCR provider bounding box overflowed.")
+            })?);
+        bottom =
+            bottom.max(bounds.y.checked_add(bounds.height).ok_or_else(|| {
+                provider_output_error("An OCR provider bounding box overflowed.")
+            })?);
+    }
+    if boxes.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(OcrBoundingBox {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+    }))
 }
 
 fn provider_output_error(message: impl Into<String>) -> UseError {
@@ -210,7 +298,7 @@ mod tests {
     use a3s_use_core::Readiness;
     use async_trait::async_trait;
 
-    use crate::{OcrBlock, OcrProviderStatus};
+    use crate::{OcrBlock, OcrBlockCategory, OcrBlockRole, OcrProviderStatus};
 
     use super::*;
 
@@ -241,10 +329,12 @@ mod tests {
                 blocks: vec![OcrBlock {
                     page: 1,
                     text: "fixture text".to_string(),
+                    category: None,
                     confidence: None,
                     detection_confidence: None,
                     polygon: None,
                     bounding_box: None,
+                    bounding_boxes: Vec::new(),
                 }],
                 warnings: Vec::new(),
             })
@@ -259,6 +349,64 @@ mod tests {
         );
         assert_eq!(detect_image_type(b"\xff\xd8\xffrest"), Some("image/jpeg"));
         assert_eq!(detect_image_type(b"not an image"), None);
+    }
+
+    #[test]
+    fn validates_bounded_categories_and_exact_component_envelopes() {
+        let component = OcrBoundingBox {
+            x: 10,
+            y: 20,
+            width: 30,
+            height: 40,
+        };
+        let block = OcrBlock {
+            page: 1,
+            text: "grounded".into(),
+            category: Some(OcrBlockCategory {
+                raw_label: "vendor-special".into(),
+                role: OcrBlockRole::Unknown,
+            }),
+            confidence: None,
+            detection_confidence: None,
+            polygon: None,
+            bounding_box: Some(component),
+            bounding_boxes: vec![component],
+        };
+        let output = |block| OcrProviderOutput {
+            model: None,
+            text: "grounded".into(),
+            blocks: vec![block],
+            warnings: Vec::new(),
+        };
+
+        assert!(validate_provider_output(&output(block.clone())).is_ok());
+
+        let mut invalid_label = block.clone();
+        invalid_label.category.as_mut().unwrap().raw_label = "not a label".into();
+        assert_eq!(
+            validate_provider_output(&output(invalid_label))
+                .unwrap_err()
+                .code,
+            "use.ocr.provider_output_invalid"
+        );
+
+        let mut wrong_envelope = block.clone();
+        wrong_envelope.bounding_box.as_mut().unwrap().width += 1;
+        assert_eq!(
+            validate_provider_output(&output(wrong_envelope))
+                .unwrap_err()
+                .code,
+            "use.ocr.provider_output_invalid"
+        );
+
+        let mut too_many = block;
+        too_many.bounding_boxes = vec![component; MAX_COMPONENT_BOXES_PER_BLOCK + 1];
+        assert_eq!(
+            validate_provider_output(&output(too_many))
+                .unwrap_err()
+                .code,
+            "use.ocr.provider_output_invalid"
+        );
     }
 
     #[tokio::test]
