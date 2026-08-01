@@ -28,7 +28,7 @@ required-features = ["ppocr-v6"]
 
 [features]
 default = ["ppocr-v6", "mcp", "cli"]
-unlimited-ocr = ["dep:base64", "dep:reqwest", "dep:serde_json"]
+unlimited-ocr = ["dep:base64", "dep:image", "dep:reqwest", "dep:serde_json"]
 ppocr-v6 = [
     "dep:clipper2",
     "dep:fs2",

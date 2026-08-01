@@ -3,7 +3,9 @@ use std::net::TcpListener;
 use std::thread;
 
 use a3s_use_core::Artifact;
+use image::ImageEncoder as _;
 
+use super::grounding::{GroundingGeometry, MAX_GROUNDING_BLOCK_TEXT_BYTES};
 use super::*;
 
 #[test]
@@ -32,23 +34,179 @@ fn debug_output_redacts_bearer_tokens() {
 }
 
 #[test]
-fn cleans_grounding_markers_without_rewriting_markdown() {
+fn parses_reviewed_grounding_forms_into_source_pixel_blocks() {
     let raw = concat!(
-        "<|ref|>title<|/ref|><|det|>[[10, 20, 900, 80]]<|/det|># Heading\n\n",
-        "<|det|>text [10, 100, 900, 200]<|/det|>Body \\coloneqq value",
+        "<|ref|>title<|/ref|><|det|>[[0, 0, 999, 100]]<|/det|>",
+        "# Heading\ncontinued\n",
+        "<|det|>text [[100, 200, 400, 300], [500, 250, 900, 350]]<|/det|>",
+        "Body \\coloneqq value",
         "<｜end▁of▁sentence｜>"
     );
-    let (text, removed) = clean_model_output(raw);
-    assert_eq!(text, "# Heading\n\nBody := value");
-    assert!(removed);
+    let parsed = parse_model_output(
+        raw,
+        Some(GroundingGeometry {
+            width: 1_000,
+            height: 500,
+        }),
+    )
+    .unwrap();
+
+    assert_eq!(parsed.text, "# Heading\ncontinued\nBody := value");
+    assert!(parsed.warnings.is_empty());
+    assert_eq!(parsed.blocks.len(), 2);
+    assert_eq!(parsed.blocks[0].page, 1);
+    assert_eq!(parsed.blocks[0].text, "# Heading\ncontinued");
+    assert_eq!(
+        parsed.blocks[0].bounding_box,
+        Some(crate::OcrBoundingBox {
+            x: 0,
+            y: 0,
+            width: 1_000,
+            height: 50,
+        })
+    );
+    assert_eq!(parsed.blocks[1].text, "Body := value");
+    assert_eq!(
+        parsed.blocks[1].bounding_box,
+        Some(crate::OcrBoundingBox {
+            x: 100,
+            y: 100,
+            width: 800,
+            height: 75,
+        })
+    );
+    assert!(parsed.blocks.iter().all(|block| block.confidence.is_none()
+        && block.detection_confidence.is_none()
+        && block.polygon.is_none()));
 }
 
 #[test]
 fn preserves_unclosed_grounding_markers() {
     let raw = "text <|det|>unfinished";
-    let (text, removed) = clean_model_output(raw);
-    assert_eq!(text, raw);
-    assert!(!removed);
+    let parsed = parse_model_output(
+        raw,
+        Some(GroundingGeometry {
+            width: 100,
+            height: 50,
+        }),
+    )
+    .unwrap();
+    assert_eq!(parsed.text, raw);
+    assert!(parsed.blocks.is_empty());
+    assert_eq!(parsed.warnings.len(), 1);
+}
+
+#[test]
+fn malformed_and_non_text_grounding_never_fabricate_boxes() {
+    let raw = concat!(
+        "<|det|>image [0, 0, 999, 999]<|/det|>![figure](figure.jpg)\n",
+        "<|det|>text [0, 0, 1000, 10]<|/det|>Out of range\n",
+        "<|det|>text [10, 20, 10, 30]<|/det|>Collapsed\n",
+        "Plain text"
+    );
+    let parsed = parse_model_output(
+        raw,
+        Some(GroundingGeometry {
+            width: 100,
+            height: 50,
+        }),
+    )
+    .unwrap();
+
+    assert_eq!(
+        parsed.text,
+        "![figure](figure.jpg)\nOut of range\nCollapsed\nPlain text"
+    );
+    assert!(parsed.blocks.is_empty());
+    assert_eq!(parsed.warnings.len(), 1);
+}
+
+#[test]
+fn grounding_marker_count_is_bounded_before_block_construction() {
+    let raw = "<|det|>text [0, 0, 1, 1]<|/det|>x".repeat(MAX_GROUNDING_MARKERS + 1);
+    let error = parse_model_output(
+        &raw,
+        Some(GroundingGeometry {
+            width: 100,
+            height: 50,
+        }),
+    )
+    .unwrap_err();
+
+    assert_eq!(error.code, "use.ocr.provider_output_invalid");
+}
+
+#[test]
+fn grounding_coordinate_count_and_source_dimensions_are_bounded() {
+    let boxes = (0..129)
+        .map(|_| "[0, 0, 1, 1]")
+        .collect::<Vec<_>>()
+        .join(",");
+    let raw = format!("<|det|>text [{boxes}]<|/det|>bounded");
+    let error = parse_model_output(
+        &raw,
+        Some(GroundingGeometry {
+            width: 100,
+            height: 50,
+        }),
+    )
+    .unwrap_err();
+    assert_eq!(error.code, "use.ocr.provider_output_invalid");
+
+    let error = source_grounding_geometry(b"\x89PNG\r\n\x1a\ninvalid").unwrap_err();
+    assert_eq!(error.code, "use.ocr.provider_output_invalid");
+}
+
+#[test]
+fn oversized_grounded_text_is_preserved_without_geometry() {
+    let text = "x".repeat(MAX_GROUNDING_BLOCK_TEXT_BYTES + 1);
+    let raw = format!("<|det|>text [0, 0, 999, 999]<|/det|>{text}");
+    let parsed = parse_model_output(
+        &raw,
+        Some(GroundingGeometry {
+            width: 100,
+            height: 50,
+        }),
+    )
+    .unwrap();
+
+    assert_eq!(parsed.text, text);
+    assert!(parsed.blocks.is_empty());
+    assert_eq!(parsed.warnings.len(), 1);
+}
+
+#[test]
+fn missing_or_orientation_transformed_grounding_is_explicitly_degraded() {
+    let plain = parse_model_output(
+        "plain text",
+        Some(GroundingGeometry {
+            width: 3,
+            height: 2,
+        }),
+    )
+    .unwrap();
+    assert!(plain.blocks.is_empty());
+    assert_eq!(plain.warnings.len(), 1);
+
+    let image_only = parse_model_output(
+        "<|det|>image [0, 0, 999, 999]<|/det|>![figure](figure.jpg)",
+        Some(GroundingGeometry {
+            width: 3,
+            height: 2,
+        }),
+    )
+    .unwrap();
+    assert!(image_only.blocks.is_empty());
+    assert_eq!(image_only.warnings.len(), 1);
+
+    let raw = "<|det|>text [0, 0, 999, 999]<|/det|>grounded";
+    let transformed = parse_model_output(raw, None).unwrap();
+    assert_eq!(transformed.text, "grounded");
+    assert!(transformed.blocks.is_empty());
+    assert_eq!(transformed.warnings.len(), 1);
+
+    let oriented_jpeg = fixture_oriented_jpeg(3, 2);
+    assert_eq!(source_grounding_geometry(&oriented_jpeg).unwrap(), None);
 }
 
 #[tokio::test]
@@ -68,7 +226,7 @@ async fn sends_the_official_vllm_request_and_decodes_its_response() {
     .to_string();
     let (base_url, request_thread) = serve_once(response_body);
     let provider = UnlimitedOcrProvider::new(UnlimitedOcrConfig::local(base_url).unwrap()).unwrap();
-    let image = b"\x89PNG\r\n\x1a\nfixture".to_vec();
+    let image = fixture_png(100, 50);
     let input = OcrInput::new(
         Artifact {
             path: "/tmp/fixture.png".into(),
@@ -83,8 +241,18 @@ async fn sends_the_official_vllm_request_and_decodes_its_response() {
 
     assert_eq!(output.model.as_deref(), Some(UNLIMITED_OCR_MODEL));
     assert_eq!(output.text, "# Parsed heading");
-    assert!(output.blocks.is_empty());
-    assert_eq!(output.warnings.len(), 1);
+    assert_eq!(output.blocks.len(), 1);
+    assert_eq!(output.blocks[0].text, "# Parsed heading");
+    assert_eq!(
+        output.blocks[0].bounding_box,
+        Some(crate::OcrBoundingBox {
+            x: 1,
+            y: 1,
+            width: 89,
+            height: 3,
+        })
+    );
+    assert!(output.warnings.is_empty());
 
     let request = request_thread.join().unwrap();
     let (head, body) = request.split_once("\r\n\r\n").unwrap();
@@ -99,6 +267,43 @@ async fn sends_the_official_vllm_request_and_decodes_its_response() {
         payload["messages"][0]["content"][1]["image_url"]["url"],
         format!("data:image/png;base64,{}", BASE64_STANDARD.encode(image))
     );
+}
+
+fn fixture_png(width: u32, height: u32) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut bytes)
+        .write_image(
+            &vec![255; (width * height) as usize],
+            width,
+            height,
+            image::ExtendedColorType::L8,
+        )
+        .unwrap();
+    bytes
+}
+
+fn fixture_oriented_jpeg(width: u32, height: u32) -> Vec<u8> {
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new(&mut jpeg)
+        .encode(
+            &vec![255; (width * height * 3) as usize],
+            width,
+            height,
+            image::ExtendedColorType::Rgb8,
+        )
+        .unwrap();
+    let exif = [
+        b'E', b'x', b'i', b'f', 0, 0, b'I', b'I', 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 0x01, 3, 0, 1, 0,
+        0, 0, 6, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    let segment_length = u16::try_from(exif.len() + 2).unwrap().to_be_bytes();
+    let mut oriented = Vec::with_capacity(jpeg.len() + exif.len() + 4);
+    oriented.extend_from_slice(&jpeg[..2]);
+    oriented.extend_from_slice(&[0xff, 0xe1]);
+    oriented.extend_from_slice(&segment_length);
+    oriented.extend_from_slice(&exif);
+    oriented.extend_from_slice(&jpeg[2..]);
+    oriented
 }
 
 fn serve_once(response_body: String) -> (String, thread::JoinHandle<String>) {

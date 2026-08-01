@@ -31,10 +31,12 @@ return the typed error and explicit `a3s install use/ocr` suggestion to the
 parent; never install or repair models from inside the `use` worker.
 
 An Unlimited-OCR provider calls an operator-managed vLLM endpoint. Honor the
-reported source-transfer policy before extraction. Its Markdown output may not
-include calibrated confidence or source-pixel geometry; preserve its warning
-instead of inventing those fields. The worker must not start, install, or repair
-the external model server.
+reported source-transfer policy before extraction. It preserves Markdown and
+maps valid upstream `0..=999` text grounding into typed source-pixel bounding
+boxes. It does not fabricate calibrated confidence, image regions, or geometry
+for missing, malformed, empty, out-of-range, or EXIF-transformed markers;
+preserve its warning in those cases. The worker must not start, install, or
+repair the external model server.
 
 In a CLI-only host, equivalent commands are:
 

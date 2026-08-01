@@ -1,3 +1,5 @@
+mod grounding;
+
 use std::fmt;
 use std::net::IpAddr;
 use std::time::Duration;
@@ -9,6 +11,10 @@ use base64::Engine as _;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::{StatusCode, Url};
 use serde::Deserialize;
+
+#[cfg(test)]
+use grounding::MAX_GROUNDING_MARKERS;
+use grounding::{parse_model_output, source_grounding_geometry};
 
 use crate::provider::{
     OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
@@ -228,6 +234,7 @@ impl OcrProvider for UnlimitedOcrProvider {
     }
 
     async fn recognize(&self, input: OcrInput) -> UseResult<OcrProviderOutput> {
+        let source_geometry = source_grounding_geometry(input.bytes())?;
         let image_url = format!(
             "data:{};base64,{}",
             input.source().media_type,
@@ -279,19 +286,12 @@ impl OcrProvider for UnlimitedOcrProvider {
                     "Unlimited-OCR returned no textual content in its first completion choice.",
                 )
             })?;
-        let (text, removed_grounding) = clean_model_output(&raw);
-        let warnings = removed_grounding
-            .then(|| {
-                "Unlimited-OCR grounding labels and normalized coordinates were omitted from the text-only provider result."
-                    .to_string()
-            })
-            .into_iter()
-            .collect();
+        let parsed = parse_model_output(&raw, source_geometry)?;
         Ok(OcrProviderOutput {
             model: Some(self.config.model.clone()),
-            text,
-            blocks: Vec::new(),
-            warnings,
+            text: parsed.text,
+            blocks: parsed.blocks,
+            warnings: parsed.warnings,
         })
     }
 }
@@ -415,37 +415,6 @@ async fn read_bounded_response(mut response: reqwest::Response) -> UseResult<Vec
         body.extend_from_slice(&chunk);
     }
     Ok(body)
-}
-
-fn clean_model_output(raw: &str) -> (String, bool) {
-    let (without_refs, removed_refs) = remove_token_spans(raw, "<|ref|>", "<|/ref|>");
-    let (without_detections, removed_detections) =
-        remove_token_spans(&without_refs, "<|det|>", "<|/det|>");
-    let mut text = without_detections.trim().to_string();
-    while text.ends_with(STOP_TOKEN) {
-        text.truncate(text.len() - STOP_TOKEN.len());
-        text = text.trim_end().to_string();
-    }
-    text = text.replace("\\coloneqq", ":=").replace("\\eqqcolon", "=:");
-    (text, removed_refs || removed_detections)
-}
-
-fn remove_token_spans(input: &str, open: &str, close: &str) -> (String, bool) {
-    let mut output = String::with_capacity(input.len());
-    let mut remaining = input;
-    let mut removed = false;
-    while let Some(start) = remaining.find(open) {
-        output.push_str(&remaining[..start]);
-        let after_open = &remaining[start + open.len()..];
-        let Some(end) = after_open.find(close) else {
-            output.push_str(&remaining[start..]);
-            return (output, removed);
-        };
-        remaining = &after_open[end + close.len()..];
-        removed = true;
-    }
-    output.push_str(remaining);
-    (output, removed)
 }
 
 fn request_error(endpoint: &Url, error: reqwest::Error) -> UseError {

@@ -186,11 +186,27 @@ as off-device; `with_bearer_token` adds authentication without exposing the
 token through diagnostics or `Debug`.
 
 The provider sends the upstream single-image prompt and no-repeat n-gram
-arguments, preserves generated Markdown, and removes category/normalized
-coordinate grounding markers. It returns a warning instead of inventing
-source-pixel boxes or calibrated confidence. Diagnostics report `unknown` until
-extraction checks endpoint reachability because the synchronous diagnostic
-interface does not perform network I/O.
+arguments and preserves generated Markdown. It strictly parses both grounding
+forms reviewed in the upstream model implementation:
+
+~~~text
+<|ref|>title<|/ref|><|det|>[[x1, y1, x2, y2]]<|/det|>text
+<|det|>text [x1, y1, x2, y2]<|/det|>text
+~~~
+
+Unlimited-OCR coordinates use the closed `0..=999` basis documented by the
+[upstream postprocessor](https://huggingface.co/baidu/Unlimited-OCR/blob/07dea832e22aefee32ad281d4b80551282e1c168/modeling_unlimitedocr.py#L62-L111).
+A3S OCR resolves the verified input dimensions and maps valid non-image
+grounding into typed source-pixel `OcrBlock` boxes. Multiple boxes for one
+generated block are represented by their bounded union. The adapter evaluates
+no model text as code, fabricates no confidence, and emits no geometry for
+missing, malformed, out-of-range, empty, image-only, or EXIF-transformed
+grounding. This follows the upstream loader's EXIF-transpose behavior without
+mislabeling transformed coordinates as untransformed source pixels. Degraded
+grounding remains visible through one bounded warning while the generated text
+is preserved.
+Diagnostics report `unknown` until extraction checks endpoint reachability
+because the synchronous diagnostic interface does not perform network I/O.
 
 <details>
 <summary>Official vLLM server recipe</summary>
@@ -268,6 +284,8 @@ the MCP host instead of looking like a local-only read.
 - PP-OCRv6 never transfers source bytes off device.
 - Unlimited-OCR remote endpoints are HTTPS-only and explicitly marked as
   off-device.
+- Unlimited-OCR source boxes are emitted only from valid `0..=999` grounding
+  and decoded source-image dimensions; malformed markers never become boxes.
 - Model installation, repair, and external server deployment are never hidden
   inside extraction.
 
