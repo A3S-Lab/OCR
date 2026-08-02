@@ -9,7 +9,7 @@ mod tokenizer;
 use std::sync::{Arc, Mutex};
 
 use a3s_power::inference::{
-    EmbeddedRuntime, ExecutionDigest, ModelIdentity, WeightHierarchy, WeightStore,
+    EmbeddedRuntime, ExecutionDigest, ModelIdentity, ResidencyPolicy, WeightHierarchy, WeightStore,
 };
 use a3s_use_core::{Readiness, UseError, UseResult};
 use async_trait::async_trait;
@@ -140,6 +140,7 @@ impl UnlimitedOcrSession {
         let assets = inspect_assets(config.model_dir())?;
         let runtime = EmbeddedRuntime::new(config.device, config.limits.clone())
             .map_err(|error| power_error("initialize the embedded runtime", error))?;
+        let residency = resolve_residency(config, &runtime)?;
         let store = Arc::new(
             WeightStore::open_config(&config.weight_store, &config.limits)
                 .map_err(|error| power_error("open the reviewed Unlimited-OCR weights", error))?,
@@ -150,7 +151,7 @@ impl UnlimitedOcrSession {
             MODEL_REVISION,
             store.sha256().to_string(),
         );
-        let hierarchy = WeightHierarchy::new(store, runtime.clone(), config.residency.clone())
+        let hierarchy = WeightHierarchy::new(store, runtime.clone(), residency)
             .map_err(|error| power_error("initialize the shared weight hierarchy", error))?;
         let weights = shared(hierarchy);
         let vision = VisionEncoder::new(Arc::clone(&weights));
@@ -215,6 +216,20 @@ impl UnlimitedOcrSession {
             warnings: parsed.warnings,
         })
     }
+}
+
+fn resolve_residency(
+    config: &UnlimitedOcrConfig,
+    runtime: &EmbeddedRuntime,
+) -> UseResult<ResidencyPolicy> {
+    let Some(policy) = &config.residency_budget else {
+        return Ok(config.residency.clone());
+    };
+    let plan = runtime
+        .plan_residency_budget(policy)
+        .map_err(|error| power_error("plan the hardware-aware residency budget", error))?;
+    plan.apply_to(&config.residency)
+        .map_err(|error| power_error("apply the hardware-aware residency budget", error))
 }
 
 fn provider_output_error(message: impl Into<String>) -> UseError {

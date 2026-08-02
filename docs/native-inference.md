@@ -14,7 +14,7 @@ residency, cancellation, telemetry, or execution receipts.
 | Tokenization, generation, and grounding semantics | A3S OCR |
 | Tensor execution and typed devices | A3S Power |
 | Admission, cancellation, limits, and receipts | A3S Power |
-| Storage/host/device weight hierarchy and routing telemetry | A3S Power |
+| Weight hierarchy, hardware budgets, and routing telemetry | A3S Power |
 | TEE encryption, integrity, signatures, privacy, and attestation | A3S Power |
 
 The `power-runtime` feature depends on A3S Power with default features disabled
@@ -99,21 +99,28 @@ native worker observes it at bounded preprocessing, vision, and decoder
 boundaries before releasing the request permit.
 Power's Colibri-inspired hierarchy supplies exact routed-expert unions,
 bounded prefetch, LFRU/LRU placement, transactional hot sets, verified complete
-or partial replicas, and private-by-default routing telemetry. The provider
-does not create a second cache, integrity path, router, receipt, or admission
-controller.
+or partial replicas, opt-in native host/CUDA/Metal budget discovery, unified
+memory accounting, and private-by-default routing telemetry. The provider does
+not create a second hardware probe, cache, integrity path, router, receipt, or
+admission controller.
 
 `UnlimitedOcrConfig` accepts only a local model directory plus typed Power
-device, limits, residency, and replica settings. CPU, CUDA, and Metal are build
-features; an explicit unavailable device fails closed. Provider construction is
-lazy and never downloads a model, invokes Python, starts a subprocess, contacts
-an OCR service, or binds a Web port.
+device, limits, residency, and replica settings. Hardware-aware cache planning
+is explicitly enabled with `ResidencyBudgetPolicy`; the zero-cache default does
+not probe hardware. Power applies the resulting byte budget to the existing
+residency policy, counts Metal unified memory once, and keeps the capacity
+snapshot out of automatic persistence, telemetry, and receipts. Manual cache
+bytes and automatic budgeting cannot be combined. CPU, CUDA, and Metal are
+build features; an explicit unavailable device fails closed. Provider
+construction is lazy and never downloads a model, invokes Python, starts a
+subprocess, contacts an OCR service, or binds a Web port.
 
 ## TEE and privacy invariants
 
 - Source pixels and tensor values are not included in placement telemetry.
 - Execution receipts contain digests and dimensions, not tensor contents.
 - Detailed route heat is opt-in in Power and is never persisted automatically.
+- Hardware capacity discovery is opt-in and snapshots are not exported by OCR.
 - Weight validation uses Power's canonical hashing rather than a provider-local
   duplicate implementation.
 - Native OCR holds one Power admission permit across all component graphs in a

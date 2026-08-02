@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use a3s_power::inference::{DevicePreference, InferenceLimits, ResidencyPolicy, WeightStoreConfig};
+use a3s_power::inference::{
+    DevicePreference, InferenceLimits, ResidencyBudgetPolicy, ResidencyPolicy, WeightStoreConfig,
+};
 use a3s_use_core::{UseError, UseResult};
 
 use super::UNLIMITED_OCR_MODEL;
@@ -18,6 +20,7 @@ pub struct UnlimitedOcrConfig {
     pub(crate) device: DevicePreference,
     pub(crate) limits: InferenceLimits,
     pub(crate) residency: ResidencyPolicy,
+    pub(crate) residency_budget: Option<ResidencyBudgetPolicy>,
     pub(crate) max_generated_tokens: usize,
 }
 
@@ -30,6 +33,7 @@ impl UnlimitedOcrConfig {
             device: DevicePreference::Auto,
             limits,
             residency: ResidencyPolicy::default(),
+            residency_budget: None,
             max_generated_tokens: DEFAULT_MAX_GENERATED_TOKENS,
         })
     }
@@ -77,8 +81,37 @@ impl UnlimitedOcrConfig {
         residency
             .validate()
             .map_err(|error| config_error(format!("Invalid weight residency policy: {error}")))?;
+        if self.residency_budget.is_some() && has_explicit_cache_budget(&residency) {
+            return Err(config_error(
+                "Manual host/device cache bytes cannot be combined with an automatic residency budget.",
+            ));
+        }
         validate_residency(&residency, &self.limits)?;
         self.residency = residency;
+        Ok(self)
+    }
+
+    /// Opt into Power's native hardware-aware cache budget planning.
+    ///
+    /// Manual host/device cache bytes are mutually exclusive with this policy.
+    /// Other residency controls, including eviction, prefetch, and telemetry,
+    /// remain owned by [`ResidencyPolicy`] and are retained when the derived
+    /// byte budget is applied during lazy session loading.
+    pub fn with_residency_budget_policy(
+        mut self,
+        policy: ResidencyBudgetPolicy,
+    ) -> UseResult<Self> {
+        policy.validate().map_err(|error| {
+            config_error(format!(
+                "Invalid automatic residency budget policy: {error}"
+            ))
+        })?;
+        if has_explicit_cache_budget(&self.residency) {
+            return Err(config_error(
+                "An automatic residency budget cannot replace explicit host/device cache bytes.",
+            ));
+        }
+        self.residency_budget = Some(policy);
         Ok(self)
     }
 
@@ -123,6 +156,10 @@ impl UnlimitedOcrConfig {
         self.max_generated_tokens
     }
 
+    pub fn residency_budget_policy(&self) -> Option<&ResidencyBudgetPolicy> {
+        self.residency_budget.as_ref()
+    }
+
     pub fn sends_source_off_device(&self) -> bool {
         false
     }
@@ -136,6 +173,7 @@ impl std::fmt::Debug for UnlimitedOcrConfig {
             .field("device", &self.device)
             .field("limits", &self.limits)
             .field("residency", &self.residency)
+            .field("residency_budget", &self.residency_budget)
             .field("max_generated_tokens", &self.max_generated_tokens)
             .finish()
     }
@@ -173,6 +211,10 @@ fn validate_residency(policy: &ResidencyPolicy, limits: &InferenceLimits) -> Use
     Ok(())
 }
 
+fn has_explicit_cache_budget(policy: &ResidencyPolicy) -> bool {
+    policy.host_cache_bytes > 0 || policy.device_cache_bytes > 0
+}
+
 fn config_error(message: impl Into<String>) -> UseError {
     UseError::new("use.ocr.unlimited_ocr_config_invalid", message)
 }
@@ -204,5 +246,41 @@ mod tests {
             ..ResidencyPolicy::default()
         };
         assert!(config.with_residency_policy(policy).is_err());
+    }
+
+    #[test]
+    fn automatic_and_manual_cache_budgets_are_mutually_exclusive() {
+        let automatic = ResidencyBudgetPolicy::new(5_000, 0).unwrap();
+        let manual = ResidencyPolicy {
+            host_cache_bytes: 1,
+            ..ResidencyPolicy::default()
+        };
+
+        assert!(UnlimitedOcrConfig::new("fixture-model")
+            .unwrap()
+            .with_residency_policy(manual.clone())
+            .unwrap()
+            .with_residency_budget_policy(automatic.clone())
+            .is_err());
+        assert!(UnlimitedOcrConfig::new("fixture-model")
+            .unwrap()
+            .with_residency_budget_policy(automatic)
+            .unwrap()
+            .with_residency_policy(manual)
+            .is_err());
+    }
+
+    #[test]
+    fn automatic_residency_is_explicitly_opt_in() {
+        let config = UnlimitedOcrConfig::new("fixture-model").unwrap();
+        assert!(config.residency_budget_policy().is_none());
+        assert_eq!(config.residency.host_cache_bytes, 0);
+        assert_eq!(config.residency.device_cache_bytes, 0);
+
+        let automatic = ResidencyBudgetPolicy::new(5_000, 0).unwrap();
+        let config = config
+            .with_residency_budget_policy(automatic.clone())
+            .unwrap();
+        assert_eq!(config.residency_budget_policy(), Some(&automatic));
     }
 }

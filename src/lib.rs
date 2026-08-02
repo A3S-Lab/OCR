@@ -36,8 +36,9 @@ mod unlimited_ocr;
 
 #[cfg(feature = "power-runtime")]
 pub use a3s_power::inference::{
-    DevicePreference, InferenceLimits, ResidencyPolicy, TelemetryMode, WeightSourceConfig,
-    WeightSourceCoverage, WeightSourceWeighting, WeightStoreConfig,
+    DevicePreference, InferenceLimits, ResidencyAllocationOrder, ResidencyBudgetPolicy,
+    ResidencyPolicy, TelemetryMode, WeightSourceConfig, WeightSourceCoverage,
+    WeightSourceWeighting, WeightStoreConfig,
 };
 #[cfg(feature = "ppocr-v6")]
 pub use assets::{ocr_status, OcrInstallSource, OcrRuntimeStatus};
