@@ -25,6 +25,16 @@ jobs:
           cargo tree --no-default-features --features unlimited-ocr -e features > "${unlimited_tree}"
           ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v|reqwest v|hyper v' "${unlimited_tree}"
 
+  official-ppocr-v6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Execute the pinned official PP-OCRv6 graphs on CPU
+        shell: bash
+        run: tools/check_official_ppocr_v6.sh "${RUNNER_TEMP}/official-ppocr-v6"
+
   test:
     strategy:
       fail-fast: false

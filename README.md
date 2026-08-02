@@ -130,7 +130,7 @@ The stable result shape keeps the source next to the OCR evidence:
     {
       "schema": "a3s.power.embedded-execution-receipt.v1",
       "model": {"family": "baidu/Unlimited-OCR", "revision": "07dea832...", "weightsSha256": "..."},
-      "runtime": {"name": "a3s-power-native", "version": "0.5.1", "device": "metal:0"},
+      "runtime": {"name": "a3s-power-native", "version": "0.6.0", "device": "metal:0"},
       "input": {"representation": "image-request", "sha256": "...", "byteLength": 12345, "itemCount": 1},
       "output": {"representation": "utf8-text", "sha256": "...", "byteLength": 321, "itemCount": 287}
     }
@@ -188,6 +188,12 @@ isolated installation. The provider executes reviewed OCR-owned graph plans
 through Power's shared admission, device, limit, integrity, cancellation, and
 receipt mechanisms. It does not require ONNX Runtime, Python, PaddlePaddle, a
 subprocess, an inference service, or a Web listener.
+
+Linux CI installs that exact pinned bundle and executes both reviewed graphs on
+the CPU. The gate checks the canonical Power weight digests, exact output
+shapes, item counts, byte lengths, and deterministic output digests for the
+zero-tensor detection and recognition fixtures; a missing model cannot turn the
+test into a pass.
 
 See [Native Inference Architecture](docs/native-inference.md) for the Power/OCR
 ownership boundary, model conversion and install integrity, execution receipts,
@@ -371,6 +377,7 @@ cargo test --no-default-features --features unlimited-ocr --locked
 cargo check --no-default-features --features mcp --locked
 cargo test --features unlimited-ocr --locked
 cargo clippy --all-targets --features unlimited-ocr --locked -- -D warnings
+tools/check_official_ppocr_v6.sh /tmp/a3s-ppocr-v6-gate
 # On macOS:
 cargo check --no-default-features --features unlimited-ocr-metal --locked
 cargo package --locked

@@ -60,6 +60,15 @@ pinned upstream ONNX containers, preserves their numeric tensors in
 SafeTensors, and emits deterministic reviewed plans. ONNX is not a runtime
 format and neither ONNX Runtime nor Python appears in the inference path.
 
+`tools/check_official_ppocr_v6.sh` is the non-skippable native execution gate
+used by pull-request and release CI. It installs the SHA-256-pinned bundle into
+a dedicated runner directory, verifies the four required assets, and runs both
+reviewed graphs on Linux CPU. Detection is locked to `[1, 1, 64, 64]` and
+recognition to `[1, 40, 18710]`; both fixtures also pin the canonical Power
+output digest, byte length, and item count. This proves that the published
+weights execute through Power. It does not replace the remaining real-image
+parity work against the pinned upstream implementation.
+
 ## Unlimited-OCR
 
 The optional Unlimited-OCR provider is an OCR-owned native Rust implementation
@@ -143,3 +152,7 @@ Before changing a pinned model or graph plan, verify:
 6. cancellation, limit, malformed-plan, and wrong-digest failures;
 7. an embedded dependency closure without ONNX Runtime, a Web server, browser
    automation, Python inference, or external OCR services.
+
+The official-bundle CPU graph gate is enforced today. Real-image and
+Unlimited-OCR upstream parity evidence remain open acceptance work and must not
+be reported as complete until reproducible fixtures are checked in.
