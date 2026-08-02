@@ -34,7 +34,8 @@ local image, verify its media type, read it once, and compute canonical source
 evidence. Only then are the bytes passed to an injected provider. The provider
 may recognize text locally or through an explicitly configured endpoint, but it
 cannot replace the source path, media type, size, or SHA-256 recorded by
-`OcrClient`.
+`OcrClient`. Native providers reuse A3S Power's embedded, model-neutral
+inference substrate; they do not enable Power's HTTP server.
 
 ## Quick start
 
@@ -94,6 +95,11 @@ The provider owns recognition. `OcrClient` owns the evidence envelope.
 | Provider-output validation | Readiness messages and provider-specific warnings |
 | Final `OcrResult` assembly | Declared off-device source policy |
 
+Native results may also contain `executionReceipts`. Each receipt binds a
+model family and revision, the exact weight digest, Power runtime/device
+identity, and input/output tensor digests. Downstream parsers should preserve
+these receipts with the OCR evidence.
+
 The stable result shape keeps the source next to the OCR evidence:
 
 ~~~jsonc
@@ -137,7 +143,7 @@ Provider choice is a typed object, never a raw backend-name switch.
 
 | Provider | Runtime | Source boundary |
 | --- | --- | --- |
-| `PpOcrV6Provider` | Local ONNX Runtime | Always on device |
+| `PpOcrV6Provider` | Embedded A3S Power native graph runtime | Always on device |
 | `UnlimitedOcrProvider` | Operator-managed vLLM | Loopback stays local; remote HTTPS is declared off device |
 | Custom `OcrProvider` | Defined by the implementation | Required in its descriptor |
 
@@ -146,7 +152,7 @@ Provider choice is a typed object, never a raw backend-name switch.
 The default A3S integration uses:
 
 - provider ID: `pp-ocr-v6`
-- engine: `onnx-runtime`
+- engine: `a3s-power-native`
 - pinned bundle: `PP-OCRv6_small`
 - transfer policy: local only
 
@@ -157,8 +163,10 @@ decode → detect → DB post-process → reading order → perspective crop
        → batched recognition → CTC decode → source-pixel evidence
 ~~~
 
-The release packages pinned detection and recognition models. Installation and
-repair remain explicit:
+The OCR-owned release packages pinned detection and recognition SafeTensors
+plus their inference configuration. Installation verifies the archive length
+and SHA-256, extracts only the four declared files, and records the exact Power
+weight digests. Installation and repair remain explicit:
 
 ~~~bash
 a3s install use/ocr
@@ -167,7 +175,14 @@ a3s install use/ocr --force
 
 `A3S_OCR_MODEL_DIR` can point development builds at an explicit model bundle.
 `A3S_USE_OCR_HOME` overrides the managed model root for packaging, tests, or an
-isolated installation. The provider does not require Python or PaddlePaddle.
+isolated installation. The provider executes reviewed OCR-owned graph plans
+through Power's shared admission, device, limit, integrity, cancellation, and
+receipt mechanisms. It does not require ONNX Runtime, Python, PaddlePaddle, a
+subprocess, an inference service, or a Web listener.
+
+See [Native Inference Architecture](docs/native-inference.md) for the Power/OCR
+ownership boundary, model conversion and install integrity, execution receipts,
+and TEE/privacy release gates.
 
 ### Optional: baidu/Unlimited-OCR
 
@@ -278,7 +293,8 @@ the MCP host instead of looking like a local-only read.
 
 | Feature | Adds |
 | --- | --- |
-| `ppocr-v6` | Local PP-OCRv6 provider, installer, ONNX Runtime, image pipeline |
+| `power-runtime` | Model-neutral embedded A3S Power runtime; never enables its server feature |
+| `ppocr-v6` | Local PP-OCRv6 provider, native graph plans, installer, image pipeline |
 | `unlimited-ocr` | Typed HTTP client for an operator-managed Unlimited-OCR vLLM server |
 | `mcp` | Provider-neutral standard MCP host |
 | `cli` | Standalone CLI; assembles PP-OCRv6 and MCP |
@@ -303,6 +319,8 @@ the MCP host instead of looking like a local-only read.
   markers never become boxes or semantic claims.
 - Model installation, repair, and external server deployment are never hidden
   inside extraction.
+- The embedded PP-OCRv6 dependency boundary contains no ONNX Runtime, HTTP
+  server, browser automation, Python runtime, or network listener.
 
 ## Development
 

@@ -9,6 +9,18 @@ permissions:
   contents: read
 
 jobs:
+  native-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify the embedded inference dependency boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo tree --no-default-features --features ppocr-v6 -e features > dependency-tree.txt
+          ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v' dependency-tree.txt
+
   test:
     strategy:
       fail-fast: false

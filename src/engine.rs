@@ -1,16 +1,14 @@
-use std::path::Path;
-
+use a3s_power::inference::ExecutionReceipt;
 use a3s_use_core::{UseError, UseResult};
 use image::{imageops, ImageBuffer, Rgb, RgbImage};
 use imageproc::geometric_transformations::{warp_into, Interpolation, Projection};
 use imageproc::point::Point;
-use ort::session::builder::GraphOptimizationLevel;
-use ort::session::Session;
-use ort::value::TensorRef;
+use tokio_util::sync::CancellationToken;
 
 use crate::assets::ModelAssets;
 use crate::config::{load_detection, load_recognition, DetectionConfig, RecognitionConfig};
 use crate::postprocess::{decode_ctc, detection_boxes, Detection};
+use crate::ppocr_v6::native::NativePpOcrV6;
 use crate::preprocess::{detection_input, recognition_input};
 
 const RECOGNITION_BATCH_SIZE: usize = 8;
@@ -24,9 +22,13 @@ pub(crate) struct EngineBlock {
     pub(crate) confidence: f32,
 }
 
+pub(crate) struct EngineExtraction {
+    pub(crate) blocks: Vec<EngineBlock>,
+    pub(crate) receipts: Vec<ExecutionReceipt>,
+}
+
 pub(crate) struct PpOcrV6Engine {
-    detection: Session,
-    recognition: Session,
+    native: NativePpOcrV6,
     detection_config: DetectionConfig,
     recognition_config: RecognitionConfig,
 }
@@ -35,20 +37,23 @@ impl PpOcrV6Engine {
     pub(crate) fn load(assets: &ModelAssets) -> UseResult<Self> {
         let detection_config = load_detection(&assets.detection_config)?;
         let recognition_config = load_recognition(&assets.recognition_config)?;
-        let detection = load_session(&assets.detection_model, "detection")?;
-        let recognition = load_session(&assets.recognition_model, "recognition")?;
+        let native = NativePpOcrV6::load(assets)?;
         Ok(Self {
-            detection,
-            recognition,
+            native,
             detection_config,
             recognition_config,
         })
     }
 
-    pub(crate) fn extract(&mut self, image: &RgbImage) -> UseResult<Vec<EngineBlock>> {
+    pub(crate) fn extract(&mut self, image: &RgbImage) -> UseResult<EngineExtraction> {
+        let cancellation = CancellationToken::new();
+        let permit = self.native.begin(&cancellation)?;
         let input = detection_input(image, &self.detection_config)?;
-        let (shape, output) =
-            run_session(&mut self.detection, &input.data, input.shape, "detection")?;
+        let detection = self
+            .native
+            .detect(input.data, input.shape, &permit, &cancellation)?;
+        let shape = detection.tensor.shape;
+        let output = detection.tensor.values;
         let detections = detection_boxes(
             &output,
             &shape,
@@ -57,7 +62,10 @@ impl PpOcrV6Engine {
             &self.detection_config,
         )?;
         if detections.is_empty() {
-            return Ok(Vec::new());
+            return Ok(EngineExtraction {
+                blocks: Vec::new(),
+                receipts: vec![detection.receipt],
+            });
         }
 
         let crops = detections
@@ -65,17 +73,18 @@ impl PpOcrV6Engine {
             .map(|detection| perspective_crop(image, detection))
             .collect::<UseResult<Vec<_>>>()?;
         let mut blocks = Vec::with_capacity(detections.len());
+        let mut receipts = vec![detection.receipt];
         for (detection_batch, crop_batch) in detections
             .chunks(RECOGNITION_BATCH_SIZE)
             .zip(crops.chunks(RECOGNITION_BATCH_SIZE))
         {
             let input = recognition_input(crop_batch, &self.recognition_config)?;
-            let (shape, output) = run_session(
-                &mut self.recognition,
-                &input.data,
-                input.shape,
-                "recognition",
-            )?;
+            let recognition =
+                self.native
+                    .recognize(input.data, input.shape, &permit, &cancellation)?;
+            let shape = recognition.tensor.shape;
+            let output = recognition.tensor.values;
+            receipts.push(recognition.receipt);
             if shape.len() != 3 || shape[0] != detection_batch.len() {
                 return Err(engine_error(
                     "use.ocr.provider_output_invalid",
@@ -112,86 +121,8 @@ impl PpOcrV6Engine {
                 });
             }
         }
-        Ok(blocks)
+        Ok(EngineExtraction { blocks, receipts })
     }
-}
-
-fn load_session(path: &Path, role: &str) -> UseResult<Session> {
-    let session = Session::builder()
-        .map_err(|error| runtime_error(role, "create an ONNX Runtime session", error))?
-        .with_optimization_level(GraphOptimizationLevel::Level3)
-        .map_err(|error| runtime_error(role, "configure graph optimization", error))?
-        .commit_from_file(path)
-        .map_err(|error| runtime_error(role, "load the ONNX model", error))?;
-    if session.inputs.len() != 1 || session.outputs.len() != 1 {
-        return Err(engine_error(
-            "use.ocr.model_invalid",
-            format!(
-                "PP-OCRv6 {role} model must expose exactly one input and one output; found {} inputs and {} outputs.",
-                session.inputs.len(),
-                session.outputs.len()
-            ),
-        ));
-    }
-    Ok(session)
-}
-
-fn run_session(
-    session: &mut Session,
-    data: &[f32],
-    shape: [usize; 4],
-    role: &str,
-) -> UseResult<(Vec<usize>, Vec<f32>)> {
-    let expected = shape
-        .iter()
-        .try_fold(1_usize, |total, dimension| total.checked_mul(*dimension));
-    if expected != Some(data.len()) {
-        return Err(engine_error(
-            "use.ocr.provider_input_invalid",
-            format!("PP-OCRv6 {role} tensor length does not match its shape."),
-        ));
-    }
-    let input = TensorRef::from_array_view((shape, data))
-        .map_err(|error| runtime_error(role, "create an ONNX Runtime input tensor", error))?;
-    let outputs = session
-        .run(ort::inputs![input])
-        .map_err(|error| runtime_error(role, "run ONNX inference", error))?;
-    if outputs.len() != 1 {
-        return Err(engine_error(
-            "use.ocr.provider_output_invalid",
-            format!(
-                "PP-OCRv6 {role} inference returned {} outputs instead of one.",
-                outputs.len()
-            ),
-        ));
-    }
-    let output = outputs.values().next().ok_or_else(|| {
-        engine_error(
-            "use.ocr.provider_output_invalid",
-            format!("PP-OCRv6 {role} inference returned no output tensor."),
-        )
-    })?;
-    let (output_shape, output_data) = output
-        .try_extract_tensor::<f32>()
-        .map_err(|error| runtime_error(role, "read the ONNX output tensor", error))?;
-    let output_shape = output_shape
-        .iter()
-        .map(|dimension| {
-            usize::try_from(*dimension).map_err(|_| {
-                engine_error(
-                    "use.ocr.provider_output_invalid",
-                    format!("PP-OCRv6 {role} output contains an invalid dimension {dimension}."),
-                )
-            })
-        })
-        .collect::<UseResult<Vec<_>>>()?;
-    if output_data.iter().any(|value| !value.is_finite()) {
-        return Err(engine_error(
-            "use.ocr.provider_output_invalid",
-            format!("PP-OCRv6 {role} output contains a non-finite value."),
-        ));
-    }
-    Ok((output_shape, output_data.to_vec()))
 }
 
 fn perspective_crop(image: &RgbImage, detection: &Detection) -> UseResult<RgbImage> {
@@ -243,13 +174,6 @@ fn perspective_crop(image: &RgbImage, detection: &Detection) -> UseResult<RgbIma
 
 fn distance(left: Point<f32>, right: Point<f32>) -> f32 {
     (left.x - right.x).hypot(left.y - right.y)
-}
-
-fn runtime_error(role: &str, action: &str, error: impl std::fmt::Display) -> UseError {
-    engine_error(
-        "use.ocr.runtime_failed",
-        format!("Failed to {action} for PP-OCRv6 {role}: {error}"),
-    )
 }
 
 fn crop_error(message: impl Into<String>) -> UseError {

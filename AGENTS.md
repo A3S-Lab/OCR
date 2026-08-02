@@ -15,7 +15,13 @@ PP-OCRv6 provider.
 - Keep source validation, bounds, media-type detection, and canonical evidence
   in `OcrClient`; providers must not replace source provenance.
 - Keep PP-OCRv6 as one optional default provider. Its implementation remains
-  local through ONNX Runtime and must not add Python or PaddlePaddle.
+  local through the model-neutral `a3s-power` embedded runtime and must not add
+  ONNX Runtime, Python, PaddlePaddle, a subprocess, or a listener.
+- OCR owns model architectures, reviewed graph plans, preprocessing,
+  postprocessing, tokenizers, decoding, revision pins, and model assets.
+  Reuse Power for admission, devices, limits, weight integrity and residency,
+  cancellation, routing telemetry, and execution receipts; do not duplicate
+  those mechanisms in a provider.
 - Every provider descriptor must declare whether it sends source bytes off
   device; SDK and MCP surfaces must preserve that policy.
 - Preserve the `a3s-use-ocr` crate, binary, MCP, and Skill identities.

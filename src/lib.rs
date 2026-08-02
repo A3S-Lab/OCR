@@ -3,8 +3,8 @@
 //! [`OcrClient`] owns bounded source validation and evidence while recognition
 //! is delegated to an injected [`OcrProvider`]. The optional PP-OCRv6 feature
 //! supplies the local default used by A3S Use without making that model the
-//! library's architectural boundary. The optional Unlimited-OCR feature
-//! connects a typed provider to an externally managed vLLM server.
+//! library's architectural boundary. Local model implementations reuse the
+//! model-neutral A3S Power embedded runtime without enabling its Web server.
 
 #[cfg(feature = "ppocr-v6")]
 mod assets;
@@ -38,8 +38,8 @@ pub use install::{install_ppocr_v6, repair_ppocr_v6, uninstall_managed_ppocr_v6}
 #[cfg(feature = "mcp")]
 pub use mcp::OcrMcpServer;
 pub use models::{
-    OcrBlock, OcrBlockCategory, OcrBlockRole, OcrBoundingBox, OcrDiagnostic, OcrPoint, OcrRequest,
-    OcrResult,
+    OcrBlock, OcrBlockCategory, OcrBlockRole, OcrBoundingBox, OcrDiagnostic, OcrExecutionDigest,
+    OcrExecutionModel, OcrExecutionReceipt, OcrExecutionRuntime, OcrPoint, OcrRequest, OcrResult,
 };
 #[cfg(feature = "ppocr-v6")]
 pub use ppocr_v6::{PpOcrV6Provider, PP_OCR_V6_PROVIDER_ID};
