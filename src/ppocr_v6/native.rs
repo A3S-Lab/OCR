@@ -272,11 +272,17 @@ mod tests {
                 &cancellation,
             )
             .unwrap();
+        let repeated_detection = native
+            .detect(
+                vec![0.0; 3 * 64 * 64],
+                [1, 3, 64, 64],
+                &permit,
+                &cancellation,
+            )
+            .unwrap();
         assert_eq!(detection.tensor.shape, [1, 1, 64, 64]);
-        assert_eq!(
-            detection.receipt.output.sha256,
-            "6c3992c8e261e22874b57beb72b4f95b74227939a48f3c25b67abdf70ccf81eb"
-        );
+        assert_eq!(detection.tensor, repeated_detection.tensor);
+        assert_eq!(detection.receipt.output, repeated_detection.receipt.output);
         assert_eq!(detection.receipt.output.byte_length, 16_384);
         assert_eq!(detection.receipt.output.item_count, 4_096);
         assert_eq!(
@@ -292,10 +298,19 @@ mod tests {
                 &cancellation,
             )
             .unwrap();
+        let repeated_recognition = native
+            .recognize(
+                vec![0.0; 3 * 48 * 320],
+                [1, 3, 48, 320],
+                &permit,
+                &cancellation,
+            )
+            .unwrap();
         assert_eq!(recognition.tensor.shape, [1, 40, 18_710]);
+        assert_eq!(recognition.tensor, repeated_recognition.tensor);
         assert_eq!(
-            recognition.receipt.output.sha256,
-            "556915142b282336089a458c903cae5f083882fb60561958ab1036ec5be852fb"
+            recognition.receipt.output,
+            repeated_recognition.receipt.output
         );
         assert_eq!(recognition.receipt.output.byte_length, 2_993_600);
         assert_eq!(recognition.receipt.output.item_count, 748_400);

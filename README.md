@@ -191,9 +191,10 @@ subprocess, an inference service, or a Web listener.
 
 Linux CI installs that exact pinned bundle and executes both reviewed graphs on
 the CPU. The gate checks the canonical Power weight digests, exact output
-shapes, item counts, byte lengths, and deterministic output digests for the
-zero-tensor detection and recognition fixtures; a missing model cannot turn the
-test into a pass.
+shapes, item counts, and byte lengths for the zero-tensor detection and
+recognition fixtures. A repeated execution on the same runner must reproduce
+the complete tensor and canonical output digest; a missing model cannot turn
+the test into a pass.
 
 See [Native Inference Architecture](docs/native-inference.md) for the Power/OCR
 ownership boundary, model conversion and install integrity, execution receipts,

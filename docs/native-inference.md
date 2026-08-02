@@ -65,9 +65,13 @@ used by pull-request and release CI. It installs the SHA-256-pinned bundle into
 a dedicated runner directory, verifies the four required assets, and runs both
 reviewed graphs on Linux CPU. Detection is locked to `[1, 1, 64, 64]` and
 recognition to `[1, 40, 18710]`; both fixtures also pin the canonical Power
-output digest, byte length, and item count. This proves that the published
-weights execute through Power. It does not replace the remaining real-image
-parity work against the pinned upstream implementation.
+byte length and item count, then require a repeated execution on the same
+runner to reproduce the complete tensor and canonical output digest. A
+cross-host bitwise digest is deliberately not claimed because CPU kernels may
+use hardware-specific floating-point reduction orders. This proves that the
+published weights execute deterministically through Power on the release
+runner. It does not replace the remaining real-image parity work against the
+pinned upstream implementation.
 
 ## Unlimited-OCR
 
