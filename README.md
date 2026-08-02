@@ -130,7 +130,7 @@ The stable result shape keeps the source next to the OCR evidence:
     {
       "schema": "a3s.power.embedded-execution-receipt.v1",
       "model": {"family": "baidu/Unlimited-OCR", "revision": "07dea832...", "weightsSha256": "..."},
-      "runtime": {"name": "a3s-power-native", "version": "0.6.0", "device": "metal:0"},
+      "runtime": {"name": "a3s-power-native", "version": "0.7.0", "device": "metal:0"},
       "input": {"representation": "image-request", "sha256": "...", "byteLength": 12345, "itemCount": 1},
       "output": {"representation": "utf8-text", "sha256": "...", "byteLength": 321, "itemCount": 287}
     }
@@ -192,9 +192,14 @@ subprocess, an inference service, or a Web listener.
 Linux CI installs that exact pinned bundle and executes both reviewed graphs on
 the CPU. The gate checks the canonical Power weight digests, exact output
 shapes, item counts, and byte lengths for the zero-tensor detection and
-recognition fixtures. A repeated execution on the same runner must reproduce
-the complete tensor and canonical output digest; a missing model cannot turn
-the test into a pass.
+recognition fixtures. It then downloads PaddleOCR's SHA-256-pinned
+`general_ocr_002` image and executes the complete Rust pipeline: resize,
+detection, DB postprocessing, reading-order sort, perspective crops, batched
+recognition, CTC decoding, source-coordinate polygons, and five Power execution
+receipts. The 30 output blocks are checked against a reference generated with
+Paddle 3.3.1 and PaddleOCR 3.7.0 using explicit text, score, and four-point
+coordinate tolerances. Paddle, Python, and ONNX Runtime are not test or runtime
+dependencies of this crate.
 
 See [Native Inference Architecture](docs/native-inference.md) for the Power/OCR
 ownership boundary, model conversion and install integrity, execution receipts,

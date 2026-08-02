@@ -34,7 +34,11 @@ inference bundles published by PaddlePaddle/PaddleOCR. ONNX is used only as the
 audited offline interchange input to the OCR-owned conversion tool. Runtime
 packages contain SafeTensors weights and inference configuration only. The
 installer pins the A3S OCR release archive URL, byte size, SHA-256 digest, and
-the canonical A3S Power weight digests.
+the canonical A3S Power weight digests. The explicit CI parity gate downloads
+PaddleOCR's `general_ocr_002` demonstration image by a pinned byte length and
+SHA-256 and compares the Rust output with a one-time Paddle 3.3.1 / PaddleOCR
+3.7.0 reference. The image and Paddle runtime are not redistributed in the
+crate.
 
 PaddleOCR is licensed under the Apache License, Version 2.0.
 
