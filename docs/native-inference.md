@@ -70,8 +70,17 @@ runner to reproduce the complete tensor and canonical output digest. A
 cross-host bitwise digest is deliberately not claimed because CPU kernels may
 use hardware-specific floating-point reduction orders. This proves that the
 published weights execute deterministically through Power on the release
-runner. It does not replace the remaining real-image parity work against the
-pinned upstream implementation.
+runner.
+
+The same gate downloads PaddleOCR's official `general_ocr_002` image only after
+checking its 128,713-byte length and SHA-256
+`4425af33dd163cf73bdff502bd35ee527e9bdd5725501db1da78bfdae9f538f4`.
+It runs the complete Rust image pipeline and compares 30 ordered blocks against
+a one-time Paddle 3.3.1 / PaddleOCR 3.7.0 reference produced with the exact
+PP-OCRv6 small models. Whitespace and one reviewed punctuation boundary are
+normalized, recognition confidence may differ by at most 0.065, and every
+source polygon coordinate may differ by at most four pixels. The gate still
+executes no Paddle, Python, ONNX, browser, service, or Web listener.
 
 ## Unlimited-OCR
 
@@ -157,6 +166,7 @@ Before changing a pinned model or graph plan, verify:
 7. an embedded dependency closure without ONNX Runtime, a Web server, browser
    automation, Python inference, or external OCR services.
 
-The official-bundle CPU graph gate is enforced today. Real-image and
-Unlimited-OCR upstream parity evidence remain open acceptance work and must not
-be reported as complete until reproducible fixtures are checked in.
+The official-bundle CPU graph and PP-OCRv6 real-image parity gates are enforced
+today. Unlimited-OCR upstream parity evidence remains open acceptance work and
+must not be reported as complete until its reproducible fixtures are checked
+in.

@@ -8,7 +8,10 @@ use crate::config::{DetectionConfig, RecognitionConfig};
 
 const MAX_IMAGE_SIDE: u32 = 16_384;
 const MAX_DECODED_BYTES: u64 = 256 * 1024 * 1024;
-const DETECTION_MIN_SIDE: u32 = 736;
+// PaddleOCR's reviewed PP-OCRv6 small pipeline uses `limit_type = min` with
+// `limit_side_len = 64`. The model's HPI metadata also names 736 as an
+// optimization profile, but that is not the pipeline resize policy.
+const DETECTION_MIN_SIDE: u32 = 64;
 const DETECTION_MAX_SIDE: u32 = 4_000;
 const RECOGNITION_MAX_WIDTH: u32 = 3_200;
 
@@ -182,7 +185,7 @@ mod tests {
 
     #[test]
     fn detection_dimensions_are_bounded_stride_multiples() {
-        assert_eq!(detection_dimensions(10, 20).unwrap(), (736, 1_472));
+        assert_eq!(detection_dimensions(10, 20).unwrap(), (64, 128));
         assert_eq!(detection_dimensions(4_000, 1_000).unwrap(), (4_000, 992));
         assert_eq!(
             detection_dimensions(20_000, 10_000).unwrap(),

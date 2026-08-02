@@ -209,7 +209,11 @@ fn box_score(output: &[f32], width: usize, height: usize, polygon: &[Point<i32>;
     let mut count = 0_usize;
     for y in min_y..=max_y {
         for x in min_x..=max_x {
-            if point_in_convex_polygon(Point::new(x as f32 + 0.5, y as f32 + 0.5), &polygon) {
+            // Paddle's `box_score_fast` rasterizes the integer polygon with
+            // `fillPoly` and averages every covered pixel, including its
+            // boundary. Sampling integer pixel coordinates reproduces that
+            // contract more closely than sampling pixel centers.
+            if point_in_convex_polygon(Point::new(x as f32, y as f32), &polygon) {
                 sum += output[y * width + x];
                 count += 1;
             }
@@ -286,7 +290,10 @@ fn sort_reading_order(detections: &mut [Detection]) {
         while cursor > 0 {
             let current = detections[cursor].polygon[0];
             let previous = detections[cursor - 1].polygon[0];
-            if (current.y - previous.y).abs() < 10.0 && current.x < previous.x {
+            // Keep the reviewed pipeline's ten-pixel row tolerance after
+            // integer coordinate projection. Native geometry can differ from
+            // OpenCV by one rounding unit at the boundary, so include ten.
+            if (current.y - previous.y).abs() <= 10.0 && current.x < previous.x {
                 detections.swap(cursor, cursor - 1);
                 cursor -= 1;
             } else {
@@ -322,5 +329,43 @@ mod tests {
         let result = decode_ctc(&output, &[1, 5, 4], &config).unwrap();
         assert_eq!(result.text, "AAB");
         assert!((result.confidence - 0.8).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn fast_box_score_includes_integer_polygon_boundaries() {
+        let output = (0..9).map(|value| value as f32).collect::<Vec<_>>();
+        let polygon = [
+            Point::new(1, 0),
+            Point::new(2, 1),
+            Point::new(1, 2),
+            Point::new(0, 1),
+        ];
+        assert!((box_score(&output, 3, 3, &polygon) - 4.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn reading_order_includes_the_integer_ten_pixel_row_boundary() {
+        let mut detections = [
+            Detection {
+                polygon: [
+                    Point::new(100.0, 0.0),
+                    Point::new(110.0, 0.0),
+                    Point::new(110.0, 5.0),
+                    Point::new(100.0, 5.0),
+                ],
+                confidence: 1.0,
+            },
+            Detection {
+                polygon: [
+                    Point::new(0.0, 10.0),
+                    Point::new(10.0, 10.0),
+                    Point::new(10.0, 15.0),
+                    Point::new(0.0, 15.0),
+                ],
+                confidence: 1.0,
+            },
+        ];
+        sort_reading_order(&mut detections);
+        assert_eq!(detections[0].polygon[0], Point::new(0.0, 10.0));
     }
 }

@@ -45,3 +45,38 @@ cargo test \
 grep -Fq \
   "test result: ok. 1 passed; 0 failed; 0 ignored" \
   "${test_root}/official-model-test.log"
+
+fixture_url="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_ocr_002.png"
+fixture_bytes="128713"
+fixture_sha256="4425af33dd163cf73bdff502bd35ee527e9bdd5725501db1da78bfdae9f538f4"
+export A3S_PPOCR_V6_REAL_IMAGE="${test_root}/general_ocr_002.png"
+
+curl \
+  --proto '=https' \
+  --proto-redir '=https' \
+  --fail \
+  --location \
+  --silent \
+  --show-error \
+  --max-filesize 1048576 \
+  --output "${A3S_PPOCR_V6_REAL_IMAGE}" \
+  "${fixture_url}"
+
+actual_fixture_bytes="$(wc -c < "${A3S_PPOCR_V6_REAL_IMAGE}" | tr -d ' ')"
+actual_fixture_sha256="$(shasum -a 256 "${A3S_PPOCR_V6_REAL_IMAGE}" | awk '{print $1}')"
+test "${actual_fixture_bytes}" = "${fixture_bytes}"
+test "${actual_fixture_sha256}" = "${fixture_sha256}"
+
+cargo test \
+  --locked \
+  --no-default-features \
+  --features ppocr-v6 \
+  --lib \
+  engine::tests::official_real_image_matches_upstream \
+  -- \
+  --ignored \
+  --exact | tee "${test_root}/official-real-image-test.log"
+
+grep -Fq \
+  "test result: ok. 1 passed; 0 failed; 0 ignored" \
+  "${test_root}/official-real-image-test.log"

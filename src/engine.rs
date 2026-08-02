@@ -135,11 +135,9 @@ fn perspective_crop(image: &RgbImage, detection: &Detection) -> UseResult<RgbIma
     let polygon = detection.polygon;
     let width = distance(polygon[0], polygon[1])
         .max(distance(polygon[2], polygon[3]))
-        .round()
         .max(1.0) as u32;
     let height = distance(polygon[0], polygon[3])
         .max(distance(polygon[1], polygon[2]))
-        .round()
         .max(1.0) as u32;
     let pixels = u64::from(width)
         .checked_mul(u64::from(height))
@@ -153,12 +151,9 @@ fn perspective_crop(image: &RgbImage, detection: &Detection) -> UseResult<RgbIma
     let source = polygon.map(|point| (point.x, point.y));
     let destination = [
         (0.0, 0.0),
-        (width.saturating_sub(1) as f32, 0.0),
-        (
-            width.saturating_sub(1) as f32,
-            height.saturating_sub(1) as f32,
-        ),
-        (0.0, height.saturating_sub(1) as f32),
+        (width as f32, 0.0),
+        (width as f32, height as f32),
+        (0.0, height as f32),
     ];
     let projection = Projection::from_control_points(source, destination).ok_or_else(|| {
         crop_error("PP-OCRv6 detected a degenerate text polygon that cannot be rectified.")
@@ -188,4 +183,266 @@ fn crop_error(message: impl Into<String>) -> UseError {
 
 fn engine_error(code: &str, message: impl Into<String>) -> UseError {
     UseError::new(code, message)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use sha2::{Digest, Sha256};
+
+    use super::*;
+    use crate::assets::OcrInstallSource;
+
+    const REAL_IMAGE_SHA256: &str =
+        "4425af33dd163cf73bdff502bd35ee527e9bdd5725501db1da78bfdae9f538f4";
+    const MAX_RECOGNITION_SCORE_DELTA: f64 = 0.065;
+    const MAX_POLYGON_COORDINATE_DELTA: f32 = 4.0;
+
+    struct ExpectedBlock {
+        text: &'static str,
+        recognition: f64,
+        polygon: [(i32, i32); 4],
+    }
+
+    // Generated once with Paddle 3.3.1, PaddleOCR 3.7.0, and the exact
+    // PP-OCRv6 small artifacts pinned by this crate. The gate below executes
+    // only the Rust implementation; Paddle and Python are not test or runtime
+    // dependencies.
+    const UPSTREAM_BLOCKS: &[ExpectedBlock] = &[
+        ExpectedBlock {
+            text: "www.997788.com中国收藏热线",
+            recognition: 0.998620331,
+            polygon: [(0, 1), (335, 0), (335, 33), (0, 34)],
+        },
+        ExpectedBlock {
+            text: "登机牌",
+            recognition: 0.999989033,
+            polygon: [(150, 22), (358, 15), (360, 74), (152, 81)],
+        },
+        ExpectedBlock {
+            text: "BOARDING",
+            recognition: 0.999916852,
+            polygon: [(418, 19), (661, 15), (661, 61), (418, 64)],
+        },
+        ExpectedBlock {
+            text: "PASS",
+            recognition: 0.999979794,
+            polygon: [(699, 13), (823, 10), (824, 60), (700, 62)],
+        },
+        ExpectedBlock {
+            text: "舱位 CLASS",
+            recognition: 0.953512967,
+            polygon: [(340, 103), (458, 103), (458, 128), (340, 128)],
+        },
+        ExpectedBlock {
+            text: "序号SERIAL NO.",
+            recognition: 0.993820965,
+            polygon: [(486, 100), (649, 98), (649, 123), (486, 125)],
+        },
+        ExpectedBlock {
+            text: "座位号 SEAT NO.",
+            recognition: 0.980658054,
+            polygon: [(674, 95), (835, 91), (836, 118), (675, 123)],
+        },
+        ExpectedBlock {
+            text: "航班FLIGHT",
+            recognition: 0.999896109,
+            polygon: [(63, 110), (192, 108), (192, 130), (63, 132)],
+        },
+        ExpectedBlock {
+            text: "日期 DATE",
+            recognition: 0.983355403,
+            polygon: [(212, 106), (318, 106), (318, 131), (212, 131)],
+        },
+        ExpectedBlock {
+            text: "MU 2379",
+            recognition: 0.987337768,
+            polygon: [(81, 138), (214, 136), (214, 161), (81, 163)],
+        },
+        ExpectedBlock {
+            text: "03DEC",
+            recognition: 0.984453499,
+            polygon: [(231, 136), (327, 134), (327, 160), (231, 162)],
+        },
+        ExpectedBlock {
+            text: "W",
+            recognition: 0.991825104,
+            polygon: [(405, 133), (430, 133), (430, 157), (405, 157)],
+        },
+        ExpectedBlock {
+            text: "035",
+            recognition: 0.999922514,
+            polygon: [(509, 129), (568, 129), (568, 156), (509, 156)],
+        },
+        ExpectedBlock {
+            text: "始发地 FROM",
+            recognition: 0.948752105,
+            polygon: [(341, 172), (470, 169), (470, 195), (341, 198)],
+        },
+        ExpectedBlock {
+            text: "登机口",
+            recognition: 0.999819696,
+            polygon: [(487, 173), (553, 171), (554, 194), (488, 196)],
+        },
+        ExpectedBlock {
+            text: "GATE",
+            recognition: 0.999981642,
+            polygon: [(565, 171), (615, 171), (615, 194), (565, 194)],
+        },
+        ExpectedBlock {
+            text: "登机时间BDT",
+            recognition: 0.999968469,
+            polygon: [(676, 167), (811, 164), (811, 190), (676, 193)],
+        },
+        ExpectedBlock {
+            text: "目的地 TO",
+            recognition: 0.906847239,
+            polygon: [(66, 178), (169, 178), (169, 203), (66, 203)],
+        },
+        ExpectedBlock {
+            text: "福州",
+            recognition: 0.999795079,
+            polygon: [(97, 206), (168, 206), (168, 229), (97, 229)],
+        },
+        ExpectedBlock {
+            text: "TAIYUAN",
+            recognition: 0.999807537,
+            polygon: [(336, 216), (476, 216), (476, 240), (336, 240)],
+        },
+        ExpectedBlock {
+            text: "G11",
+            recognition: 0.999913216,
+            polygon: [(506, 213), (553, 213), (553, 237), (506, 237)],
+        },
+        ExpectedBlock {
+            text: "FUZHOU",
+            recognition: 0.999510050,
+            polygon: [(88, 226), (204, 226), (204, 252), (88, 252)],
+        },
+        ExpectedBlock {
+            text: "身份识别ID NO.",
+            recognition: 0.995628238,
+            polygon: [(342, 236), (485, 233), (485, 258), (342, 261)],
+        },
+        ExpectedBlock {
+            text: "姓名 NAME",
+            recognition: 0.944117248,
+            polygon: [(65, 250), (172, 247), (172, 269), (65, 271)],
+        },
+        ExpectedBlock {
+            text: "ZHANGQIWEI",
+            recognition: 0.999886990,
+            polygon: [(74, 274), (264, 272), (264, 298), (74, 300)],
+        },
+        ExpectedBlock {
+            text: "票号 TKT NO.",
+            recognition: 0.992853165,
+            polygon: [(460, 294), (580, 292), (580, 317), (460, 320)],
+        },
+        ExpectedBlock {
+            text: "张祺伟",
+            recognition: 0.998239696,
+            polygon: [(103, 311), (210, 311), (210, 337), (103, 337)],
+        },
+        ExpectedBlock {
+            text: "票价 FARE",
+            recognition: 0.984983921,
+            polygon: [(68, 342), (166, 339), (166, 365), (68, 367)],
+        },
+        ExpectedBlock {
+            text: "ETKT7813699238489/1",
+            recognition: 0.999883354,
+            polygon: [(343, 348), (663, 344), (663, 368), (343, 371)],
+        },
+        ExpectedBlock {
+            text: "登机口于起飞前10分钟关闭 GATES CLOSE 10 MINUTES BEFORE DEPARTURE TIME",
+            recognition: 0.978114545,
+            polygon: [(98, 455), (832, 441), (832, 466), (98, 480)],
+        },
+    ];
+
+    #[test]
+    fn perspective_crop_uses_the_upstream_exclusive_extent() {
+        let image = RgbImage::new(20, 20);
+        let detection = Detection {
+            polygon: [
+                Point::new(1.0, 2.0),
+                Point::new(11.0, 2.0),
+                Point::new(11.0, 7.0),
+                Point::new(1.0, 7.0),
+            ],
+            confidence: 1.0,
+        };
+        let crop = perspective_crop(&image, &detection).unwrap();
+        assert_eq!(crop.dimensions(), (10, 5));
+    }
+
+    #[test]
+    #[ignore = "requires the pinned official PP-OCRv6 bundle and real-image fixture"]
+    fn official_real_image_matches_upstream() {
+        let root = PathBuf::from(
+            std::env::var_os("A3S_PPOCR_V6_MODEL")
+                .expect("A3S_PPOCR_V6_MODEL must name the pinned official model bundle"),
+        );
+        let image_path = PathBuf::from(
+            std::env::var_os("A3S_PPOCR_V6_REAL_IMAGE")
+                .expect("A3S_PPOCR_V6_REAL_IMAGE must name the pinned official image"),
+        );
+        let assets = ModelAssets {
+            root: root.clone(),
+            detection_weights: root.join("det/model.safetensors"),
+            detection_config: root.join("det/inference.yml"),
+            recognition_weights: root.join("rec/model.safetensors"),
+            recognition_config: root.join("rec/inference.yml"),
+            source: OcrInstallSource::Environment,
+        };
+        let mut engine = PpOcrV6Engine::load(&assets).unwrap();
+        let bytes = std::fs::read(image_path).unwrap();
+        assert_eq!(format!("{:x}", Sha256::digest(&bytes)), REAL_IMAGE_SHA256);
+        let image = crate::preprocess::decode_image(&bytes).unwrap();
+        assert_eq!(image.dimensions(), (896, 528));
+        let cancellation = CancellationToken::new();
+        let extraction = engine.extract(&image, &cancellation).unwrap();
+        assert_eq!(extraction.receipts.len(), 5);
+        assert_eq!(extraction.blocks.len(), UPSTREAM_BLOCKS.len());
+
+        for (index, (actual, expected)) in extraction.blocks.iter().zip(UPSTREAM_BLOCKS).enumerate()
+        {
+            assert_eq!(
+                parity_text(&actual.text),
+                parity_text(expected.text),
+                "recognized text diverged at block {index}: {:?} versus {:?}",
+                actual.text,
+                expected.text
+            );
+            assert!(
+                (f64::from(actual.confidence) - expected.recognition).abs()
+                    <= MAX_RECOGNITION_SCORE_DELTA,
+                "recognition score diverged at block {index}: {} versus {}",
+                actual.confidence,
+                expected.recognition
+            );
+            assert!(actual.detection_confidence >= engine.detection_config.box_threshold);
+            for (point_index, (actual, expected)) in
+                actual.polygon.iter().zip(expected.polygon).enumerate()
+            {
+                let x_delta = (actual.x - expected.0 as f32).abs();
+                let y_delta = (actual.y - expected.1 as f32).abs();
+                assert!(
+                    x_delta <= MAX_POLYGON_COORDINATE_DELTA
+                        && y_delta <= MAX_POLYGON_COORDINATE_DELTA,
+                    "polygon diverged at block {index}, point {point_index}: {actual:?} versus {expected:?}"
+                );
+            }
+        }
+    }
+
+    fn parity_text(value: &str) -> String {
+        value
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect::<String>()
+            .replace(".中国", "中国")
+    }
 }

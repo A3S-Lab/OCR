@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Execute the pinned official PP-OCRv6 graphs on CPU
+      - name: Execute pinned PP-OCRv6 graphs and real-image parity on CPU
         shell: bash
         run: tools/check_official_ppocr_v6.sh "${RUNNER_TEMP}/official-ppocr-v6"
 

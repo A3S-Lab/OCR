@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "a3s-power"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "162536653a7e0467e263c4dc0aaff7af4ef23bf7c500ba14c6ebc94db4877c82"
+checksum = "c028d504be93cdf18a214068e9f4e9ed69eabac18f41c8496c4caf79f031a855"
 dependencies = [
  "aes-gcm",
  "async-trait",
