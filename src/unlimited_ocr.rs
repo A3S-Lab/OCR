@@ -291,6 +291,7 @@ impl OcrProvider for UnlimitedOcrProvider {
             model: Some(self.config.model.clone()),
             text: parsed.text,
             blocks: parsed.blocks,
+            execution_receipts: Vec::new(),
             warnings: parsed.warnings,
         })
     }

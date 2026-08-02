@@ -32,6 +32,12 @@ jobs:
       - run: cargo check --no-default-features --features mcp --locked
       - run: cargo test --all-features --locked
       - run: cargo clippy --all-targets --all-features --locked -- -D warnings
+      - name: Verify the embedded inference dependency boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo tree --no-default-features --features ppocr-v6 -e features > dependency-tree.txt
+          ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v' dependency-tree.txt
       - run: cargo package --locked
 
   assets:

@@ -74,6 +74,7 @@ impl OcrClient {
             source,
             text: output.text,
             blocks: output.blocks,
+            execution_receipts: output.execution_receipts,
             warnings: output.warnings,
         })
     }
@@ -336,6 +337,7 @@ mod tests {
                     bounding_box: None,
                     bounding_boxes: Vec::new(),
                 }],
+                execution_receipts: Vec::new(),
                 warnings: Vec::new(),
             })
         }
@@ -376,6 +378,7 @@ mod tests {
             model: None,
             text: "grounded".into(),
             blocks: vec![block],
+            execution_receipts: Vec::new(),
             warnings: Vec::new(),
         };
 

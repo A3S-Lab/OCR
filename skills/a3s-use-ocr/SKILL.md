@@ -25,8 +25,10 @@ file through another tool.
 
 For the default PP-OCRv6 provider, the engine runs detection, reading-order
 sorting, perspective crop correction, tall-crop rotation, recognition, and CTC
-decoding locally. It does not require Python or PaddlePaddle and never sends the
-source image off the device. If its doctor reports missing or damaged models,
+decoding locally through the embedded A3S Power runtime. It does not require
+ONNX Runtime, Python, PaddlePaddle, a subprocess, or a Web listener and never
+sends the source image off the device. Preserve the returned Power execution
+receipts with the OCR evidence. If its doctor reports missing or damaged models,
 return the typed error and explicit `a3s install use/ocr` suggestion to the
 parent; never install or repair models from inside the `use` worker.
 

@@ -86,6 +86,44 @@ pub struct OcrBlock {
     pub bounding_boxes: Vec<OcrBoundingBox>,
 }
 
+/// Provider-neutral projection of one execution receipt produced by the
+/// shared inference substrate. Receipt digests are computed and bound by the
+/// runtime; OCR only carries the typed evidence to downstream consumers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExecutionReceipt {
+    pub schema: String,
+    pub model: OcrExecutionModel,
+    pub runtime: OcrExecutionRuntime,
+    pub input: OcrExecutionDigest,
+    pub output: OcrExecutionDigest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExecutionModel {
+    pub family: String,
+    pub revision: String,
+    pub weights_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExecutionRuntime {
+    pub name: String,
+    pub version: String,
+    pub device: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExecutionDigest {
+    pub representation: String,
+    pub sha256: String,
+    pub byte_length: usize,
+    pub item_count: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OcrResult {
@@ -98,6 +136,8 @@ pub struct OcrResult {
     pub text: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<OcrBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub execution_receipts: Vec<OcrExecutionReceipt>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
 }

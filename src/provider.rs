@@ -3,7 +3,7 @@ use std::sync::Arc;
 use a3s_use_core::{Artifact, Readiness, UseError, UseResult};
 use async_trait::async_trait;
 
-use crate::OcrBlock;
+use crate::{OcrBlock, OcrExecutionReceipt};
 
 /// Stable identity and execution characteristics of an OCR provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,6 +97,7 @@ pub struct OcrProviderOutput {
     pub model: Option<String>,
     pub text: String,
     pub blocks: Vec<OcrBlock>,
+    pub execution_receipts: Vec<OcrExecutionReceipt>,
     pub warnings: Vec<String>,
 }
 

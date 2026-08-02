@@ -2,7 +2,7 @@
      width="1200" height="440" viewBox="0 0 1200 440"
      role="img" aria-labelledby="title desc">
   <title id="title">A3S OCR — text extraction with canonical source evidence</title>
-  <desc id="desc">A bounded image is validated and hashed by OcrClient, routed to either the local PP-OCRv6 provider or a typed Unlimited-OCR vLLM provider, and returned with path, media type, size, and SHA-256 evidence.</desc>
+  <desc id="desc">A bounded image is validated and hashed by OcrClient, routed to a typed OCR model over the embedded A3S Power runtime, and returned with source and execution evidence.</desc>
 
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1200" y2="440" gradientUnits="userSpaceOnUse">
@@ -84,7 +84,7 @@
       <rect width="176" height="94" rx="9" fill="#11231d" stroke="#379673" stroke-width="2"/>
       <text x="16" y="29" fill="#79e2be" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" letter-spacing="1">DEFAULT / LOCAL</text>
       <text x="16" y="59" fill="#f3f7fb" font-size="22" font-weight="720">PP-OCRv6</text>
-      <text x="16" y="81" fill="#93b9aa" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">ONNX Runtime</text>
+      <text x="16" y="81" fill="#93b9aa" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Power native</text>
 
       <rect y="119" width="176" height="94" rx="9" fill="#201b15" stroke="#a77b37" stroke-width="2"/>
       <text x="16" y="148" fill="#f3c875" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" letter-spacing="1">OPTIONAL / TYPED</text>
