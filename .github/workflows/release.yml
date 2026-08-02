@@ -38,10 +38,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo tree --no-default-features --features ppocr-v6 -e features > ppocr-tree.txt
-          ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v' ppocr-tree.txt
-          cargo tree --no-default-features --features unlimited-ocr -e features > unlimited-tree.txt
-          ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v|reqwest v|hyper v' unlimited-tree.txt
+          ppocr_tree="${RUNNER_TEMP}/ppocr-tree.txt"
+          unlimited_tree="${RUNNER_TEMP}/unlimited-tree.txt"
+          cargo tree --no-default-features --features ppocr-v6 -e features > "${ppocr_tree}"
+          ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v' "${ppocr_tree}"
+          cargo tree --no-default-features --features unlimited-ocr -e features > "${unlimited_tree}"
+          ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v|reqwest v|hyper v' "${unlimited_tree}"
       - run: cargo package --locked
 
   assets:
