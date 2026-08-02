@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "a3s-power"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64a7c756f772be4b274298bb4914fff7af32322e76026c5f179d77f3e111c575"
+checksum = "76f89072e74d811e485fce0da25cc0c0a6ad54ed6371e193e282fb7c552baec8"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -26,6 +26,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "windows-sys 0.59.0",
  "zeroize",
 ]
 
@@ -3952,6 +3953,15 @@ name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
+dependencies = [
+ "windows-targets",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.59.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets",
 ]

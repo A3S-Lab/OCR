@@ -130,7 +130,7 @@ The stable result shape keeps the source next to the OCR evidence:
     {
       "schema": "a3s.power.embedded-execution-receipt.v1",
       "model": {"family": "baidu/Unlimited-OCR", "revision": "07dea832...", "weightsSha256": "..."},
-      "runtime": {"name": "a3s-power-native", "version": "0.5.0", "device": "metal:0"},
+      "runtime": {"name": "a3s-power-native", "version": "0.5.1", "device": "metal:0"},
       "input": {"representation": "image-request", "sha256": "...", "byteLength": 12345, "itemCount": 1},
       "output": {"representation": "utf8-text", "sha256": "...", "byteLength": 321, "itemCount": 287}
     }
@@ -203,11 +203,16 @@ cancellation, telemetry, and receipt mechanisms.
 
 ~~~rust
 use a3s_use_ocr::{
-    OcrClient, UnlimitedOcrConfig, UnlimitedOcrProvider, UseResult,
+    OcrClient, ResidencyBudgetPolicy, UnlimitedOcrConfig,
+    UnlimitedOcrProvider,
 };
 
-fn local_unlimited_ocr() -> UseResult<OcrClient> {
+fn local_unlimited_ocr() -> Result<OcrClient, Box<dyn std::error::Error>> {
+    let residency = ResidencyBudgetPolicy::new(5_000, 5_000)?
+        .with_host_reserve_bytes(2 * 1024 * 1024 * 1024)
+        .with_device_reserve_bytes(512 * 1024 * 1024);
     let config = UnlimitedOcrConfig::new("/models/baidu-unlimited-ocr")?
+        .with_residency_budget_policy(residency)?
         .with_max_generated_tokens(8_192)?;
     OcrClient::with_provider(UnlimitedOcrProvider::new(config)?)
 }
@@ -240,11 +245,16 @@ EXIF-aware decode
 One logical extraction holds one Power permit and cancellation token across
 the complete vision, projector, decoder, and grounding flow. Routed experts
 use Power's exact batch union and private-by-default route telemetry rather
-than a second OCR-local cache. When an explicit residency cache budget is
-configured, bounded expert prefetch overlaps shared-expert computation and
-uses Power's LFRU/LRU placement. Dropping the awaiting
-recognition future cancels that shared token; the blocking native worker then
-stops at its bounded preprocessing, vision, and decoder cancellation points.
+than a second OCR-local cache. Cache residency remains zero by default. A typed,
+opt-in `ResidencyBudgetPolicy` asks the selected Power runtime to discover
+bounded host/CUDA/Metal capacity and derive the cache bytes from explicit
+fractions, reserves, caps, and runtime limits; Metal unified memory is counted
+once. Manual cache bytes and automatic budgeting are mutually exclusive.
+Capacity snapshots are neither persisted nor added to telemetry or execution
+receipts. With either explicit cache mode, bounded expert prefetch overlaps
+shared-expert computation and uses Power's LFRU/LRU placement. Dropping the
+awaiting recognition future cancels that shared token; the blocking native
+worker then stops at its bounded preprocessing, vision, and decoder cancellation points.
 The provider emits one final receipt binding the source image digest, reviewed
 weight collection, Power device, and user-visible UTF-8 text.
 

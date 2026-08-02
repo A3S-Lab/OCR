@@ -31,6 +31,73 @@ fn embedded_provider_and_session_are_send_and_sync() {
 }
 
 #[test]
+fn automatic_cpu_residency_uses_the_shared_power_runtime_limit() {
+    let limits = a3s_power::inference::InferenceLimits {
+        max_resident_weight_bytes: 2_048,
+        ..a3s_power::inference::InferenceLimits::default()
+    };
+    let budget = a3s_power::inference::ResidencyBudgetPolicy::new(10_000, 0)
+        .unwrap()
+        .with_max_host_cache_bytes(1_024)
+        .unwrap();
+    let config = UnlimitedOcrConfig::new("fixture-model")
+        .unwrap()
+        .with_device(a3s_power::inference::DevicePreference::Cpu)
+        .with_limits(limits)
+        .unwrap()
+        .with_residency_policy(a3s_power::inference::ResidencyPolicy {
+            max_entries_per_layer: 7,
+            ..a3s_power::inference::ResidencyPolicy::default()
+        })
+        .unwrap()
+        .with_residency_budget_policy(budget)
+        .unwrap();
+    let runtime = EmbeddedRuntime::new(config.device, config.limits.clone()).unwrap();
+
+    let residency = resolve_residency(&config, &runtime).unwrap();
+
+    assert_eq!(residency.host_cache_bytes, 1_024);
+    assert_eq!(residency.device_cache_bytes, 0);
+    assert_eq!(residency.max_entries_per_layer, 7);
+}
+
+#[cfg(all(target_os = "macos", feature = "unlimited-ocr-metal"))]
+#[test]
+fn automatic_metal_residency_reuses_powers_unified_memory_plan() {
+    let limits = a3s_power::inference::InferenceLimits {
+        max_resident_weight_bytes: 2 * 1024 * 1024,
+        ..a3s_power::inference::InferenceLimits::default()
+    };
+    let budget = a3s_power::inference::ResidencyBudgetPolicy::new(10_000, 10_000).unwrap();
+    let config = UnlimitedOcrConfig::new("fixture-model")
+        .unwrap()
+        .with_device(a3s_power::inference::DevicePreference::Metal { ordinal: 0 })
+        .with_limits(limits)
+        .unwrap()
+        .with_residency_budget_policy(budget.clone())
+        .unwrap();
+    let runtime = EmbeddedRuntime::new(config.device, config.limits.clone()).unwrap();
+    let snapshot = runtime.memory_snapshot().unwrap();
+    let expected = runtime
+        .plan_residency_budget(&budget)
+        .unwrap()
+        .apply_to(&config.residency)
+        .unwrap();
+
+    let residency = resolve_residency(&config, &runtime).unwrap();
+
+    assert!(snapshot.device.as_ref().unwrap().unified_with_host);
+    assert_eq!(residency, expected);
+    assert!(
+        residency
+            .host_cache_bytes
+            .checked_add(residency.device_cache_bytes)
+            .unwrap()
+            <= config.limits.max_resident_weight_bytes
+    );
+}
+
+#[test]
 fn parses_reviewed_grounding_forms_into_source_pixel_blocks() {
     let raw = concat!(
         "<|ref|>title<|/ref|><|det|>[[0, 0, 999, 100]]<|/det|>",
