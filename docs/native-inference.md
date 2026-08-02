@@ -60,6 +60,55 @@ pinned upstream ONNX containers, preserves their numeric tensors in
 SafeTensors, and emits deterministic reviewed plans. ONNX is not a runtime
 format and neither ONNX Runtime nor Python appears in the inference path.
 
+## Unlimited-OCR
+
+The optional Unlimited-OCR provider is an OCR-owned native Rust implementation
+of the upstream model at revision
+`07dea832e22aefee32ad281d4b80551282e1c168`. A3S OCR pins the exact model,
+tokenizer, processor, tensor inventory, weight byte length, and raw weight
+SHA-256. Power owns all full SafeTensors hashing, including replica
+verification, and exposes the verified collection through one shared
+`WeightHierarchy`.
+
+```text
+bounded source image
+  -> EXIF-aware decode and Pillow-compatible normalized global/tiled views
+  -> SAM ViT-B (windowed/global attention and relative positions)
+  -> CLIP-L over SAM patch embeddings
+  -> OCR-owned projector and spatial token assembly
+  -> DeepSeek-style MHA/MoE decoder
+  -> deterministic n-gram-constrained generation
+  -> bounded Markdown and 0..=999 grounding projection
+  -> one Power receipt over source image and visible UTF-8 output
+```
+
+The vision tower contains the reviewed 1024-pixel global view and optional
+640-pixel tile grid. Its RGB bicubic coefficients, antialiasing, fixed-point
+quantization, aspect rounding, and centering match the reviewed Pillow path.
+The tower then applies SAM absolute/relative position interpolation, the 24-layer
+CLIP branch, the 2048-to-1280 projector, learned row-newline embeddings, and
+the view separator. The 12-layer decoder uses exact MHA, RoPE, a dense first
+feed-forward layer, and 11 MoE layers with 64 routed experts and exact top-6
+weights. OCR owns this topology and generation behavior; no OCR model or asset
+is embedded in Power.
+
+One request holds one Power permit and cancellation token across preprocessing,
+both vision branches, projection, all decoder layers, and receipt creation.
+Dropping the async recognition future cancels that same token; the blocking
+native worker observes it at bounded preprocessing, vision, and decoder
+boundaries before releasing the request permit.
+Power's Colibri-inspired hierarchy supplies exact routed-expert unions,
+bounded prefetch, LFRU/LRU placement, transactional hot sets, verified complete
+or partial replicas, and private-by-default routing telemetry. The provider
+does not create a second cache, integrity path, router, receipt, or admission
+controller.
+
+`UnlimitedOcrConfig` accepts only a local model directory plus typed Power
+device, limits, residency, and replica settings. CPU, CUDA, and Metal are build
+features; an explicit unavailable device fails closed. Provider construction is
+lazy and never downloads a model, invokes Python, starts a subprocess, contacts
+an OCR service, or binds a Web port.
+
 ## TEE and privacy invariants
 
 - Source pixels and tensor values are not included in placement telemetry.
@@ -69,6 +118,8 @@ format and neither ONNX Runtime nor Python appears in the inference path.
   duplicate implementation.
 - Native OCR holds one Power admission permit across all component graphs in a
   logical extraction.
+- Unlimited-OCR emits one request-level receipt rather than independent vision,
+  projector, and decoder receipts.
 - Device choice fails closed when an explicitly requested accelerator is not
   available; execution is never silently sent to a remote service.
 - Model acquisition is explicit and does not occur during extraction.

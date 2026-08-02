@@ -8,6 +8,8 @@
 
 #[cfg(feature = "ppocr-v6")]
 mod assets;
+#[cfg(feature = "power-runtime")]
+mod cancellation;
 #[cfg(feature = "cli")]
 pub mod cli;
 mod client;
@@ -27,9 +29,16 @@ mod ppocr_v6;
 #[cfg(feature = "ppocr-v6")]
 mod preprocess;
 mod provider;
+#[cfg(feature = "power-runtime")]
+mod receipt;
 #[cfg(feature = "unlimited-ocr")]
 mod unlimited_ocr;
 
+#[cfg(feature = "power-runtime")]
+pub use a3s_power::inference::{
+    DevicePreference, InferenceLimits, ResidencyPolicy, TelemetryMode, WeightSourceConfig,
+    WeightSourceCoverage, WeightSourceWeighting, WeightStoreConfig,
+};
 #[cfg(feature = "ppocr-v6")]
 pub use assets::{ocr_status, OcrInstallSource, OcrRuntimeStatus};
 pub use client::OcrClient;

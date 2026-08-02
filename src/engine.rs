@@ -6,6 +6,7 @@ use imageproc::point::Point;
 use tokio_util::sync::CancellationToken;
 
 use crate::assets::ModelAssets;
+use crate::cancellation::check_cancelled;
 use crate::config::{load_detection, load_recognition, DetectionConfig, RecognitionConfig};
 use crate::postprocess::{decode_ctc, detection_boxes, Detection};
 use crate::ppocr_v6::native::NativePpOcrV6;
@@ -45,13 +46,17 @@ impl PpOcrV6Engine {
         })
     }
 
-    pub(crate) fn extract(&mut self, image: &RgbImage) -> UseResult<EngineExtraction> {
-        let cancellation = CancellationToken::new();
-        let permit = self.native.begin(&cancellation)?;
+    pub(crate) fn extract(
+        &mut self,
+        image: &RgbImage,
+        cancellation: &CancellationToken,
+    ) -> UseResult<EngineExtraction> {
+        check_cancelled(cancellation)?;
+        let permit = self.native.begin(cancellation)?;
         let input = detection_input(image, &self.detection_config)?;
         let detection = self
             .native
-            .detect(input.data, input.shape, &permit, &cancellation)?;
+            .detect(input.data, input.shape, &permit, cancellation)?;
         let shape = detection.tensor.shape;
         let output = detection.tensor.values;
         let detections = detection_boxes(
@@ -78,10 +83,11 @@ impl PpOcrV6Engine {
             .chunks(RECOGNITION_BATCH_SIZE)
             .zip(crops.chunks(RECOGNITION_BATCH_SIZE))
         {
+            check_cancelled(cancellation)?;
             let input = recognition_input(crop_batch, &self.recognition_config)?;
             let recognition =
                 self.native
-                    .recognize(input.data, input.shape, &permit, &cancellation)?;
+                    .recognize(input.data, input.shape, &permit, cancellation)?;
             let shape = recognition.tensor.shape;
             let output = recognition.tensor.values;
             receipts.push(recognition.receipt);

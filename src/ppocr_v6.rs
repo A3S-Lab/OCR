@@ -3,21 +3,19 @@ pub(crate) mod native;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use a3s_power::inference::{ExecutionDigest, ExecutionReceipt, ExecutionRepresentation};
 use a3s_use_core::{Readiness, UseError, UseResult};
 use async_trait::async_trait;
 
 use crate::assets::{ocr_status, resolve_model_assets, OcrInstallSource};
+use crate::cancellation::run_blocking;
 use crate::config::MODEL_FAMILY;
 use crate::engine::{EngineExtraction, PpOcrV6Engine};
-use crate::models::{
-    OcrBlock, OcrBoundingBox, OcrExecutionDigest, OcrExecutionModel, OcrExecutionReceipt,
-    OcrExecutionRuntime, OcrPoint,
-};
+use crate::models::{OcrBlock, OcrBoundingBox, OcrPoint};
 use crate::preprocess::decode_image;
 use crate::provider::{
     OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
 };
+use crate::receipt::project_receipt;
 
 pub const PP_OCR_V6_PROVIDER_ID: &str = "pp-ocr-v6";
 const ENGINE_NAME: &str = "a3s-power-native";
@@ -85,7 +83,7 @@ impl OcrProvider for PpOcrV6Provider {
 
     async fn recognize(&self, input: OcrInput) -> UseResult<OcrProviderOutput> {
         let loaded = Arc::clone(&self.loaded);
-        tokio::task::spawn_blocking(move || {
+        run_blocking("local PP-OCRv6 inference", move |cancellation| {
             let image = decode_image(input.bytes())?;
             let assets = resolve_model_assets()?;
             let mut loaded = loaded.lock().map_err(|_| {
@@ -110,15 +108,9 @@ impl OcrProvider for PpOcrV6Provider {
                     "The local PP-OCRv6 engine failed to initialize.",
                 )
             })?;
-            build_output(engine.engine.extract(&image)?)
+            build_output(engine.engine.extract(&image, &cancellation)?)
         })
         .await
-        .map_err(|error| {
-            UseError::new(
-                "use.ocr.runtime_failed",
-                format!("The local PP-OCRv6 inference task failed: {error}"),
-            )
-        })?
     }
 }
 
@@ -168,39 +160,6 @@ fn build_output(extraction: EngineExtraction) -> UseResult<OcrProviderOutput> {
         execution_receipts: receipts.into_iter().map(project_receipt).collect(),
         warnings: Vec::new(),
     })
-}
-
-fn project_receipt(receipt: ExecutionReceipt) -> OcrExecutionReceipt {
-    OcrExecutionReceipt {
-        schema: receipt.schema,
-        model: OcrExecutionModel {
-            family: receipt.model.family,
-            revision: receipt.model.revision,
-            weights_sha256: receipt.model.weights_sha256,
-        },
-        runtime: OcrExecutionRuntime {
-            name: receipt.runtime.name,
-            version: receipt.runtime.version,
-            device: receipt.runtime.device,
-        },
-        input: project_digest(receipt.input),
-        output: project_digest(receipt.output),
-    }
-}
-
-fn project_digest(digest: ExecutionDigest) -> OcrExecutionDigest {
-    let representation = match digest.representation {
-        ExecutionRepresentation::F32Tensor => "f32-tensor",
-        ExecutionRepresentation::ImageRequest => "image-request",
-        ExecutionRepresentation::TokenIds => "token-ids",
-        ExecutionRepresentation::Utf8Text => "utf8-text",
-    };
-    OcrExecutionDigest {
-        representation: representation.to_string(),
-        sha256: digest.sha256,
-        byte_length: digest.byte_length,
-        item_count: digest.item_count,
-    }
 }
 
 fn ocr_point(point: imageproc::point::Point<f32>) -> UseResult<OcrPoint> {

@@ -2,10 +2,11 @@
 
 ## Baidu Unlimited-OCR
 
-The optional `unlimited-ocr` feature interoperates with an externally managed
-`baidu/Unlimited-OCR` vLLM server through its OpenAI-compatible API. The crate
-does not redistribute the model, its custom Python code, vLLM, or container
-images.
+The optional `unlimited-ocr` feature implements the reviewed
+`baidu/Unlimited-OCR` topology in native Rust and loads an operator-supplied
+checkpoint at the pinned upstream revision. The crate does not redistribute
+model weights, upstream Python code, vLLM, or container images. No upstream
+source code is copied into the native implementation.
 
 Unlimited-OCR is licensed under the MIT License.
 
@@ -13,7 +14,17 @@ Upstream repositories:
 
 - <https://github.com/baidu/Unlimited-OCR>
 - <https://huggingface.co/baidu/Unlimited-OCR>
-- <https://recipes.vllm.ai/baidu/Unlimited-OCR>
+
+## Pillow-Compatible Bicubic Preprocessing
+
+The native Unlimited-OCR preprocessor independently implements the reviewed
+8-bit bicubic coefficient, antialiasing, boundary, and fixed-point rounding
+semantics used by Pillow. Numeric fixtures were derived from Pillow 11.3.0.
+No Pillow runtime or Python dependency is included.
+
+Pillow is licensed under the HPND License.
+
+Reference: <https://github.com/python-pillow/Pillow/blob/11.3.0/src/libImaging/Resample.c>
 
 ## PaddlePaddle/PaddleOCR PP-OCRv6 Models
 

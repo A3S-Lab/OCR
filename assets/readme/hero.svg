@@ -89,7 +89,7 @@
       <rect y="119" width="176" height="94" rx="9" fill="#201b15" stroke="#a77b37" stroke-width="2"/>
       <text x="16" y="148" fill="#f3c875" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" letter-spacing="1">OPTIONAL / TYPED</text>
       <text x="16" y="178" fill="#f3f7fb" font-size="22" font-weight="720">Unlimited-OCR</text>
-      <text x="16" y="200" fill="#c5a873" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">vLLM endpoint</text>
+      <text x="16" y="200" fill="#c5a873" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Power embedded</text>
     </g>
 
     <g id="evidence-ledger" transform="translate(0 298)">

@@ -22,11 +22,11 @@ fn pp_ocr_v6_is_one_provider_behind_the_public_interface() {
 #[cfg(feature = "unlimited-ocr")]
 #[test]
 fn unlimited_ocr_is_one_provider_behind_the_public_interface() {
-    let config = UnlimitedOcrConfig::local("http://127.0.0.1:8000/v1").unwrap();
+    let config = UnlimitedOcrConfig::new("fixture-unlimited-ocr-model").unwrap();
     let provider = UnlimitedOcrProvider::new(config).unwrap();
     let descriptor = provider.descriptor();
     assert_eq!(descriptor.id, UNLIMITED_OCR_PROVIDER_ID);
-    assert_eq!(descriptor.engine, "vllm-openai");
+    assert_eq!(descriptor.engine, "a3s-power-native");
     assert!(!descriptor.sends_source_off_device);
     assert_eq!(provider.config().model(), UNLIMITED_OCR_MODEL);
 }
