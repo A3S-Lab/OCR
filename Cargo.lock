@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "a3s-use-ocr"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "a3s-power",
  "a3s-use-core",
