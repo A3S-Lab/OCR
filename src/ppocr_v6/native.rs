@@ -247,10 +247,10 @@ mod tests {
     }
 
     #[test]
-    fn reviewed_weights_execute_when_configured() {
-        let Some(root) = std::env::var_os("A3S_PPOCR_V6_MODEL") else {
-            return;
-        };
+    #[ignore = "requires the pinned official PP-OCRv6 native bundle"]
+    fn official_weights_execute_with_pinned_cpu_fixtures() {
+        let root = std::env::var_os("A3S_PPOCR_V6_MODEL")
+            .expect("A3S_PPOCR_V6_MODEL must name the pinned official model bundle");
         let root = std::path::PathBuf::from(root);
         let assets = ModelAssets {
             root: root.clone(),
@@ -272,7 +272,19 @@ mod tests {
                 &cancellation,
             )
             .unwrap();
-        assert_eq!(detection.tensor.shape[0..2], [1, 1]);
+        let repeated_detection = native
+            .detect(
+                vec![0.0; 3 * 64 * 64],
+                [1, 3, 64, 64],
+                &permit,
+                &cancellation,
+            )
+            .unwrap();
+        assert_eq!(detection.tensor.shape, [1, 1, 64, 64]);
+        assert_eq!(detection.tensor, repeated_detection.tensor);
+        assert_eq!(detection.receipt.output, repeated_detection.receipt.output);
+        assert_eq!(detection.receipt.output.byte_length, 16_384);
+        assert_eq!(detection.receipt.output.item_count, 4_096);
         assert_eq!(
             detection.receipt.model.weights_sha256,
             DETECTION_WEIGHTS_SHA256
@@ -286,8 +298,22 @@ mod tests {
                 &cancellation,
             )
             .unwrap();
-        assert_eq!(recognition.tensor.shape[0], 1);
-        assert_eq!(recognition.tensor.shape[2], 18_710);
+        let repeated_recognition = native
+            .recognize(
+                vec![0.0; 3 * 48 * 320],
+                [1, 3, 48, 320],
+                &permit,
+                &cancellation,
+            )
+            .unwrap();
+        assert_eq!(recognition.tensor.shape, [1, 40, 18_710]);
+        assert_eq!(recognition.tensor, repeated_recognition.tensor);
+        assert_eq!(
+            recognition.receipt.output,
+            repeated_recognition.receipt.output
+        );
+        assert_eq!(recognition.receipt.output.byte_length, 2_993_600);
+        assert_eq!(recognition.receipt.output.item_count, 748_400);
         assert_eq!(
             recognition.receipt.model.weights_sha256,
             RECOGNITION_WEIGHTS_SHA256

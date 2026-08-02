@@ -32,6 +32,9 @@ jobs:
       - run: cargo check --no-default-features --features mcp --locked
       - run: cargo test --features unlimited-ocr --locked
       - run: cargo clippy --all-targets --features unlimited-ocr --locked -- -D warnings
+      - name: Execute the pinned official PP-OCRv6 graphs on CPU
+        shell: bash
+        run: tools/check_official_ppocr_v6.sh "${RUNNER_TEMP}/official-ppocr-v6"
       - if: runner.os == 'macOS'
         run: cargo check --no-default-features --features unlimited-ocr-metal --locked
       - name: Verify the embedded inference dependency boundary
