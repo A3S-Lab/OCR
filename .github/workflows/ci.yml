@@ -18,8 +18,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo tree --no-default-features --features ppocr-v6 -e features > dependency-tree.txt
-          ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v' dependency-tree.txt
+          cargo tree --no-default-features --features ppocr-v6 -e features > ppocr-tree.txt
+          ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v' ppocr-tree.txt
+          cargo tree --no-default-features --features unlimited-ocr -e features > unlimited-tree.txt
+          ! grep -E '(^| )ort(-sys)? v|chromiumoxide|a3s-power feature "server"|axum v|reqwest v|hyper v' unlimited-tree.txt
 
   test:
     strategy:
@@ -36,6 +38,8 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo test --no-default-features --lib --locked
       - run: cargo check --no-default-features --features mcp --locked
-      - run: cargo test --all-features --locked
-      - run: cargo clippy --all-targets --all-features --locked -- -D warnings
+      - run: cargo test --features unlimited-ocr --locked
+      - run: cargo clippy --all-targets --features unlimited-ocr --locked -- -D warnings
+      - if: runner.os == 'macOS'
+        run: cargo check --no-default-features --features unlimited-ocr-metal --locked
       - run: cargo package --locked

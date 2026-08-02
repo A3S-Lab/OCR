@@ -31,11 +31,11 @@ not a single model.
 
 Every extraction starts with the same client-owned work: resolve a bounded
 local image, verify its media type, read it once, and compute canonical source
-evidence. Only then are the bytes passed to an injected provider. The provider
-may recognize text locally or through an explicitly configured endpoint, but it
-cannot replace the source path, media type, size, or SHA-256 recorded by
-`OcrClient`. Native providers reuse A3S Power's embedded, model-neutral
-inference substrate; they do not enable Power's HTTP server.
+evidence. Only then are the bytes passed to an injected provider. A provider
+must declare its source-transfer policy and cannot replace the source path,
+media type, size, or SHA-256 recorded by `OcrClient`. Both built-in providers
+reuse A3S Power's embedded, model-neutral inference substrate; neither enables
+Power's HTTP server or opens its own listener.
 
 ## Quick start
 
@@ -97,15 +97,15 @@ The provider owns recognition. `OcrClient` owns the evidence envelope.
 
 Native results may also contain `executionReceipts`. Each receipt binds a
 model family and revision, the exact weight digest, Power runtime/device
-identity, and input/output tensor digests. Downstream parsers should preserve
-these receipts with the OCR evidence.
+identity, and canonical input/output digests. Downstream parsers should
+preserve these receipts with the OCR evidence.
 
 The stable result shape keeps the source next to the OCR evidence:
 
 ~~~jsonc
 {
   "provider": "unlimited-ocr",
-  "engine": "vllm-openai",
+  "engine": "a3s-power-native",
   "model": "baidu/Unlimited-OCR",
   "source": {
     "path": "/canonical/path/to/scan.png",
@@ -126,6 +126,15 @@ The stable result shape keeps the source next to the OCR evidence:
       ]
     }
   ],
+  "executionReceipts": [
+    {
+      "schema": "a3s.power.embedded-execution-receipt.v1",
+      "model": {"family": "baidu/Unlimited-OCR", "revision": "07dea832...", "weightsSha256": "..."},
+      "runtime": {"name": "a3s-power-native", "version": "0.5.0", "device": "metal:0"},
+      "input": {"representation": "image-request", "sha256": "...", "byteLength": 12345, "itemCount": 1},
+      "output": {"representation": "utf8-text", "sha256": "...", "byteLength": 321, "itemCount": 287}
+    }
+  ],
   "warnings": []
 }
 ~~~
@@ -144,7 +153,7 @@ Provider choice is a typed object, never a raw backend-name switch.
 | Provider | Runtime | Source boundary |
 | --- | --- | --- |
 | `PpOcrV6Provider` | Embedded A3S Power native graph runtime | Always on device |
-| `UnlimitedOcrProvider` | Operator-managed vLLM | Loopback stays local; remote HTTPS is declared off device |
+| `UnlimitedOcrProvider` | Embedded A3S Power native VLM runtime | Always on device |
 | Custom `OcrProvider` | Defined by the implementation | Required in its descriptor |
 
 ### Default: PP-OCRv6
@@ -186,9 +195,11 @@ and TEE/privacy release gates.
 
 ### Optional: baidu/Unlimited-OCR
 
-Enable the `unlimited-ocr` feature to connect to the official
-OpenAI-compatible vLLM serving contract. The Rust crate does not embed the 3B
-vision-language model, start Docker or Python, or download its weights.
+Enable the `unlimited-ocr` feature to run the reviewed 3B vision-language model
+in-process. A3S OCR owns the native Rust model topology, tokenizer,
+preprocessing, generation loop, revision pins, and grounding parser. A3S Power
+supplies the shared device, admission, weight-integrity, residency, routing,
+cancellation, telemetry, and receipt mechanisms.
 
 ~~~rust
 use a3s_use_ocr::{
@@ -196,19 +207,58 @@ use a3s_use_ocr::{
 };
 
 fn local_unlimited_ocr() -> UseResult<OcrClient> {
-    let config = UnlimitedOcrConfig::local("http://127.0.0.1:8000/v1")?;
+    let config = UnlimitedOcrConfig::new("/models/baidu-unlimited-ocr")?
+        .with_max_generated_tokens(8_192)?;
     OcrClient::with_provider(UnlimitedOcrProvider::new(config)?)
 }
 ~~~
 
-`UnlimitedOcrConfig::local` accepts only loopback endpoints and marks source
-bytes as on-device. `UnlimitedOcrConfig::remote` requires HTTPS and marks them
-as off-device; `with_bearer_token` adds authentication without exposing the
-token through diagnostics or `Debug`.
+`UnlimitedOcrConfig::from_env` reads the same local path from
+`A3S_UNLIMITED_OCR_MODEL_DIR`. Provider creation is lazy: it performs no model
+download, process launch, network request, or socket bind. Session loading
+accepts only the pinned upstream revision
+`07dea832e22aefee32ad281d4b80551282e1c168`, verifies the exact tokenizer and
+processor assets, and asks Power to perform the single full SafeTensors hash
+and inventory verification path, including any explicitly configured verified
+replicas. The reviewed primary weight file is exactly 6,672,547,120 bytes
+with SHA-256
+`2bc48a7a110061ea58fff65d3169367eebe3aee371ca6968dc2219c1b2855fc6`.
 
-The provider sends the upstream single-image prompt and no-repeat n-gram
-arguments and preserves generated Markdown. It strictly parses both grounding
-forms reviewed in the upstream model implementation:
+The native forward path follows the authoritative upstream implementation:
+
+~~~text
+EXIF-aware decode
+  → 1024px global view + optional bounded 640px tile grid
+  → SAM ViT-B detail tower
+  → CLIP-L semantic tower over SAM patch features
+  → 2048 → 1280 projector + spatial newline/view separator packing
+  → 12-layer DeepSeek-style decoder (64 routed experts, exact top-6)
+  → deterministic greedy decode + sliding no-repeat 35-gram
+  → bounded Markdown and source-pixel grounding
+~~~
+
+One logical extraction holds one Power permit and cancellation token across
+the complete vision, projector, decoder, and grounding flow. Routed experts
+use Power's exact batch union and private-by-default route telemetry rather
+than a second OCR-local cache. When an explicit residency cache budget is
+configured, bounded expert prefetch overlaps shared-expert computation and
+uses Power's LFRU/LRU placement. Dropping the awaiting
+recognition future cancels that shared token; the blocking native worker then
+stops at its bounded preprocessing, vision, and decoder cancellation points.
+The provider emits one final receipt binding the source image digest, reviewed
+weight collection, Power device, and user-visible UTF-8 text.
+
+CPU is available with `unlimited-ocr`. Build with `unlimited-ocr-metal` for an
+explicit Apple Metal device or `unlimited-ocr-cuda` for an explicit NVIDIA CUDA
+device. Typed device selection fails closed when the requested accelerator is
+unavailable. Running inside Power's TEE deployment retains model integrity,
+resource bounds, private telemetry, and receipt guarantees; source bytes and
+detailed routing data are never exported by this provider.
+
+The provider applies the upstream single-image prompt and no-repeat n-gram
+policy in the native generation loop and preserves generated Markdown. It
+strictly parses both grounding forms reviewed in the upstream model
+implementation:
 
 ~~~text
 <|ref|>title<|/ref|><|det|>[[x1, y1, x2, y2]]<|/det|>text
@@ -226,37 +276,14 @@ headers/footers, footnotes, page numbers, and code receive matching roles;
 other valid labels remain `unknown` rather than being promoted. The upstream
 taxonomy is intentionally treated as open.
 
-The adapter evaluates no model text as code, fabricates no confidence, and
+The implementation evaluates no model text as code, fabricates no confidence, and
 emits no geometry for missing, malformed, out-of-range, empty, image-only, or
 EXIF-transformed grounding. It never trusts generated image paths. This follows
 the upstream loader's EXIF-transpose behavior without mislabeling transformed
 coordinates as untransformed source pixels. Degraded grounding remains visible
-through one bounded warning while the generated text is preserved.
-Diagnostics report `unknown` until extraction checks endpoint reachability
-because the synchronous diagnostic interface does not perform network I/O.
-
-<details>
-<summary>Official vLLM server recipe</summary>
-
-Use vLLM 0.25.0 or newer and review the upstream
-[Unlimited-OCR recipe](https://recipes.vllm.ai/baidu/Unlimited-OCR) before
-deployment:
-
-~~~bash
-docker run --rm --gpus all --network host --ipc host \
-  vllm/vllm-openai:unlimited-ocr \
-  baidu/Unlimited-OCR \
-  --trust-remote-code \
-  --logits_processors vllm.model_executor.models.unlimited_ocr:NGramPerReqLogitsProcessor \
-  --no-enable-prefix-caching \
-  --mm-processor-cache-gb 0
-~~~
-
-Redirects are disabled so image bytes and credentials are not forwarded to
-another origin. Loopback clients also bypass environment-configured HTTP
-proxies.
-
-</details>
+through one bounded warning while the generated text is preserved. Diagnostics
+validate the local asset manifest without doing the 6.7 GiB hash twice; the
+first session open completes Power's mandatory full checkpoint verification.
 
 ### The provider interface
 
@@ -286,8 +313,8 @@ stable provider ID, engine name, and off-device source policy.
 | Standard MCP | `OcrMcpServer::new(client)` | Exposes `ocr_doctor` and `ocr_extract` |
 
 `OcrMcpServer` projects the provider's source-transfer policy into the
-`ocr_extract` tool annotation. A remote provider therefore remains visible to
-the MCP host instead of looking like a local-only read.
+`ocr_extract` tool annotation. A custom off-device provider therefore remains
+visible to the MCP host instead of looking like a local-only read.
 
 ## Feature flags
 
@@ -295,7 +322,9 @@ the MCP host instead of looking like a local-only read.
 | --- | --- |
 | `power-runtime` | Model-neutral embedded A3S Power runtime; never enables its server feature |
 | `ppocr-v6` | Local PP-OCRv6 provider, native graph plans, installer, image pipeline |
-| `unlimited-ocr` | Typed HTTP client for an operator-managed Unlimited-OCR vLLM server |
+| `unlimited-ocr` | Native CPU Unlimited-OCR model, tokenizer, image pipeline, generation, and grounding |
+| `unlimited-ocr-metal` | Unlimited-OCR plus the Power/Candle Apple Metal device path |
+| `unlimited-ocr-cuda` | Unlimited-OCR plus the Power/Candle NVIDIA CUDA device path |
 | `mcp` | Provider-neutral standard MCP host |
 | `cli` | Standalone CLI; assembles PP-OCRv6 and MCP |
 | default | `ppocr-v6`, `mcp`, and `cli` |
@@ -311,16 +340,15 @@ the MCP host instead of looking like a local-only read.
   1.
 - Provider labels and component-box lists are bounded; a component list must
   exactly agree with its compatibility envelope.
-- PP-OCRv6 never transfers source bytes off device.
-- Unlimited-OCR remote endpoints are HTTPS-only and explicitly marked as
-  off-device.
+- Both built-in providers never transfer source bytes off device.
 - Unlimited-OCR source boxes and categories are emitted only from valid,
   bounded `0..=999` grounding and decoded source-image dimensions; malformed
   markers never become boxes or semantic claims.
-- Model installation, repair, and external server deployment are never hidden
+- Model installation, repair, and checkpoint acquisition are never hidden
   inside extraction.
-- The embedded PP-OCRv6 dependency boundary contains no ONNX Runtime, HTTP
-  server, browser automation, Python runtime, or network listener.
+- The built-in embedded inference boundaries contain no ONNX Runtime, external
+  OCR service, HTTP client/server, browser automation, Python runtime,
+  subprocess inference, or network listener.
 
 ## Development
 
@@ -331,8 +359,10 @@ cargo fmt --all -- --check
 cargo test --no-default-features --lib --locked
 cargo test --no-default-features --features unlimited-ocr --locked
 cargo check --no-default-features --features mcp --locked
-cargo test --all-features --locked
-cargo clippy --all-targets --all-features --locked -- -D warnings
+cargo test --features unlimited-ocr --locked
+cargo clippy --all-targets --features unlimited-ocr --locked -- -D warnings
+# On macOS:
+cargo check --no-default-features --features unlimited-ocr-metal --locked
 cargo package --locked
 ~~~
 
@@ -344,8 +374,8 @@ Skill, and model assets.
 <summary>Release ownership</summary>
 
 This repository owns the provider interface, default PP-OCRv6 implementation,
-Unlimited-OCR adapter, tests, model provenance, Skill content, crate
-publication, and platform archives. A3S Use owns the built-in route, chosen
+native Unlimited-OCR implementation, tests, model provenance, Skill content,
+crate publication, and platform archives. A3S Use owns the built-in route, chosen
 default provider, capability projection, component policy, and final product
 assembly. Releases meet through immutable revisions and SHA-256-bound
 artifacts.

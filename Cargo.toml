@@ -1,6 +1,6 @@
 [package]
 name = "a3s-use-ocr"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/A3S-Lab/OCR"
@@ -29,7 +29,26 @@ required-features = ["ppocr-v6"]
 [features]
 default = ["ppocr-v6", "mcp", "cli"]
 power-runtime = ["dep:a3s-power", "dep:tokio-util"]
-unlimited-ocr = ["power-runtime", "dep:base64", "dep:image", "dep:reqwest", "dep:serde_json"]
+unlimited-ocr = [
+    "power-runtime",
+    "dep:candle-core",
+    "dep:candle-nn",
+    "dep:image",
+    "dep:serde_json",
+    "dep:tokenizers",
+]
+unlimited-ocr-cuda = [
+    "unlimited-ocr",
+    "a3s-power/embedded-cuda",
+    "candle-core/cuda",
+    "candle-nn/cuda",
+]
+unlimited-ocr-metal = [
+    "unlimited-ocr",
+    "a3s-power/embedded-metal",
+    "candle-core/metal",
+    "candle-nn/metal",
+]
 ppocr-v6 = [
     "power-runtime",
     "dep:clipper2",
@@ -48,7 +67,8 @@ cli = ["ppocr-v6", "mcp", "dep:clap"]
 a3s-power = { version = "=0.5.0", default-features = false, features = ["embedded-inference"], optional = true }
 a3s-use-core = "0.2.0"
 async-trait = "0.1"
-base64 = { version = "0.22", optional = true }
+candle-core = { version = "0.10.2", default-features = false, optional = true }
+candle-nn = { version = "0.10.2", default-features = false, optional = true }
 clap = { version = "4", features = ["derive"], optional = true }
 clipper2 = { version = "=0.5.3", default-features = false, optional = true }
 fs2 = { version = "0.4", optional = true }
@@ -64,6 +84,7 @@ sha2 = "0.10"
 tar = { version = "0.4", optional = true }
 tokio = { version = "1", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync"] }
 tokio-util = { version = "0.7", default-features = false, features = ["rt"], optional = true }
+tokenizers = { version = "0.22.2", default-features = false, features = ["fancy-regex"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"
