@@ -9,7 +9,7 @@ use super::ops::{
     attention_from_scores, check_cancelled, conv2d, layer_norm, layer_norm_2d, resize_linear_1d,
     resize_spatial_cubic, tensor_error,
 };
-use crate::unlimited_ocr::model::ops::linear;
+use crate::unlimited_ocr::model::ops::{linear, matmul};
 use crate::unlimited_ocr::model::weights::SAM_LAYER_BASE;
 use crate::unlimited_ocr::model::ModelWeights;
 
@@ -275,7 +275,7 @@ fn attention(
         .and_then(|q| {
             k.transpose(2, 3)
                 .and_then(|k| k.contiguous())
-                .and_then(|k| q.matmul(&k))
+                .and_then(|k| matmul(&q, &k))
         })
         .and_then(|scores| scores / (HEAD_DIM as f64).sqrt())
         .map_err(tensor_error("compute SAM attention scores"))?;
@@ -328,14 +328,12 @@ fn add_relative_positions(
     let queries = queries
         .reshape((batch_heads, height, width, HEAD_DIM))
         .map_err(tensor_error("shape SAM relative-position queries"))?;
-    let height_bias = queries
-        .matmul(
-            &rel_h
-                .broadcast_left(batch_heads)
-                .and_then(|value| value.transpose(2, 3))
-                .and_then(|value| value.contiguous())
-                .map_err(tensor_error("shape SAM height positions"))?,
-        )
+    let height_positions = rel_h
+        .broadcast_left(batch_heads)
+        .and_then(|value| value.transpose(2, 3))
+        .and_then(|value| value.contiguous())
+        .map_err(tensor_error("shape SAM height positions"))?;
+    let height_bias = matmul(&queries, &height_positions)
         .map_err(tensor_error("compute SAM height-relative bias"))?;
     let width_bias = queries
         .transpose(1, 2)
@@ -345,7 +343,7 @@ fn add_relative_positions(
                 .broadcast_left(batch_heads)
                 .and_then(|positions| positions.transpose(2, 3))
                 .and_then(|positions| positions.contiguous())
-                .and_then(|positions| value.matmul(&positions))
+                .and_then(|positions| matmul(&value, &positions))
         })
         .and_then(|value| value.transpose(1, 2))
         .map_err(tensor_error("compute SAM width-relative bias"))?;

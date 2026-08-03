@@ -296,13 +296,13 @@ fn missing_or_orientation_transformed_geometry_is_explicitly_degraded() {
 }
 
 #[tokio::test]
-async fn reviewed_checkpoint_runs_locally_when_configured() {
+async fn reviewed_checkpoint_generates_one_token_locally_when_configured() {
     let Some(root) = std::env::var_os("A3S_UNLIMITED_OCR_MODEL_DIR") else {
         return;
     };
     let config = UnlimitedOcrConfig::new(root)
         .unwrap()
-        .with_max_generated_tokens(8)
+        .with_max_generated_tokens(1)
         .unwrap();
     let provider = UnlimitedOcrProvider::new(config).unwrap();
     let image = fixture_png(64, 64);

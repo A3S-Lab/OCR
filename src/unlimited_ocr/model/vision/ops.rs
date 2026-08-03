@@ -3,6 +3,8 @@ use a3s_use_core::{UseError, UseResult};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{Conv2d, Conv2dConfig, LayerNorm, Module};
 
+use crate::unlimited_ocr::model::ops::matmul;
+
 pub(super) fn layer_norm(
     input: &Tensor,
     weight: Tensor,
@@ -32,12 +34,29 @@ pub(super) fn layer_norm_2d(
 
 pub(super) fn conv2d(
     input: &Tensor,
-    weight: Tensor,
-    bias: Option<Tensor>,
+    mut weight: Tensor,
+    mut bias: Option<Tensor>,
     stride: usize,
     padding: usize,
 ) -> UseResult<Tensor> {
-    Conv2d::new(
+    let output_dtype = input.dtype();
+    let promote =
+        input.device().is_cpu() && output_dtype == DType::BF16 && weight.dtype() == DType::BF16;
+    let input = if promote {
+        weight = weight
+            .to_dtype(DType::F32)
+            .map_err(tensor_error("promote a CPU convolution weight"))?;
+        bias = bias
+            .map(|value| value.to_dtype(DType::F32))
+            .transpose()
+            .map_err(tensor_error("promote a CPU convolution bias"))?;
+        input
+            .to_dtype(DType::F32)
+            .map_err(tensor_error("promote a CPU convolution input"))?
+    } else {
+        input.clone()
+    };
+    let output = Conv2d::new(
         weight,
         bias,
         Conv2dConfig {
@@ -46,8 +65,14 @@ pub(super) fn conv2d(
             ..Conv2dConfig::default()
         },
     )
-    .forward(input)
-    .map_err(tensor_error("execute a vision convolution"))
+    .forward(&input)
+    .map_err(tensor_error("execute a vision convolution"))?;
+    if promote {
+        return output
+            .to_dtype(output_dtype)
+            .map_err(tensor_error("restore CPU convolution precision"));
+    }
+    Ok(output)
 }
 
 pub(super) fn scaled_attention(q: &Tensor, k: &Tensor, v: &Tensor) -> UseResult<Tensor> {
@@ -59,7 +84,7 @@ pub(super) fn scaled_attention(q: &Tensor, k: &Tensor, v: &Tensor) -> UseResult<
         .and_then(|q| {
             k.transpose(2, 3)
                 .and_then(|k| k.contiguous())
-                .and_then(|k| q.matmul(&k))
+                .and_then(|k| matmul(&q, &k))
         })
         .and_then(|scores| scores / (head_dim as f64).sqrt())
         .map_err(tensor_error("compute scaled vision attention"))?;
@@ -74,13 +99,13 @@ pub(super) fn attention_from_scores(scores: &Tensor, values: &Tensor) -> UseResu
     )
     .and_then(|value| value.to_dtype(values.dtype()))
     .map_err(tensor_error("normalize vision attention scores"))?;
-    probabilities
-        .matmul(
-            &values
-                .contiguous()
-                .map_err(tensor_error("pack vision attention values"))?,
-        )
-        .map_err(tensor_error("apply vision attention values"))
+    matmul(
+        &probabilities,
+        &values
+            .contiguous()
+            .map_err(tensor_error("pack vision attention values"))?,
+    )
+    .map_err(tensor_error("apply vision attention values"))
 }
 
 /// Resize learned spatial embeddings with an antialiased cubic kernel.
@@ -319,5 +344,16 @@ mod tests {
             output.flatten_all().unwrap().to_vec1::<f32>().unwrap(),
             vec![0.0, 5.0, 10.0]
         );
+    }
+
+    #[test]
+    fn cpu_bf16_convolution_restores_checkpoint_precision() {
+        let input = Tensor::ones((1, 1, 2, 2), DType::BF16, &Device::Cpu).unwrap();
+        let weight = Tensor::ones((1, 1, 1, 1), DType::BF16, &Device::Cpu).unwrap();
+
+        let output = conv2d(&input, weight, None, 1, 0).unwrap();
+
+        assert_eq!(output.dtype(), DType::BF16);
+        assert_eq!(output.dims(), &[1, 1, 2, 2]);
     }
 }

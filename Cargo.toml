@@ -37,6 +37,11 @@ unlimited-ocr = [
     "dep:serde_json",
     "dep:tokenizers",
 ]
+unlimited-ocr-accelerate = [
+    "unlimited-ocr",
+    "candle-core/accelerate",
+    "candle-nn/accelerate",
+]
 unlimited-ocr-cuda = [
     "unlimited-ocr",
     "a3s-power/embedded-cuda",
