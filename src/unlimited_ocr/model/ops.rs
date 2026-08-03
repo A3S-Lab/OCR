@@ -1,5 +1,5 @@
 use a3s_use_core::{UseError, UseResult};
-use candle_core::Tensor;
+use candle_core::{DType, Tensor};
 
 /// Apply a checkpoint linear layer to the final input dimension.
 ///
@@ -35,9 +35,7 @@ pub(super) fn linear(input: &Tensor, weight: &Tensor, bias: Option<&Tensor>) -> 
         .transpose(0, 1)
         .and_then(|value| value.contiguous())
         .map_err(tensor_error("transpose a linear weight"))?;
-    let output = input
-        .matmul(&weight)
-        .map_err(tensor_error("execute a linear projection"))?;
+    let output = matmul(&input, &weight).map_err(tensor_error("execute a linear projection"))?;
     let output = match bias {
         Some(bias) => output
             .broadcast_add(bias)
@@ -47,6 +45,22 @@ pub(super) fn linear(input: &Tensor, weight: &Tensor, bias: Option<&Tensor>) -> 
     output
         .reshape(output_shape)
         .map_err(tensor_error("restore a linear output shape"))
+}
+
+/// Execute a matrix product while preserving reviewed BF16 rounding on CPU.
+///
+/// Candle 0.10 cannot execute CPU BF16 matmul directly. Promote only the
+/// individual operation to f32, then restore its BF16 output boundary instead
+/// of silently promoting the complete model and changing autoregressive logits.
+pub(super) fn matmul(left: &Tensor, right: &Tensor) -> candle_core::Result<Tensor> {
+    let promote =
+        left.device().is_cpu() && left.dtype() == DType::BF16 && right.dtype() == DType::BF16;
+    if !promote {
+        return left.matmul(right);
+    }
+    left.to_dtype(DType::F32)?
+        .matmul(&right.to_dtype(DType::F32)?)?
+        .to_dtype(DType::BF16)
 }
 
 fn tensor_error(action: &'static str) -> impl FnOnce(candle_core::Error) -> UseError {
@@ -85,5 +99,29 @@ mod tests {
             .flat_map(|row| [row[0] + 0.5, row[1] + row[2] - 0.5])
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn cpu_bf16_matmul_uses_f32_compute_and_restores_bf16() {
+        let left = Tensor::from_vec(vec![1.0_f32, 2.0], (1, 2), &Device::Cpu)
+            .unwrap()
+            .to_dtype(DType::BF16)
+            .unwrap();
+        let right = Tensor::from_vec(vec![3.0_f32, 4.0], (2, 1), &Device::Cpu)
+            .unwrap()
+            .to_dtype(DType::BF16)
+            .unwrap();
+
+        let output = matmul(&left, &right).unwrap();
+
+        assert_eq!(output.dtype(), DType::BF16);
+        assert_eq!(
+            output
+                .to_dtype(DType::F32)
+                .unwrap()
+                .to_vec2::<f32>()
+                .unwrap(),
+            [vec![11.0]]
+        );
     }
 }

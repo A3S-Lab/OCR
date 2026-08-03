@@ -241,4 +241,6 @@ fn generation_error(message: impl Into<String>) -> UseError {
 }
 
 #[cfg(test)]
+mod numerical_tests;
+#[cfg(test)]
 mod tests;

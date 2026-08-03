@@ -5,7 +5,7 @@ use a3s_use_core::{UseError, UseResult};
 use candle_core::{DType, IndexOp, Tensor, D};
 use tokio_util::sync::CancellationToken;
 
-use super::ops::linear;
+use super::ops::{linear, matmul};
 use super::weights::{expert_name, model_error, power_error};
 use super::{
     ModelWeights, ATTENTION_HEADS, DECODER_LAYERS, DENSE_INTERMEDIATE_SIZE, EXPERTS_PER_TOKEN,
@@ -18,6 +18,16 @@ use crate::unlimited_ocr::tokenizer::{PromptEncoding, EOS_TOKEN_ID};
 
 pub(crate) struct Decoder {
     weights: Arc<ModelWeights>,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ReferenceTokenScore {
+    pub(crate) expected_token: u32,
+    pub(crate) greedy_token: u32,
+    pub(crate) rank: usize,
+    pub(crate) expected_logit: f32,
+    pub(crate) max_logit: f32,
 }
 
 impl Decoder {
@@ -33,6 +43,93 @@ impl Decoder {
         permit: &ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<Vec<u32>> {
+        self.decode(
+            prompt,
+            vision,
+            max_generated_tokens,
+            |_, logits| greedy_token(logits),
+            permit,
+            cancellation,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn score_reference_tokens(
+        &self,
+        prompt: &PromptEncoding,
+        vision: &Tensor,
+        reference: &[u32],
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<Vec<ReferenceTokenScore>> {
+        let mut scores = Vec::with_capacity(reference.len());
+        let generated = self.decode(
+            prompt,
+            vision,
+            reference.len(),
+            |step, logits| {
+                let expected_token = reference[step];
+                let expected_index = usize::try_from(expected_token).map_err(|_| {
+                    model_error("Unlimited-OCR reference token exceeds the host index range.")
+                })?;
+                let expected_logit = *logits.get(expected_index).ok_or_else(|| {
+                    model_error(format!(
+                        "Unlimited-OCR reference token {expected_token} is outside the reviewed vocabulary."
+                    ))
+                })?;
+                if !expected_logit.is_finite() {
+                    return Err(model_error(format!(
+                        "Unlimited-OCR reference token {expected_token} has no finite logit at step {step}."
+                    )));
+                }
+                let greedy_token = greedy_token(logits)?;
+                let max_logit = logits[greedy_token as usize];
+                let rank = logits
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .filter(|(index, value)| {
+                        value.is_finite()
+                            && (value.total_cmp(&expected_logit).is_gt()
+                                || (value.total_cmp(&expected_logit).is_eq()
+                                    && *index < expected_index))
+                    })
+                    .count()
+                    .saturating_add(1);
+                scores.push(ReferenceTokenScore {
+                    expected_token,
+                    greedy_token,
+                    rank,
+                    expected_logit,
+                    max_logit,
+                });
+                Ok(expected_token)
+            },
+            permit,
+            cancellation,
+        )?;
+        if generated.len() != reference.len() {
+            return Err(model_error(format!(
+                "Unlimited-OCR teacher forcing stopped after {} of {} reference tokens.",
+                generated.len(),
+                reference.len()
+            )));
+        }
+        Ok(scores)
+    }
+
+    fn decode<F>(
+        &self,
+        prompt: &PromptEncoding,
+        vision: &Tensor,
+        max_generated_tokens: usize,
+        mut select_token: F,
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<Vec<u32>>
+    where
+        F: FnMut(usize, &[f32]) -> UseResult<u32>,
+    {
         check_cancelled(cancellation)?;
         let prompt_len = prompt.token_ids.len();
         if prompt_len == 0 {
@@ -86,7 +183,14 @@ impl Decoder {
                 )));
             }
             no_repeat.ban_in_place(&sequence, &mut values)?;
-            let token = greedy_token(&values)?;
+            #[cfg(test)]
+            trace_generation_logits(generated.len(), &values);
+            let token = select_token(generated.len(), &values)?;
+            if (token as usize) >= VOCAB_SIZE {
+                return Err(model_error(format!(
+                    "Unlimited-OCR selected token {token} outside the reviewed vocabulary."
+                )));
+            }
             generated.push(token);
             sequence.push(token);
             if token == EOS_TOKEN_ID {
@@ -287,7 +391,7 @@ impl Decoder {
             .and_then(|q| {
                 keys.transpose(2, 3)
                     .and_then(|k| k.contiguous())
-                    .and_then(|k| q.matmul(&k))
+                    .and_then(|k| matmul(&q, &k))
             })
             .map_err(tensor_error("compute attention scores"))?;
         let scores =
@@ -307,15 +411,15 @@ impl Decoder {
         )
         .and_then(|value| value.to_dtype(hidden.dtype()))
         .map_err(tensor_error("normalize attention scores"))?;
-        let context = probabilities
-            .matmul(
-                &values
-                    .contiguous()
-                    .map_err(tensor_error("pack cached values"))?,
-            )
-            .and_then(|value| value.transpose(1, 2))
-            .and_then(|value| value.reshape((batch, query_len, HIDDEN_SIZE)))
-            .map_err(tensor_error("merge attention heads"))?;
+        let context = matmul(
+            &probabilities,
+            &values
+                .contiguous()
+                .map_err(tensor_error("pack cached values"))?,
+        )
+        .and_then(|value| value.transpose(1, 2))
+        .and_then(|value| value.reshape((batch, query_len, HIDDEN_SIZE)))
+        .map_err(tensor_error("merge attention heads"))?;
         linear(&context, &o, None)
     }
 
@@ -486,6 +590,29 @@ impl Decoder {
             .map_err(tensor_error("restore routed output shape"))?;
         (routed + shared).map_err(tensor_error("add shared expert output"))
     }
+}
+
+#[cfg(test)]
+fn trace_generation_logits(step: usize, logits: &[f32]) {
+    let capture = std::env::var("A3S_UNLIMITED_OCR_CAPTURE_STEP")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok());
+    if capture != Some(step) {
+        return;
+    }
+    let mut ranked = logits
+        .iter()
+        .copied()
+        .enumerate()
+        .filter(|(_, value)| value.is_finite())
+        .collect::<Vec<_>>();
+    ranked.sort_by(|(left_index, left), (right_index, right)| {
+        right
+            .total_cmp(left)
+            .then_with(|| left_index.cmp(right_index))
+    });
+    ranked.truncate(16);
+    eprintln!("Unlimited-OCR logits step {step}: {ranked:?}");
 }
 
 fn weight_expert_output(output: &Tensor, weights: Vec<f32>) -> UseResult<Tensor> {

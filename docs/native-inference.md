@@ -101,6 +101,24 @@ OCR-owned inventory digest. Runtime session loading compares Power's fully
 hashed `WeightStore` inventory with that same digest. The metadata gate neither
 executes upstream Python nor substitutes for numerical model-output parity.
 
+The separate local numerical gate uses the complete reviewed checkpoint and a
+SHA-256-pinned real source image. Rust deterministically center-crops the image
+to 640×528, verifies the decoded RGB digest, and losslessly re-encodes it before
+inference so the fixture does not depend on a platform JPEG encoder. One shared
+decoder loop supports both production greedy selection and test-only teacher
+forcing. The gate records expected-token rank and max-logit delta for all 64
+upstream CPU reference tokens, then repeats the decode with production greedy
+selection and parses its visible grounding.
+
+Apple Accelerate CPU execution matches all 64 tokens exactly. Metal retains a
+15-token exact prefix and no more than two rank-2 boundaries with a maximum
+0.25 logit delta. Its free-running result differs only by one reviewed leading
+punctuation boundary and a title-box edge within three source pixels. Both
+devices must preserve the three upstream `header`, `title`, and `text` blocks,
+their canonical roles, visible content, component boxes, and compatibility
+envelopes. This is a bounded numerical and product-output claim, not a claim
+that arbitrary BF16 kernels are bitwise identical across devices.
+
 ```text
 bounded source image
   -> EXIF-aware decode and Pillow-compatible normalized global/tiled views
@@ -141,10 +159,10 @@ is explicitly enabled with `ResidencyBudgetPolicy`; the zero-cache default does
 not probe hardware. Power applies the resulting byte budget to the existing
 residency policy, counts Metal unified memory once, and keeps the capacity
 snapshot out of automatic persistence, telemetry, and receipts. Manual cache
-bytes and automatic budgeting cannot be combined. CPU, CUDA, and Metal are
-build features; an explicit unavailable device fails closed. Provider
-construction is lazy and never downloads a model, invokes Python, starts a
-subprocess, contacts an OCR service, or binds a Web port.
+bytes and automatic budgeting cannot be combined. CPU, Apple Accelerate, CUDA,
+and Metal are build features; an explicit unavailable device fails closed.
+Provider construction is lazy and never downloads a model, invokes Python,
+starts a subprocess, contacts an OCR service, or binds a Web port.
 
 ## TEE and privacy invariants
 
@@ -175,8 +193,9 @@ Before changing a pinned model or graph plan, verify:
 7. an embedded dependency closure without ONNX Runtime, a Web server, browser
    automation, Python inference, or external OCR services.
 
-The official-bundle CPU graph, PP-OCRv6 real-image parity, and Unlimited-OCR
-official checkpoint/inventory gates are enforced today. Unlimited-OCR
-numerical token-generation and grounding parity evidence remains open
-acceptance work and must not be reported as complete until its reproducible
-fixtures are checked in.
+The official-bundle CPU graph, PP-OCRv6 real-image parity, Unlimited-OCR
+checkpoint/inventory, and local Unlimited-OCR numerical/grounding gates are
+implemented today. The 6.7 GiB numerical gate remains local rather than pull-
+request CI because the official checkpoint is not downloaded into ordinary CI.
+Any new device backend must publish its own expected-token rank/delta and
+free-running structured-output evidence before it is reported as accepted.

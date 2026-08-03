@@ -248,8 +248,22 @@ the pinned small-asset digests, official index, all 2,710 BF16 tensor names,
 shapes and byte ranges, the exact 6,672,212,480-byte tensor payload layout, and
 an OCR-owned canonical inventory digest. Session loading compares Power's
 fully hashed inventory with that same digest before inference. This gate proves
-checkpoint identity and topology; numerical generation and grounding parity
-remain a separate acceptance gate.
+checkpoint identity and topology. A separate local numerical gate executes the
+complete official checkpoint and keeps model-output acceptance independent
+from inventory acceptance.
+
+The numerical gate downloads the existing SHA-256-pinned PaddleOCR boarding
+pass image, derives a fixed 640×528 lossless crop in Rust, and scores all 64
+upstream CPU reference tokens through the same KV-cache, no-repeat, and decoder
+loop used by production generation. It records every expected-token rank and
+logit delta, then performs a second free-running greedy decode. CPU with Apple
+Accelerate matches all 64 reference tokens exactly. Metal preserves the first
+15 exactly and has at most two rank-2 boundaries with a maximum 0.25 logit
+delta; the visible difference is one optional leading punctuation mark and a
+three-pixel title-box edge. Both paths must return the same three `header`,
+`title`, and `text` blocks, reviewed text, and source-pixel geometry within that
+three-pixel bound. Set `A3S_UNLIMITED_OCR_REQUIRE_EXACT_PARITY=1` when auditing
+a backend that is expected to provide full teacher-forced token equality.
 
 The native forward path follows the authoritative upstream implementation:
 
@@ -280,12 +294,14 @@ worker then stops at its bounded preprocessing, vision, and decoder cancellation
 The provider emits one final receipt binding the source image digest, reviewed
 weight collection, Power device, and user-visible UTF-8 text.
 
-CPU is available with `unlimited-ocr`. Build with `unlimited-ocr-metal` for an
-explicit Apple Metal device or `unlimited-ocr-cuda` for an explicit NVIDIA CUDA
-device. Typed device selection fails closed when the requested accelerator is
-unavailable. Running inside Power's TEE deployment retains model integrity,
-resource bounds, private telemetry, and receipt guarantees; source bytes and
-detailed routing data are never exported by this provider.
+CPU is available with `unlimited-ocr`; `unlimited-ocr-accelerate` enables Apple
+Accelerate CPU kernels while preserving BF16 model boundaries. Build with
+`unlimited-ocr-metal` for an explicit Apple Metal device or
+`unlimited-ocr-cuda` for an explicit NVIDIA CUDA device. Typed device selection
+fails closed when the requested accelerator is unavailable. Running inside
+Power's TEE deployment retains model integrity, resource bounds, private
+telemetry, and receipt guarantees; source bytes and detailed routing data are
+never exported by this provider.
 
 The provider applies the upstream single-image prompt and no-repeat n-gram
 policy in the native generation loop and preserves generated Markdown. It
@@ -355,6 +371,7 @@ visible to the MCP host instead of looking like a local-only read.
 | `power-runtime` | Model-neutral embedded A3S Power runtime; never enables its server feature |
 | `ppocr-v6` | Local PP-OCRv6 provider, native graph plans, installer, image pipeline |
 | `unlimited-ocr` | Native CPU Unlimited-OCR model, tokenizer, image pipeline, generation, and grounding |
+| `unlimited-ocr-accelerate` | Unlimited-OCR plus Apple Accelerate CPU kernels with reviewed BF16 operation boundaries |
 | `unlimited-ocr-metal` | Unlimited-OCR plus the Power/Candle Apple Metal device path |
 | `unlimited-ocr-cuda` | Unlimited-OCR plus the Power/Candle NVIDIA CUDA device path |
 | `mcp` | Provider-neutral standard MCP host |
@@ -397,6 +414,7 @@ tools/check_official_ppocr_v6.sh /tmp/a3s-ppocr-v6-gate
 tools/check_official_unlimited_ocr.sh /tmp/a3s-unlimited-ocr-gate
 # With a complete reviewed checkpoint already present:
 tools/check_local_unlimited_ocr_checkpoint.sh /models/baidu-unlimited-ocr
+tools/check_local_unlimited_ocr_parity.sh /models/baidu-unlimited-ocr
 # On macOS:
 cargo check --no-default-features --features unlimited-ocr-metal --locked
 cargo package --locked
