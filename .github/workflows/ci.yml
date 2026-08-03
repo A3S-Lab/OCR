@@ -35,6 +35,16 @@ jobs:
         shell: bash
         run: tools/check_official_ppocr_v6.sh "${RUNNER_TEMP}/official-ppocr-v6"
 
+  official-unlimited-ocr-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Verify the pinned Unlimited-OCR asset and tensor inventory
+        shell: bash
+        run: tools/check_official_unlimited_ocr.sh "${RUNNER_TEMP}/official-unlimited-ocr"
+
   test:
     strategy:
       fail-fast: false

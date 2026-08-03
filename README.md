@@ -240,6 +240,16 @@ and inventory verification path, including any explicitly configured verified
 replicas. The reviewed primary weight file is exactly 6,672,547,120 bytes
 with SHA-256
 `2bc48a7a110061ea58fff65d3169367eebe3aee371ca6968dc2219c1b2855fc6`.
+The non-skippable official-inventory gate resolves only revision
+`07dea832e22aefee32ad281d4b80551282e1c168`, verifies Hugging Face's repository
+commit plus linked file size and SHA-256, and range-reads the 334,632-byte
+SafeTensors JSON header instead of downloading the 6.7 GiB payload. It checks
+the pinned small-asset digests, official index, all 2,710 BF16 tensor names,
+shapes and byte ranges, the exact 6,672,212,480-byte tensor payload layout, and
+an OCR-owned canonical inventory digest. Session loading compares Power's
+fully hashed inventory with that same digest before inference. This gate proves
+checkpoint identity and topology; numerical generation and grounding parity
+remain a separate acceptance gate.
 
 The native forward path follows the authoritative upstream implementation:
 
@@ -384,6 +394,9 @@ cargo check --no-default-features --features mcp --locked
 cargo test --features unlimited-ocr --locked
 cargo clippy --all-targets --features unlimited-ocr --locked -- -D warnings
 tools/check_official_ppocr_v6.sh /tmp/a3s-ppocr-v6-gate
+tools/check_official_unlimited_ocr.sh /tmp/a3s-unlimited-ocr-gate
+# With a complete reviewed checkpoint already present:
+tools/check_local_unlimited_ocr_checkpoint.sh /models/baidu-unlimited-ocr
 # On macOS:
 cargo check --no-default-features --features unlimited-ocr-metal --locked
 cargo package --locked
