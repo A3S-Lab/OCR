@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use a3s_power::inference::WeightStore;
+use a3s_power::inference::{TensorDescriptor, WeightStore};
 use a3s_use_core::{UseError, UseResult};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -11,6 +11,9 @@ pub(crate) const MODEL_WEIGHT_BYTES: u64 = 6_672_547_120;
 pub(crate) const MODEL_WEIGHT_SHA256: &str =
     "2bc48a7a110061ea58fff65d3169367eebe3aee371ca6968dc2219c1b2855fc6";
 const MODEL_TENSOR_COUNT: usize = 2_710;
+const MODEL_INVENTORY_SHA256: &str =
+    "7b49acc0ea490f3a236f13e4bb23f1cf7dc541f3a49fed60b6a1438334a744f3";
+const INVENTORY_DIGEST_DOMAIN: &[u8] = b"a3s.ocr.unlimited-ocr.tensor-inventory.v1\0";
 
 const REVIEWED_FILES: [ReviewedFile; 5] = [
     ReviewedFile {
@@ -51,6 +54,25 @@ struct ReviewedFile {
     relative: &'static str,
     max_bytes: u64,
     sha256: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReviewedTensorDescriptor {
+    name: String,
+    dtype: String,
+    shape: Vec<usize>,
+    bytes: u64,
+}
+
+impl From<&TensorDescriptor> for ReviewedTensorDescriptor {
+    fn from(descriptor: &TensorDescriptor) -> Self {
+        Self {
+            name: descriptor.name.clone(),
+            dtype: descriptor.dtype.to_ascii_lowercase(),
+            shape: descriptor.shape.clone(),
+            bytes: descriptor.bytes,
+        }
+    }
 }
 
 pub(crate) fn inspect_assets(root: &Path) -> UseResult<ModelAssets> {
@@ -116,12 +138,78 @@ pub(crate) fn verify_weight_store(store: &WeightStore, assets: &ModelAssets) -> 
         )
         .with_detail("revision", MODEL_REVISION));
     }
-    if store.inventory().len() != MODEL_TENSOR_COUNT {
+    verify_reviewed_inventory(store.inventory().map(ReviewedTensorDescriptor::from))
+}
+
+fn verify_reviewed_inventory(
+    inventory: impl IntoIterator<Item = ReviewedTensorDescriptor>,
+) -> UseResult<()> {
+    let mut inventory = inventory.into_iter().collect::<Vec<_>>();
+    if inventory.len() != MODEL_TENSOR_COUNT {
         return Err(model_invalid(format!(
             "Unlimited-OCR checkpoint must contain {MODEL_TENSOR_COUNT} tensors; found {}.",
-            store.inventory().len()
+            inventory.len()
         )));
     }
+    let actual = reviewed_inventory_sha256(&mut inventory)?;
+    if actual != MODEL_INVENTORY_SHA256 {
+        return Err(UseError::new(
+            "use.ocr.integrity_mismatch",
+            "Unlimited-OCR tensor names, dtypes, shapes, or byte ranges do not match the reviewed checkpoint.",
+        )
+        .with_detail("revision", MODEL_REVISION)
+        .with_detail("expectedInventorySha256", MODEL_INVENTORY_SHA256)
+        .with_detail("actualInventorySha256", actual));
+    }
+    Ok(())
+}
+
+fn reviewed_inventory_sha256(inventory: &mut [ReviewedTensorDescriptor]) -> UseResult<String> {
+    inventory.sort_by(|left, right| left.name.cmp(&right.name));
+    let count = u64::try_from(inventory.len())
+        .map_err(|_| model_invalid("Unlimited-OCR tensor count exceeds u64."))?;
+    let mut digest = Sha256::new();
+    digest.update(INVENTORY_DIGEST_DOMAIN);
+    digest.update(count.to_le_bytes());
+    let mut previous: Option<&str> = None;
+    for descriptor in inventory {
+        if descriptor.name.is_empty()
+            || descriptor.name.as_bytes().contains(&0)
+            || descriptor.dtype.is_empty()
+            || descriptor.dtype.as_bytes().contains(&0)
+            || descriptor.bytes == 0
+        {
+            return Err(model_invalid(
+                "Unlimited-OCR tensor inventory contains an invalid descriptor.",
+            ));
+        }
+        if previous == Some(descriptor.name.as_str()) {
+            return Err(model_invalid(format!(
+                "Unlimited-OCR tensor inventory repeats '{}'.",
+                descriptor.name
+            )));
+        }
+        previous = Some(&descriptor.name);
+        update_digest_field(&mut digest, descriptor.name.as_bytes())?;
+        update_digest_field(&mut digest, descriptor.dtype.as_bytes())?;
+        let rank = u64::try_from(descriptor.shape.len())
+            .map_err(|_| model_invalid("Unlimited-OCR tensor rank exceeds u64."))?;
+        digest.update(rank.to_le_bytes());
+        for dimension in &descriptor.shape {
+            let dimension = u64::try_from(*dimension)
+                .map_err(|_| model_invalid("Unlimited-OCR tensor dimension exceeds u64."))?;
+            digest.update(dimension.to_le_bytes());
+        }
+        digest.update(descriptor.bytes.to_le_bytes());
+    }
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn update_digest_field(digest: &mut Sha256, field: &[u8]) -> UseResult<()> {
+    let length = u64::try_from(field.len())
+        .map_err(|_| model_invalid("Unlimited-OCR inventory field exceeds u64."))?;
+    digest.update(length.to_le_bytes());
+    digest.update(field);
     Ok(())
 }
 
@@ -248,3 +336,7 @@ fn model_invalid(message: impl Into<String>) -> UseError {
         .with_detail("revision", MODEL_REVISION)
         .with_suggestion("Restore the exact reviewed baidu/Unlimited-OCR model assets.")
 }
+
+#[cfg(test)]
+#[path = "assets_tests.rs"]
+mod tests;

@@ -92,6 +92,15 @@ SHA-256. Power owns all full SafeTensors hashing, including replica
 verification, and exposes the verified collection through one shared
 `WeightHierarchy`.
 
+Pull-request and release CI independently resolve that exact upstream commit,
+check the Hugging Face linked weight size and SHA-256, and range-read only the
+8-byte SafeTensors prefix plus its 334,632-byte JSON header. The gate verifies
+the official small-asset digests and index, all 2,710 BF16 names, shapes,
+contiguous byte ranges, the 6,672,212,480-byte tensor payload, and a canonical
+OCR-owned inventory digest. Runtime session loading compares Power's fully
+hashed `WeightStore` inventory with that same digest. The metadata gate neither
+executes upstream Python nor substitutes for numerical model-output parity.
+
 ```text
 bounded source image
   -> EXIF-aware decode and Pillow-compatible normalized global/tiled views
@@ -166,7 +175,8 @@ Before changing a pinned model or graph plan, verify:
 7. an embedded dependency closure without ONNX Runtime, a Web server, browser
    automation, Python inference, or external OCR services.
 
-The official-bundle CPU graph and PP-OCRv6 real-image parity gates are enforced
-today. Unlimited-OCR upstream parity evidence remains open acceptance work and
-must not be reported as complete until its reproducible fixtures are checked
-in.
+The official-bundle CPU graph, PP-OCRv6 real-image parity, and Unlimited-OCR
+official checkpoint/inventory gates are enforced today. Unlimited-OCR
+numerical token-generation and grounding parity evidence remains open
+acceptance work and must not be reported as complete until its reproducible
+fixtures are checked in.

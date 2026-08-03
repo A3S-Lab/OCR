@@ -35,6 +35,9 @@ jobs:
       - name: Execute pinned PP-OCRv6 graphs and real-image parity on CPU
         shell: bash
         run: tools/check_official_ppocr_v6.sh "${RUNNER_TEMP}/official-ppocr-v6"
+      - name: Verify the pinned Unlimited-OCR asset and tensor inventory
+        shell: bash
+        run: tools/check_official_unlimited_ocr.sh "${RUNNER_TEMP}/official-unlimited-ocr"
       - if: runner.os == 'macOS'
         run: cargo check --no-default-features --features unlimited-ocr-metal --locked
       - name: Verify the embedded inference dependency boundary
