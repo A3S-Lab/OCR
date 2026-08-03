@@ -25,58 +25,32 @@ weight_file="model-00001-of-000001.safetensors"
 weight_bytes="6672547120"
 weight_sha256="2bc48a7a110061ea58fff65d3169367eebe3aee371ca6968dc2219c1b2855fc6"
 header_json_bytes="334632"
+repository_url="https://huggingface.co/${repository}"
 base_url="https://huggingface.co/${repository}/resolve/${revision}"
 
-download_asset() {
-  local relative="${1}"
-  local max_bytes="${2}"
-  curl \
-    --proto '=https' \
-    --proto-redir '=https' \
-    --fail \
-    --location \
-    --silent \
-    --show-error \
-    --retry 2 \
-    --max-filesize "${max_bytes}" \
-    --output "${fixture_root}/${relative}" \
-    "${base_url}/${relative}"
-}
+model_root="${fixture_root}/repository"
+mkdir -p "${model_root}"
+git -C "${model_root}" -c init.defaultBranch=main init --quiet
+git -C "${model_root}" remote add origin "${repository_url}"
+GIT_LFS_SKIP_SMUDGE=1 git -C "${model_root}" fetch \
+  --quiet \
+  --depth=1 \
+  origin \
+  "${revision}"
+GIT_LFS_SKIP_SMUDGE=1 git -C "${model_root}" \
+  -c advice.detachedHead=false \
+  checkout --quiet --detach FETCH_HEAD
 
-download_asset "config.json" 131072
-download_asset "tokenizer.json" 67108864
-download_asset "tokenizer_config.json" 1048576
-download_asset "special_tokens_map.json" 1048576
-download_asset "processor_config.json" 1048576
-download_asset "model.safetensors.index.json" 1048576
+test "$(git -C "${model_root}" rev-parse HEAD)" = "${revision}"
+test "$(wc -l < "${model_root}/${weight_file}" | tr -d ' ')" = "3"
+test "$(sed -n '1p' "${model_root}/${weight_file}")" = \
+  "version https://git-lfs.github.com/spec/v1"
+test "$(sed -n '2p' "${model_root}/${weight_file}")" = \
+  "oid sha256:${weight_sha256}"
+test "$(sed -n '3p' "${model_root}/${weight_file}")" = \
+  "size ${weight_bytes}"
 
-headers="${fixture_root}/model.safetensors.headers"
-curl \
-  --proto '=https' \
-  --fail \
-  --head \
-  --silent \
-  --show-error \
-  --retry 2 \
-  --output "${headers}" \
-  "${base_url}/${weight_file}"
-
-header_value() {
-  local key="${1}"
-  awk -F ': *' -v key="${key}" '
-    tolower($1) == tolower(key) {
-      sub(/\r$/, "", $2)
-      print $2
-      exit
-    }
-  ' "${headers}"
-}
-
-test "$(header_value x-repo-commit)" = "${revision}"
-test "$(header_value x-linked-size)" = "${weight_bytes}"
-test "$(header_value x-linked-etag)" = "\"${weight_sha256}\""
-
-header_fixture="${fixture_root}/model.safetensors.header"
+header_fixture="${model_root}/model.safetensors.header"
 header_fixture_bytes="$((header_json_bytes + 8))"
 curl \
   --proto '=https' \
@@ -85,7 +59,10 @@ curl \
   --location \
   --silent \
   --show-error \
-  --retry 2 \
+  --retry 20 \
+  --retry-all-errors \
+  --retry-delay 15 \
+  --retry-max-time 300 \
   --range "0-$((header_fixture_bytes - 1))" \
   --max-filesize 1048576 \
   --output "${header_fixture}" \
@@ -96,7 +73,7 @@ actual_header_json_bytes="$(od -An -t u8 -N 8 "${header_fixture}" | tr -d '[:spa
 test "${actual_header_fixture_bytes}" = "${header_fixture_bytes}"
 test "${actual_header_json_bytes}" = "${header_json_bytes}"
 
-export A3S_UNLIMITED_OCR_OFFICIAL_FIXTURE="${fixture_root}"
+export A3S_UNLIMITED_OCR_OFFICIAL_FIXTURE="${model_root}"
 cargo test \
   --locked \
   --no-default-features \
