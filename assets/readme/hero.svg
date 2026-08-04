@@ -2,7 +2,7 @@
      width="1200" height="440" viewBox="0 0 1200 440"
      role="img" aria-labelledby="title desc">
   <title id="title">A3S OCR — text extraction with canonical source evidence</title>
-  <desc id="desc">A bounded image is validated and hashed by OcrClient, routed to a typed OCR model over the embedded A3S Power runtime, and returned with source and execution evidence.</desc>
+  <desc id="desc">A bounded image is validated and hashed by OcrClient, routed to an OCR-owned typed model over the model-neutral A3S Power runtime, and returned with source and execution evidence.</desc>
 
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1200" y2="440" gradientUnits="userSpaceOnUse">
@@ -84,13 +84,16 @@
       <rect width="176" height="94" rx="9" fill="#11231d" stroke="#379673" stroke-width="2"/>
       <text x="16" y="29" fill="#79e2be" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" letter-spacing="1">DEFAULT / LOCAL</text>
       <text x="16" y="59" fill="#f3f7fb" font-size="22" font-weight="720">PP-OCRv6</text>
-      <text x="16" y="81" fill="#93b9aa" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Power native</text>
+      <text x="16" y="81" fill="#93b9aa" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">OCR-owned graph</text>
 
       <rect y="119" width="176" height="94" rx="9" fill="#201b15" stroke="#a77b37" stroke-width="2"/>
       <text x="16" y="148" fill="#f3c875" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" letter-spacing="1">OPTIONAL / TYPED</text>
       <text x="16" y="178" fill="#f3f7fb" font-size="22" font-weight="720">Unlimited-OCR</text>
-      <text x="16" y="200" fill="#c5a873" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Power embedded</text>
+      <text x="16" y="200" fill="#c5a873" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">OCR-owned VLM</text>
+
     </g>
+
+    <text x="254" y="287" fill="#91a0b2" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700">POWER · DEVICES / WEIGHTS / RECEIPTS</text>
 
     <g id="evidence-ledger" transform="translate(0 298)">
       <rect width="610" height="92" rx="10" fill="#101a25" stroke="#33485e" stroke-width="2"/>
