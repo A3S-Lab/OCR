@@ -75,12 +75,63 @@ runner.
 The same gate downloads PaddleOCR's official `general_ocr_002` image only after
 checking its 128,713-byte length and SHA-256
 `4425af33dd163cf73bdff502bd35ee527e9bdd5725501db1da78bfdae9f538f4`.
+Although the upstream URL ends in `.png`, those pinned bytes have a JPEG
+signature; `OcrClient` therefore records `image/jpeg` from content detection.
 It runs the complete Rust image pipeline and compares 30 ordered blocks against
 a one-time Paddle 3.3.1 / PaddleOCR 3.7.0 reference produced with the exact
 PP-OCRv6 small models. Whitespace and one reviewed punctuation boundary are
 normalized, recognition confidence may differ by at most 0.065, and every
 source polygon coordinate may differ by at most four pixels. The gate still
 executes no Paddle, Python, ONNX, browser, service, or Web listener.
+
+`a3s-use-ocr-execution-bench` reuses the same fixture through the public client
+and provider boundary. Its schema separates first-session model loading from
+warm engine reuse, samples process RSS, binds the two model/Power fingerprints,
+and hashes canonical output without serializing recognized text or local paths.
+See [PP-OCRv6 Execution Baseline Protocol](execution-baseline.md).
+
+### Staged batches and session ownership
+
+The public staged contract names orientation, preprocessing, layout, text,
+table, and formula without requiring every provider to implement every stage.
+Descriptors declare a canonical supported-stage set. The client validates up to
+256 caller-owned slot IDs, keeps the existing 32 MiB per-image bound, caps
+retained validated inputs at 256 MiB, and reconstructs exact caller order after
+the provider returns. Source and execution failures stay on their slots;
+malformed provider cardinality, identity, order, stage, or receipt evidence
+fails the provider contract globally.
+
+PP-OCRv6 implements preprocessing and text. Its staged execution is:
+
+```text
+validated slots and exact caller IDs
+  -> cancellation-aware bounded decode; corrupt images fail only their slots
+  -> exact OCR-owned model/execution/resource declaration
+  -> Power model-session pool with finite load and device queues
+  -> deterministic contiguous plan from live host/device memory
+  -> one admitted Power microbatch permit across each planned slot group
+  -> per-slot OCR results plus digest-only Power receipt v4 evidence
+```
+
+The pool is local to the injected provider and retains at most two exact
+sessions with a 1 GiB aggregate resident-weight declaration. A session permits
+one active device execution and at most 32 queued executions. A microbatch
+contains at most eight slots and is revalidated against current capacity and
+topology before admission. CPU accounting declares decoded bytes plus bounded
+per-slot scratch; accelerator accounting separates host and device peaks while
+Power counts unified memory only once.
+
+The detector and recognizer are still invoked sequentially per image under the
+shared permit and engine lock. The batch boundary currently supplies bounded
+admission, cancellation, stable identity, partial failure, deterministic
+ordering, and auditable memory/queue evidence. It does not yet claim fused
+multi-image kernels or a throughput improvement. Those claims require the TO5
+single-image, mixed-Office, and scale benchmarks.
+
+OCR does not own document order or cross-page semantics. A parser may use slot
+IDs to bind OCR evidence to exact rendered surfaces, but retry/cache authority,
+native/visual reconciliation, cross-page continuation, and document graph
+construction remain in A3S Parser.
 
 ## Unlimited-OCR
 

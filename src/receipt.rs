@@ -2,9 +2,22 @@ use a3s_power::inference::{ExecutionDigest, ExecutionReceipt, ExecutionRepresent
 
 use crate::models::{
     OcrExecutionDigest, OcrExecutionModel, OcrExecutionReceipt, OcrExecutionRuntime,
+    OcrMicrobatchExecutionEvidence,
 };
 
 pub(crate) fn project_receipt(receipt: ExecutionReceipt) -> OcrExecutionReceipt {
+    let microbatch = receipt
+        .microbatch
+        .map(|evidence| OcrMicrobatchExecutionEvidence {
+            schema: evidence.schema,
+            session_declaration_sha256: evidence.session_declaration_sha256,
+            plan_sha256: evidence.plan_sha256,
+            batch_index: evidence.batch_index,
+            batch_count: evidence.batch_count,
+            slot_count: evidence.slot_count,
+            model_admission_queued: evidence.model_admission_queued,
+            device_admission_queued: evidence.device_admission_queued,
+        });
     OcrExecutionReceipt {
         schema: receipt.schema,
         model: OcrExecutionModel {
@@ -19,6 +32,7 @@ pub(crate) fn project_receipt(receipt: ExecutionReceipt) -> OcrExecutionReceipt 
         },
         input: project_digest(receipt.input),
         output: project_digest(receipt.output),
+        microbatch,
     }
 }
 

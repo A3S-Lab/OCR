@@ -8,6 +8,7 @@
 
 #[cfg(feature = "ppocr-v6")]
 mod assets;
+mod batch;
 #[cfg(feature = "power-runtime")]
 mod cancellation;
 #[cfg(feature = "cli")]
@@ -22,6 +23,7 @@ mod install;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 mod models;
+mod output_validation;
 #[cfg(feature = "ppocr-v6")]
 mod postprocess;
 #[cfg(feature = "ppocr-v6")]
@@ -42,6 +44,12 @@ pub use a3s_power::inference::{
 };
 #[cfg(feature = "ppocr-v6")]
 pub use assets::{ocr_status, OcrInstallSource, OcrRuntimeStatus};
+pub use batch::{
+    OcrBatchRequest, OcrBatchResult, OcrBatchSlotId, OcrBatchSlotRequest, OcrBatchSlotResult,
+    OcrBatchSlotStatus, OcrModelFingerprint, OcrProviderBatchOutput, OcrProviderBatchRequest,
+    OcrProviderBatchSlot, OcrProviderBatchSlotOutput, OcrProviderFingerprint, OcrStage,
+    OcrStageOutcome, OcrStageStatus,
+};
 pub use client::OcrClient;
 #[cfg(feature = "ppocr-v6")]
 pub use install::{install_ppocr_v6, repair_ppocr_v6, uninstall_managed_ppocr_v6};
@@ -49,7 +57,8 @@ pub use install::{install_ppocr_v6, repair_ppocr_v6, uninstall_managed_ppocr_v6}
 pub use mcp::OcrMcpServer;
 pub use models::{
     OcrBlock, OcrBlockCategory, OcrBlockRole, OcrBoundingBox, OcrDiagnostic, OcrExecutionDigest,
-    OcrExecutionModel, OcrExecutionReceipt, OcrExecutionRuntime, OcrPoint, OcrRequest, OcrResult,
+    OcrExecutionModel, OcrExecutionReceipt, OcrExecutionRuntime, OcrMicrobatchExecutionEvidence,
+    OcrPoint, OcrRequest, OcrResult,
 };
 #[cfg(feature = "ppocr-v6")]
 pub use ppocr_v6::{PpOcrV6Provider, PP_OCR_V6_PROVIDER_ID};

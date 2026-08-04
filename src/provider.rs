@@ -3,7 +3,10 @@ use std::sync::Arc;
 use a3s_use_core::{Artifact, Readiness, UseError, UseResult};
 use async_trait::async_trait;
 
-use crate::{OcrBlock, OcrExecutionReceipt};
+use crate::{
+    OcrBlock, OcrExecutionReceipt, OcrProviderBatchOutput, OcrProviderBatchRequest,
+    OcrProviderBatchSlotOutput, OcrStage, OcrStageOutcome,
+};
 
 /// Stable identity and execution characteristics of an OCR provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,6 +14,7 @@ pub struct OcrProviderDescriptor {
     pub id: String,
     pub engine: String,
     pub sends_source_off_device: bool,
+    pub supported_stages: Vec<OcrStage>,
 }
 
 impl OcrProviderDescriptor {
@@ -23,6 +27,7 @@ impl OcrProviderDescriptor {
             id: id.into(),
             engine: engine.into(),
             sends_source_off_device,
+            supported_stages: vec![OcrStage::Text],
         };
         descriptor.validate()?;
         Ok(descriptor)
@@ -53,7 +58,38 @@ impl OcrProviderDescriptor {
                 "OCR provider engine names must contain 1 through 128 characters.",
             ));
         }
+        if self.supported_stages.is_empty() {
+            return Err(UseError::new(
+                "use.ocr.provider_descriptor_invalid",
+                "OCR providers must declare at least one supported stage.",
+            ));
+        }
+        let mut stages = self.supported_stages.clone();
+        stages.sort_unstable();
+        stages.dedup();
+        if stages != self.supported_stages {
+            return Err(UseError::new(
+                "use.ocr.provider_descriptor_invalid",
+                "OCR provider stages must be unique and use canonical order.",
+            ));
+        }
         Ok(())
+    }
+
+    pub fn with_stages(mut self, mut stages: Vec<OcrStage>) -> UseResult<Self> {
+        stages.sort_unstable();
+        stages.dedup();
+        self.supported_stages = stages;
+        self.validate()?;
+        Ok(self)
+    }
+
+    pub fn supports_stage(&self, stage: OcrStage) -> bool {
+        self.supported_stages.binary_search(&stage).is_ok()
+    }
+
+    pub(crate) fn canonical_stages(&self) -> Vec<OcrStage> {
+        self.supported_stages.clone()
     }
 }
 
@@ -68,10 +104,20 @@ pub struct OcrProviderStatus {
 }
 
 /// One validated image supplied to an OCR provider.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct OcrInput {
     source: Artifact,
     bytes: Arc<[u8]>,
+}
+
+impl std::fmt::Debug for OcrInput {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("OcrInput")
+            .field("source", &"validated-image")
+            .field("byte_length", &self.bytes.len())
+            .finish()
+    }
 }
 
 impl OcrInput {
@@ -113,6 +159,44 @@ pub trait OcrProvider: Send + Sync {
     fn diagnostic(&self) -> OcrProviderStatus;
 
     async fn recognize(&self, input: OcrInput) -> UseResult<OcrProviderOutput>;
+
+    /// Default compatibility adapter for text-only providers.
+    ///
+    /// Providers with typed preprocessing, layout, table, or formula stages
+    /// should override this method and return one exact slot outcome per input.
+    async fn recognize_batch(
+        &self,
+        request: OcrProviderBatchRequest,
+    ) -> UseResult<OcrProviderBatchOutput> {
+        let mut slots = Vec::with_capacity(request.slots.len());
+        for slot in request.slots {
+            let recognition = if request.stages.contains(&OcrStage::Text) {
+                Some(self.recognize(slot.input).await)
+            } else {
+                None
+            };
+            let stages = request
+                .stages
+                .iter()
+                .map(|stage| match (*stage, &recognition) {
+                    (OcrStage::Text, Some(Ok(_))) => OcrStageOutcome::completed(*stage),
+                    (OcrStage::Text, Some(Err(error))) => {
+                        OcrStageOutcome::failed(*stage, error.clone())
+                    }
+                    _ => OcrStageOutcome::unsupported(*stage),
+                })
+                .collect();
+            slots.push(OcrProviderBatchSlotOutput {
+                slot_id: slot.slot_id,
+                stages,
+                output: recognition.and_then(Result::ok),
+            });
+        }
+        Ok(OcrProviderBatchOutput {
+            slots,
+            execution_receipts: Vec::new(),
+        })
+    }
 }
 
 #[cfg(test)]

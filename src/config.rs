@@ -143,8 +143,7 @@ pub(crate) fn load_recognition(path: &Path) -> UseResult<RecognitionConfig> {
         || !(32..=4096).contains(&dimensions[2])
     {
         return Err(config_error(format!(
-            "Unsupported PP-OCRv6 recognition input shape {:?}.",
-            dimensions
+            "Unsupported PP-OCRv6 recognition input shape {dimensions:?}."
         )));
     }
     Ok(RecognitionConfig {

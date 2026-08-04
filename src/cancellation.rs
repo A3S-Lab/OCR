@@ -7,14 +7,28 @@ use tokio_util::sync::CancellationToken;
 /// Tokio cannot abort a `spawn_blocking` task once it has started. This guard
 /// therefore cancels the one request token when the awaiting future is dropped;
 /// native stages observe that token at their bounded cancellation points.
+#[cfg(any(feature = "unlimited-ocr", test))]
 pub(crate) async fn run_blocking<T, F>(label: &'static str, operation: F) -> UseResult<T>
 where
     T: Send + 'static,
     F: FnOnce(CancellationToken) -> UseResult<T> + Send + 'static,
 {
-    let cancellation = CancellationToken::new();
-    let worker_cancellation = cancellation.clone();
-    let guard = CancelOnDrop::new(cancellation);
+    let guard = CancellationScope::new();
+    let result = run_blocking_with(label, guard.token(), operation).await;
+    guard.disarm();
+    result
+}
+
+pub(crate) async fn run_blocking_with<T, F>(
+    label: &'static str,
+    cancellation: CancellationToken,
+    operation: F,
+) -> UseResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce(CancellationToken) -> UseResult<T> + Send + 'static,
+{
+    let worker_cancellation = cancellation;
     let result = tokio::task::spawn_blocking(move || operation(worker_cancellation))
         .await
         .map_err(|error| {
@@ -23,7 +37,6 @@ where
                 format!("The {label} blocking task failed: {error}"),
             )
         })?;
-    guard.disarm();
     result
 }
 
@@ -38,25 +51,29 @@ pub(crate) fn check_cancelled(cancellation: &CancellationToken) -> UseResult<()>
     }
 }
 
-struct CancelOnDrop {
+pub(crate) struct CancellationScope {
     cancellation: CancellationToken,
     armed: bool,
 }
 
-impl CancelOnDrop {
-    fn new(cancellation: CancellationToken) -> Self {
+impl CancellationScope {
+    pub(crate) fn new() -> Self {
         Self {
-            cancellation,
+            cancellation: CancellationToken::new(),
             armed: true,
         }
     }
 
-    fn disarm(mut self) {
+    pub(crate) fn token(&self) -> CancellationToken {
+        self.cancellation.clone()
+    }
+
+    pub(crate) fn disarm(mut self) {
         self.armed = false;
     }
 }
 
-impl Drop for CancelOnDrop {
+impl Drop for CancellationScope {
     fn drop(&mut self) {
         if self.armed {
             self.cancellation.cancel();
@@ -98,9 +115,9 @@ mod tests {
 
     #[test]
     fn successful_completion_disarms_cancellation() {
-        let cancellation = CancellationToken::new();
-        let observed = cancellation.clone();
-        CancelOnDrop::new(cancellation).disarm();
+        let scope = CancellationScope::new();
+        let observed = scope.token();
+        scope.disarm();
         assert!(!observed.is_cancelled());
     }
 }

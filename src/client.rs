@@ -5,12 +5,13 @@ use a3s_use_core::{Artifact, UseError, UseResult};
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncReadExt;
 
-use crate::models::{OcrBlock, OcrBoundingBox, OcrDiagnostic, OcrRequest, OcrResult};
+use crate::models::{OcrDiagnostic, OcrRequest, OcrResult};
+use crate::output_validation::validate_provider_output;
+#[cfg(test)]
+use crate::output_validation::MAX_COMPONENT_BOXES_PER_BLOCK;
 use crate::provider::{OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput};
 
 const MAX_INPUT_BYTES: u64 = 32 * 1024 * 1024;
-const MAX_BLOCK_CATEGORY_LABEL_BYTES: usize = 128;
-const MAX_COMPONENT_BOXES_PER_BLOCK: usize = 128;
 
 /// Provider-neutral OCR client.
 ///
@@ -18,8 +19,8 @@ const MAX_COMPONENT_BOXES_PER_BLOCK: usize = 128;
 /// one injected [`OcrProvider`].
 #[derive(Clone)]
 pub struct OcrClient {
-    provider: Arc<dyn OcrProvider>,
-    descriptor: OcrProviderDescriptor,
+    pub(crate) provider: Arc<dyn OcrProvider>,
+    pub(crate) descriptor: OcrProviderDescriptor,
 }
 
 impl OcrClient {
@@ -66,6 +67,14 @@ impl OcrClient {
         let input = read_source(&request.path).await?;
         let source = input.source().clone();
         let output = self.provider.recognize(input).await?;
+        self.finish_output(source, output)
+    }
+
+    pub(crate) fn finish_output(
+        &self,
+        source: Artifact,
+        output: OcrProviderOutput,
+    ) -> UseResult<OcrResult> {
         validate_provider_output(&output)?;
         Ok(OcrResult {
             provider: self.descriptor.id.clone(),
@@ -80,118 +89,7 @@ impl OcrClient {
     }
 }
 
-fn validate_provider_output(output: &OcrProviderOutput) -> UseResult<()> {
-    for block in &output.blocks {
-        if block.page == 0 {
-            return Err(provider_output_error(
-                "OCR providers must number pages starting at 1.",
-            ));
-        }
-        for (name, value) in [
-            ("confidence", block.confidence),
-            ("detection confidence", block.detection_confidence),
-        ] {
-            if value.is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value)) {
-                return Err(provider_output_error(format!(
-                    "OCR provider {name} must be between 0 and 1."
-                )));
-            }
-        }
-        validate_block_category(block)?;
-        validate_block_geometry(block)?;
-    }
-    Ok(())
-}
-
-fn validate_block_category(block: &OcrBlock) -> UseResult<()> {
-    let Some(category) = &block.category else {
-        return Ok(());
-    };
-    let label = category.raw_label.as_bytes();
-    if label.is_empty()
-        || label.len() > MAX_BLOCK_CATEGORY_LABEL_BYTES
-        || !label
-            .first()
-            .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_')
-        || !label
-            .iter()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
-    {
-        return Err(provider_output_error(
-            "OCR provider block labels must contain 1 through 128 ASCII letters, digits, underscores, or hyphens and start with a letter or underscore.",
-        ));
-    }
-    Ok(())
-}
-
-fn validate_block_geometry(block: &OcrBlock) -> UseResult<()> {
-    if block.bounding_boxes.len() > MAX_COMPONENT_BOXES_PER_BLOCK {
-        return Err(provider_output_error(
-            "OCR provider blocks must not contain more than 128 component boxes.",
-        ));
-    }
-    if let Some(bounds) = block.bounding_box {
-        validate_box(bounds)?;
-    }
-    for bounds in &block.bounding_boxes {
-        validate_box(*bounds)?;
-    }
-    if !block.bounding_boxes.is_empty()
-        && block.bounding_box != component_envelope(&block.bounding_boxes)?
-    {
-        return Err(provider_output_error(
-            "An OCR provider block bounding box must equal the envelope of its component boxes.",
-        ));
-    }
-    Ok(())
-}
-
-fn validate_box(bounds: OcrBoundingBox) -> UseResult<()> {
-    if bounds.width == 0
-        || bounds.height == 0
-        || bounds.x.checked_add(bounds.width).is_none()
-        || bounds.y.checked_add(bounds.height).is_none()
-    {
-        return Err(provider_output_error(
-            "OCR provider bounding boxes must cover a positive representable area.",
-        ));
-    }
-    Ok(())
-}
-
-fn component_envelope(boxes: &[OcrBoundingBox]) -> UseResult<Option<OcrBoundingBox>> {
-    let mut left = u32::MAX;
-    let mut top = u32::MAX;
-    let mut right = 0_u32;
-    let mut bottom = 0_u32;
-    for bounds in boxes {
-        left = left.min(bounds.x);
-        top = top.min(bounds.y);
-        right =
-            right.max(bounds.x.checked_add(bounds.width).ok_or_else(|| {
-                provider_output_error("An OCR provider bounding box overflowed.")
-            })?);
-        bottom =
-            bottom.max(bounds.y.checked_add(bounds.height).ok_or_else(|| {
-                provider_output_error("An OCR provider bounding box overflowed.")
-            })?);
-    }
-    if boxes.is_empty() {
-        return Ok(None);
-    }
-    Ok(Some(OcrBoundingBox {
-        x: left,
-        y: top,
-        width: right - left,
-        height: bottom - top,
-    }))
-}
-
-fn provider_output_error(message: impl Into<String>) -> UseError {
-    UseError::new("use.ocr.provider_output_invalid", message)
-}
-
-async fn read_source(path: &Path) -> UseResult<OcrInput> {
+pub(crate) async fn read_source(path: &Path) -> UseResult<OcrInput> {
     let canonical = tokio::fs::canonicalize(path).await.map_err(|error| {
         UseError::new(
             "use.ocr.source_unreadable",
@@ -299,7 +197,7 @@ mod tests {
     use a3s_use_core::Readiness;
     use async_trait::async_trait;
 
-    use crate::{OcrBlock, OcrBlockCategory, OcrBlockRole, OcrProviderStatus};
+    use crate::{OcrBlock, OcrBlockCategory, OcrBlockRole, OcrBoundingBox, OcrProviderStatus};
 
     use super::*;
 

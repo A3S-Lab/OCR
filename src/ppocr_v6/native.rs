@@ -4,11 +4,15 @@ use std::path::Path;
 use std::sync::Arc;
 
 use a3s_power::inference::graph::{GraphExecutor, GraphIdentity, GraphPlan};
+#[cfg(test)]
+use a3s_power::inference::DevicePreference;
 use a3s_power::inference::{
-    DevicePreference, EmbeddedRuntime, ExecutionDigest, ExecutionPermit, ExecutionReceipt,
-    InferenceLimits, ModelIdentity, TensorInput, TensorOutput, WeightStore,
+    EmbeddedRuntime, ExecutionBatchBinding, ExecutionDigest, ExecutionPermit, ExecutionReceipt,
+    InferenceLimits, ModelIdentity, ModelSessionBinding, ModelSessionSpec, TensorInput,
+    TensorOutput, WeightStore,
 };
 use a3s_use_core::{UseError, UseResult};
+use sha2::{Digest, Sha256};
 use tokio_util::sync::CancellationToken;
 
 use crate::assets::ModelAssets;
@@ -42,10 +46,19 @@ pub(crate) struct NativePpOcrV6 {
 }
 
 impl NativePpOcrV6 {
+    #[cfg(test)]
     pub(crate) fn load(assets: &ModelAssets) -> UseResult<Self> {
-        let limits = InferenceLimits::default();
+        let limits = session_limits();
         let runtime = EmbeddedRuntime::new(DevicePreference::Auto, limits.clone())
             .map_err(|error| power_error("initialize the embedded runtime", error))?;
+        Self::load_with_runtime(assets, runtime)
+    }
+
+    pub(crate) fn load_with_runtime(
+        assets: &ModelAssets,
+        runtime: EmbeddedRuntime,
+    ) -> UseResult<Self> {
+        let limits = runtime.limits().clone();
         let detection = load_graph(
             &runtime,
             &limits,
@@ -67,6 +80,7 @@ impl NativePpOcrV6 {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn begin(&self, cancellation: &CancellationToken) -> UseResult<ExecutionPermit> {
         self.runtime
             .begin(cancellation)
@@ -140,6 +154,94 @@ impl NativePpOcrV6 {
             .receipt(identity.clone(), input_digest, output_digest);
         Ok(NativeGraphOutput { tensor, receipt })
     }
+}
+
+pub(crate) fn session_limits() -> InferenceLimits {
+    InferenceLimits {
+        max_concurrent_requests: 1,
+        max_queued_requests: 32,
+        ..InferenceLimits::default()
+    }
+}
+
+pub(crate) fn session_spec(assets: &ModelAssets) -> UseResult<ModelSessionSpec> {
+    let resident_bytes = file_size(&assets.detection_weights)?
+        .checked_add(file_size(&assets.recognition_weights)?)
+        .ok_or_else(|| model_error("PP-OCRv6 resident model bytes overflowed."))?;
+    ModelSessionSpec::new(
+        ModelSessionBinding::new(bundle_model_identity(), session_execution_sha256(assets)?),
+        session_limits(),
+        resident_bytes,
+    )
+    .map_err(|error| power_error("declare the PP-OCRv6 model session", error))
+}
+
+pub(crate) fn batch_binding() -> UseResult<ExecutionBatchBinding> {
+    ExecutionBatchBinding::new(
+        bundle_weights_sha256(),
+        named_sha256(b"a3s-ocr-ppocr-v6-staged-slot-layout-v1\0"),
+        named_sha256(b"a3s-ocr-ppocr-v6-contiguous-scheduler-v1\0"),
+    )
+    .map_err(|error| power_error("bind the PP-OCRv6 staged batch", error))
+}
+
+pub(crate) fn bundle_model_identity() -> ModelIdentity {
+    ModelIdentity::new(
+        format!("{FAMILY}-bundle"),
+        REVISION,
+        bundle_weights_sha256(),
+    )
+}
+
+fn bundle_weights_sha256() -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"a3s-ocr-ppocr-v6-bundle-weights-v1\0");
+    digest.update(DETECTION_WEIGHTS_SHA256.as_bytes());
+    digest.update(RECOGNITION_WEIGHTS_SHA256.as_bytes());
+    format!("{:x}", digest.finalize())
+}
+
+fn session_execution_sha256(assets: &ModelAssets) -> UseResult<String> {
+    let detection_config = std::fs::read(&assets.detection_config).map_err(|error| {
+        model_error(format!(
+            "Failed to read the PP-OCRv6 detection configuration: {error}"
+        ))
+    })?;
+    let recognition_config = std::fs::read(&assets.recognition_config).map_err(|error| {
+        model_error(format!(
+            "Failed to read the PP-OCRv6 recognition configuration: {error}"
+        ))
+    })?;
+    let mut digest = Sha256::new();
+    digest.update(b"a3s-ocr-ppocr-v6-session-execution-v1\0");
+    update_bytes(&mut digest, DETECTION_GRAPH.as_bytes())?;
+    update_bytes(&mut digest, RECOGNITION_GRAPH.as_bytes())?;
+    update_bytes(&mut digest, &detection_config)?;
+    update_bytes(&mut digest, &recognition_config)?;
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn update_bytes(digest: &mut Sha256, bytes: &[u8]) -> UseResult<()> {
+    let length = u64::try_from(bytes.len())
+        .map_err(|_| model_error("A PP-OCRv6 session input length cannot be represented."))?;
+    digest.update(length.to_le_bytes());
+    digest.update(bytes);
+    Ok(())
+}
+
+fn file_size(path: &Path) -> UseResult<u64> {
+    std::fs::metadata(path)
+        .map(|metadata| metadata.len())
+        .map_err(|error| {
+            model_error(format!(
+                "Failed to inspect PP-OCRv6 model bytes '{}': {error}",
+                path.display()
+            ))
+        })
+}
+
+fn named_sha256(domain: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(domain))
 }
 
 #[derive(Clone, Copy)]
@@ -223,6 +325,10 @@ fn power_error(action: &str, error: impl std::fmt::Display) -> UseError {
     )
 }
 
+fn model_error(message: impl Into<String>) -> UseError {
+    UseError::new("use.ocr.model_invalid", message)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,6 +350,43 @@ mod tests {
         let recognition: serde_json::Value = serde_json::from_str(RECOGNITION_GRAPH).unwrap();
         assert_eq!(detection["nodes"].as_array().unwrap().len(), 242);
         assert_eq!(recognition["nodes"].as_array().unwrap().len(), 481);
+    }
+
+    #[test]
+    fn pooled_session_and_batch_bindings_cover_exact_model_and_configuration() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let detection_weights = root.join("detection.safetensors");
+        let recognition_weights = root.join("recognition.safetensors");
+        let detection_config = root.join("detection.yml");
+        let recognition_config = root.join("recognition.yml");
+        std::fs::write(&detection_weights, b"detection").unwrap();
+        std::fs::write(&recognition_weights, b"recognition").unwrap();
+        std::fs::write(&detection_config, b"config-a").unwrap();
+        std::fs::write(&recognition_config, b"config-b").unwrap();
+        let assets = ModelAssets {
+            root: root.to_path_buf(),
+            detection_weights,
+            detection_config: detection_config.clone(),
+            recognition_weights,
+            recognition_config,
+            source: OcrInstallSource::Environment,
+        };
+        let first = session_spec(&assets).unwrap();
+        std::fs::write(detection_config, b"config-c").unwrap();
+        let second = session_spec(&assets).unwrap();
+
+        assert_ne!(
+            first.binding().execution_sha256,
+            second.binding().execution_sha256
+        );
+        assert_eq!(first.resident_bytes(), 20);
+        assert_eq!(first.limits().max_concurrent_requests, 1);
+        assert_eq!(first.limits().max_queued_requests, 32);
+        assert_eq!(
+            batch_binding().unwrap().weights_sha256,
+            bundle_model_identity().weights_sha256
+        );
     }
 
     #[test]

@@ -97,6 +97,23 @@ pub struct OcrExecutionReceipt {
     pub runtime: OcrExecutionRuntime,
     pub input: OcrExecutionDigest,
     pub output: OcrExecutionDigest,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub microbatch: Option<OcrMicrobatchExecutionEvidence>,
+}
+
+/// Digest-only projection of A3S Power's admitted microbatch evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OcrMicrobatchExecutionEvidence {
+    pub schema: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_declaration_sha256: Option<String>,
+    pub plan_sha256: String,
+    pub batch_index: usize,
+    pub batch_count: usize,
+    pub slot_count: usize,
+    pub model_admission_queued: bool,
+    pub device_admission_queued: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

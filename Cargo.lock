@@ -5,8 +5,7 @@ version = 3
 [[package]]
 name = "a3s-power"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c028d504be93cdf18a214068e9f4e9ed69eabac18f41c8496c4caf79f031a855"
+source = "git+https://github.com/A3S-Lab/Power.git?rev=63717ea936c194835b6b00b9b0c523ddc21f7554#63717ea936c194835b6b00b9b0c523ddc21f7554"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -51,6 +50,7 @@ version = "0.5.0"
 dependencies = [
  "a3s-power",
  "a3s-use-core",
+ "anyhow",
  "async-trait",
  "candle-core",
  "candle-nn",
@@ -59,6 +59,7 @@ dependencies = [
  "fs2",
  "image",
  "imageproc",
+ "libc",
  "reqwest",
  "rmcp",
  "schemars",
@@ -1028,7 +1029,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2568,7 +2569,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2912,7 +2913,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3308,7 +3309,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3889,7 +3890,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

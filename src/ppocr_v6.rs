@@ -1,21 +1,21 @@
+mod batch;
 pub(crate) mod native;
 
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
+use a3s_power::inference::{DevicePreference, ModelSessionPool, ModelSessionPoolPolicy};
 use a3s_use_core::{Readiness, UseError, UseResult};
 use async_trait::async_trait;
 
-use crate::assets::{ocr_status, resolve_model_assets, OcrInstallSource};
-use crate::cancellation::run_blocking;
+use crate::assets::{ocr_status, OcrInstallSource};
 use crate::config::MODEL_FAMILY;
 use crate::engine::{EngineExtraction, PpOcrV6Engine};
 use crate::models::{OcrBlock, OcrBoundingBox, OcrPoint};
-use crate::preprocess::decode_image;
 use crate::provider::{
     OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
 };
 use crate::receipt::project_receipt;
+use crate::{OcrProviderBatchOutput, OcrProviderBatchRequest, OcrStage};
 
 pub const PP_OCR_V6_PROVIDER_ID: &str = "pp-ocr-v6";
 const ENGINE_NAME: &str = "a3s-power-native";
@@ -24,19 +24,22 @@ const ENGINE_NAME: &str = "a3s-power-native";
 #[derive(Clone)]
 pub struct PpOcrV6Provider {
     descriptor: OcrProviderDescriptor,
-    loaded: Arc<Mutex<Option<LoadedEngine>>>,
+    sessions: ModelSessionPool<PpOcrV6Session>,
 }
 
-struct LoadedEngine {
-    model_dir: PathBuf,
-    engine: PpOcrV6Engine,
+pub(super) struct PpOcrV6Session {
+    engine: Mutex<PpOcrV6Engine>,
 }
 
 impl PpOcrV6Provider {
     pub fn from_env() -> UseResult<Self> {
+        let policy = ModelSessionPoolPolicy::new(2, 1024 * 1024 * 1024, 1, 32)
+            .map_err(|error| pool_error("configure", error))?;
         Ok(Self {
-            descriptor: OcrProviderDescriptor::new(PP_OCR_V6_PROVIDER_ID, ENGINE_NAME, false)?,
-            loaded: Arc::new(Mutex::new(None)),
+            descriptor: OcrProviderDescriptor::new(PP_OCR_V6_PROVIDER_ID, ENGINE_NAME, false)?
+                .with_stages(vec![OcrStage::Preprocessing, OcrStage::Text])?,
+            sessions: ModelSessionPool::new(DevicePreference::Auto, policy)
+                .map_err(|error| pool_error("initialize", error))?,
         })
     }
 }
@@ -82,39 +85,18 @@ impl OcrProvider for PpOcrV6Provider {
     }
 
     async fn recognize(&self, input: OcrInput) -> UseResult<OcrProviderOutput> {
-        let loaded = Arc::clone(&self.loaded);
-        run_blocking("local PP-OCRv6 inference", move |cancellation| {
-            let image = decode_image(input.bytes())?;
-            let assets = resolve_model_assets()?;
-            let mut loaded = loaded.lock().map_err(|_| {
-                UseError::new(
-                    "use.ocr.runtime_failed",
-                    "The local PP-OCRv6 engine lock is poisoned.",
-                )
-            })?;
-            let should_load = loaded
-                .as_ref()
-                .map(|loaded| loaded.model_dir != assets.root)
-                .unwrap_or(true);
-            if should_load {
-                *loaded = Some(LoadedEngine {
-                    model_dir: assets.root.clone(),
-                    engine: PpOcrV6Engine::load(&assets)?,
-                });
-            }
-            let engine = loaded.as_mut().ok_or_else(|| {
-                UseError::new(
-                    "use.ocr.runtime_failed",
-                    "The local PP-OCRv6 engine failed to initialize.",
-                )
-            })?;
-            build_output(engine.engine.extract(&image, &cancellation)?)
-        })
-        .await
+        batch::recognize_one(self, input).await
+    }
+
+    async fn recognize_batch(
+        &self,
+        request: OcrProviderBatchRequest,
+    ) -> UseResult<OcrProviderBatchOutput> {
+        batch::recognize_batch(self, request).await
     }
 }
 
-fn build_output(extraction: EngineExtraction) -> UseResult<OcrProviderOutput> {
+pub(super) fn build_output(extraction: EngineExtraction) -> UseResult<OcrProviderOutput> {
     let EngineExtraction { blocks, receipts } = extraction;
     let blocks = blocks
         .into_iter()
@@ -162,6 +144,13 @@ fn build_output(extraction: EngineExtraction) -> UseResult<OcrProviderOutput> {
     })
 }
 
+fn pool_error(action: &str, error: impl std::fmt::Display) -> UseError {
+    UseError::new(
+        "use.ocr.runtime_failed",
+        format!("Failed to {action} the PP-OCRv6 session pool: {error}"),
+    )
+}
+
 fn ocr_point(point: imageproc::point::Point<f32>) -> UseResult<OcrPoint> {
     Ok(OcrPoint {
         x: finite_coordinate(point.x)?,
@@ -189,5 +178,88 @@ mod tests {
         assert_eq!(provider.descriptor().id, PP_OCR_V6_PROVIDER_ID);
         assert_eq!(provider.descriptor().engine, ENGINE_NAME);
         assert!(!provider.descriptor().sends_source_off_device);
+        assert_eq!(
+            provider.descriptor().supported_stages,
+            vec![OcrStage::Preprocessing, OcrStage::Text]
+        );
+    }
+
+    #[tokio::test]
+    async fn corrupt_batch_input_isolated_before_model_session_loading() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("corrupt.bmp");
+        std::fs::write(&source, b"BM-not-a-decodable-bitmap").unwrap();
+        let client = crate::OcrClient::with_provider(PpOcrV6Provider::from_env().unwrap()).unwrap();
+        let result = client
+            .extract_batch(
+                crate::OcrBatchRequest::new(
+                    vec![OcrStage::Preprocessing, OcrStage::Text],
+                    vec![crate::OcrBatchSlotRequest::new(
+                        crate::OcrBatchSlotId::new("target-a").unwrap(),
+                        source,
+                    )],
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(result.slots[0].status, crate::OcrBatchSlotStatus::Failed);
+        assert_eq!(
+            result.slots[0].stages[0].status,
+            crate::OcrStageStatus::Failed
+        );
+        assert_eq!(
+            result.slots[0].stages[1].status,
+            crate::OcrStageStatus::Skipped
+        );
+        assert!(result.execution_receipts.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "requires the pinned official PP-OCRv6 bundle and real-image fixture"]
+    async fn real_staged_batch_is_deterministic_and_emits_power_v4_receipts() {
+        let image = std::path::PathBuf::from(
+            std::env::var_os("A3S_PPOCR_V6_REAL_IMAGE")
+                .expect("A3S_PPOCR_V6_REAL_IMAGE must name the pinned official image"),
+        );
+        let client = crate::OcrClient::with_provider(PpOcrV6Provider::from_env().unwrap()).unwrap();
+        let batch = client
+            .extract_batch(
+                crate::OcrBatchRequest::new(
+                    vec![OcrStage::Preprocessing, OcrStage::Text],
+                    vec![
+                        crate::OcrBatchSlotRequest::new(
+                            crate::OcrBatchSlotId::new("target-a").unwrap(),
+                            image.clone(),
+                        ),
+                        crate::OcrBatchSlotRequest::new(
+                            crate::OcrBatchSlotId::new("target-b").unwrap(),
+                            image.clone(),
+                        ),
+                    ],
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(batch.slots.len(), 2);
+        assert_eq!(batch.slots[0].status, crate::OcrBatchSlotStatus::Completed);
+        assert_eq!(batch.slots[1].status, crate::OcrBatchSlotStatus::Completed);
+        assert_eq!(batch.slots[0].result, batch.slots[1].result);
+        assert!(!batch.execution_receipts.is_empty());
+        assert_eq!(
+            batch
+                .execution_receipts
+                .iter()
+                .map(|receipt| receipt.microbatch.as_ref().unwrap().slot_count)
+                .sum::<usize>(),
+            2
+        );
+        for receipt in &batch.execution_receipts {
+            assert_eq!(receipt.schema, "a3s.power.embedded-execution-receipt.v4");
+            let evidence = receipt.microbatch.as_ref().unwrap();
+            assert!(evidence.session_declaration_sha256.is_some());
+            assert_eq!(evidence.batch_count, batch.execution_receipts.len());
+        }
     }
 }

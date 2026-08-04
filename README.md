@@ -100,6 +100,48 @@ async fn extract(path: impl Into<std::path::PathBuf>) -> UseResult<String> {
 Use `default-features = false` when an application only needs the neutral
 contract and client.
 
+## Staged batch extraction
+
+`OcrClient::extract_batch` accepts stable caller-owned slot IDs and a typed
+stage set. It always returns slots in caller order, even when source validation
+or one provider stage fails:
+
+~~~rust
+use a3s_use_ocr::{
+    OcrBatchRequest, OcrBatchSlotId, OcrBatchSlotRequest, OcrClient, OcrStage,
+    UseResult,
+};
+
+async fn extract_surfaces(client: &OcrClient) -> UseResult<()> {
+    let request = OcrBatchRequest::new(
+        vec![OcrStage::Preprocessing, OcrStage::Text],
+        vec![
+            OcrBatchSlotRequest::new(OcrBatchSlotId::new("slide:1")?, "slide-1.png"),
+            OcrBatchSlotRequest::new(OcrBatchSlotId::new("slide:2")?, "slide-2.png"),
+        ],
+    )?;
+    let result = client.extract_batch(request).await?;
+    assert_eq!(result.slots[0].slot_id.as_str(), "slide:1");
+    Ok(())
+}
+~~~
+
+The provider-neutral stage vocabulary is orientation, preprocessing, layout,
+text, table, and formula. A provider descriptor declares the subset it can
+complete; unimplemented stages are returned as `unsupported`, never inferred
+from text. The compatibility adapter for existing providers supports only the
+text stage. PP-OCRv6 currently declares preprocessing and text, where
+preprocessing means bounded image decode and canonicalization.
+
+A request contains 1 through 256 unique slots and at most 256 MiB of validated
+input bytes in addition to the existing 32 MiB per-image limit. Malformed
+request or provider output shapes fail the call. Source, model-load, and stage
+execution errors remain attached to their exact slots as completed, partial,
+failed, skipped, or unsupported outcomes. The result also carries canonical
+provider and per-slot model fingerprints plus digest-only execution receipts;
+raw source bytes, tensor values, and local paths are not placed in scheduling
+evidence.
+
 ## Result contract: OCR plus provenance
 
 The provider owns recognition. `OcrClient` owns the evidence envelope.
@@ -205,6 +247,16 @@ through Power's shared admission, device, limit, integrity, cancellation, and
 receipt mechanisms. It does not require ONNX Runtime, Python, PaddlePaddle, a
 subprocess, an inference service, or a Web listener.
 
+Staged PP-OCRv6 batches reuse an exact, lazily loaded Power model session and
+plan deterministic contiguous microbatches from live host/device memory
+snapshots. Each admitted microbatch holds one cancellation token, device
+permit, and engine lock across its slots and emits a schema-v4 receipt with the
+session declaration, plan digest, batch index/count, slot count, and queue
+evidence. The current graph calls remain sequential within that admitted
+microbatch; this is bounded scheduling and memory shaping, not fused multi-image
+tensor execution. Throughput gains are therefore not claimed until the TO5
+real-hardware gates pass.
+
 Linux CI installs that exact pinned bundle and executes both reviewed graphs on
 the CPU. The gate checks the canonical Power weight digests, exact output
 shapes, item counts, and byte lengths for the zero-tensor detection and
@@ -216,6 +268,15 @@ receipts. The 30 output blocks are checked against a reference generated with
 Paddle 3.3.1 and PaddleOCR 3.7.0 using explicit text, score, and four-point
 coordinate tolerances. Paddle, Python, and ONNX Runtime are not test or runtime
 dependencies of this crate.
+
+`a3s-use-ocr-execution-bench` adds a strict, path-free real-provider benchmark
+for that pinned image. It separates the first lazy model session from warm
+executions, samples process RSS every millisecond, retains both detection and
+recognition Power fingerprints, and rejects output drift. The pinned object is
+named `.png` upstream but has a JPEG byte signature; source evidence follows
+the bytes. Debug or modified-tree reports are diagnostic only. See
+[PP-OCRv6 Execution Baseline Protocol](docs/execution-baseline.md) for the
+release procedure and claim boundary.
 
 See [Native Inference Architecture](docs/native-inference.md) for the Power/OCR
 ownership boundary, model conversion and install integrity, execution receipts,
@@ -386,6 +447,7 @@ visible to the MCP host instead of looking like a local-only read.
 | --- | --- |
 | `power-runtime` | Model-neutral embedded A3S Power runtime; never enables its server feature |
 | `ppocr-v6` | Local PP-OCRv6 provider, native graph plans, installer, image pipeline |
+| `benchmark` | PP-OCRv6 real-image cold/warm execution-baseline binary |
 | `unlimited-ocr` | Native CPU Unlimited-OCR model, tokenizer, image pipeline, generation, and grounding |
 | `unlimited-ocr-accelerate` | Unlimited-OCR plus Apple Accelerate CPU kernels with reviewed BF16 operation boundaries |
 | `unlimited-ocr-metal` | Unlimited-OCR plus the Power/Candle Apple Metal device path |
@@ -439,6 +501,12 @@ cargo package --locked
 The library depends on the released `a3s-use-core` machine contracts. A3S Use
 pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
+
+The staged PP-OCRv6 source integration also consumes the unreleased Power
+session-pool and microbatch contracts. Cross-repository development is verified
+with a temporary Cargo path override; publication must release that Power API
+before updating this crate's exact `a3s-power` version. No permanent path or
+`[patch.crates-io]` override belongs in this repository.
 
 <details>
 <summary>Release ownership</summary>

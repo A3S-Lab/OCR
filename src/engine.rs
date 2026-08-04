@@ -35,6 +35,7 @@ pub(crate) struct PpOcrV6Engine {
 }
 
 impl PpOcrV6Engine {
+    #[cfg(test)]
     pub(crate) fn load(assets: &ModelAssets) -> UseResult<Self> {
         let detection_config = load_detection(&assets.detection_config)?;
         let recognition_config = load_recognition(&assets.recognition_config)?;
@@ -46,6 +47,21 @@ impl PpOcrV6Engine {
         })
     }
 
+    pub(crate) fn load_with_runtime(
+        assets: &ModelAssets,
+        runtime: a3s_power::inference::EmbeddedRuntime,
+    ) -> UseResult<Self> {
+        let detection_config = load_detection(&assets.detection_config)?;
+        let recognition_config = load_recognition(&assets.recognition_config)?;
+        let native = NativePpOcrV6::load_with_runtime(assets, runtime)?;
+        Ok(Self {
+            native,
+            detection_config,
+            recognition_config,
+        })
+    }
+
+    #[cfg(test)]
     pub(crate) fn extract(
         &mut self,
         image: &RgbImage,
@@ -53,10 +69,20 @@ impl PpOcrV6Engine {
     ) -> UseResult<EngineExtraction> {
         check_cancelled(cancellation)?;
         let permit = self.native.begin(cancellation)?;
+        self.extract_admitted(image, &permit, cancellation)
+    }
+
+    pub(crate) fn extract_admitted(
+        &mut self,
+        image: &RgbImage,
+        permit: &a3s_power::inference::ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<EngineExtraction> {
+        check_cancelled(cancellation)?;
         let input = detection_input(image, &self.detection_config)?;
         let detection = self
             .native
-            .detect(input.data, input.shape, &permit, cancellation)?;
+            .detect(input.data, input.shape, permit, cancellation)?;
         let shape = detection.tensor.shape;
         let output = detection.tensor.values;
         let detections = detection_boxes(
@@ -87,7 +113,7 @@ impl PpOcrV6Engine {
             let input = recognition_input(crop_batch, &self.recognition_config)?;
             let recognition =
                 self.native
-                    .recognize(input.data, input.shape, &permit, cancellation)?;
+                    .recognize(input.data, input.shape, permit, cancellation)?;
             let shape = recognition.tensor.shape;
             let output = recognition.tensor.values;
             receipts.push(recognition.receipt);
