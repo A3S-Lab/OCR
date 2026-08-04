@@ -5,7 +5,7 @@ version = 3
 [[package]]
 name = "a3s-power"
 version = "0.8.0"
-source = "git+https://github.com/A3S-Lab/Power.git?rev=2b5bc97d8e9778aa93a16f14fa5b7b268a8a7676#2b5bc97d8e9778aa93a16f14fa5b7b268a8a7676"
+source = "git+https://github.com/A3S-Lab/Power.git?rev=3b1f95864b3b594ec3ffc5f65e808a74a38405aa#3b1f95864b3b594ec3ffc5f65e808a74a38405aa"
 dependencies = [
  "aes-gcm",
  "async-trait",

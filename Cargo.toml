@@ -75,7 +75,7 @@ mcp = ["dep:rmcp", "dep:serde_json", "tokio/io-std"]
 cli = ["ppocr-v6", "mcp", "dep:clap"]
 
 [dependencies]
-a3s-power = { version = "=0.8.0", git = "https://github.com/A3S-Lab/Power.git", rev = "2b5bc97d8e9778aa93a16f14fa5b7b268a8a7676", default-features = false, features = ["embedded-inference"], optional = true }
+a3s-power = { version = "=0.8.0", git = "https://github.com/A3S-Lab/Power.git", rev = "3b1f95864b3b594ec3ffc5f65e808a74a38405aa", default-features = false, features = ["embedded-inference"], optional = true }
 a3s-use-core = "0.2.0"
 anyhow = { version = "1", optional = true }
 async-trait = "0.1"
