@@ -512,11 +512,12 @@ The library depends on the released `a3s-use-core` machine contracts. A3S Use
 pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
 
-The staged PP-OCRv6 source integration also consumes the unreleased Power
-session-pool and microbatch contracts. Cross-repository development is verified
-with a temporary Cargo path override; publication must release that Power API
-before updating this crate's exact `a3s-power` version. No permanent path or
-`[patch.crates-io]` override belongs in this repository.
+The staged PP-OCRv6 integration pins the merged A3S Power 0.8.0 revision
+`2b5bc97d8e9778aa93a16f14fa5b7b268a8a7676`. Source builds and CI execute that
+exact Git revision. Package verification additionally resolves the declared
+`=0.8.0` registry dependency, so the package gate remains closed until the same
+Power release is visible on crates.io. No path or `[patch.crates-io]` override
+belongs in this repository.
 
 <details>
 <summary>Release ownership</summary>
