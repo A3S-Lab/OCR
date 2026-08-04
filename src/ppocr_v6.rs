@@ -217,12 +217,55 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "requires the pinned official PP-OCRv6 bundle and real-image fixture"]
-    async fn real_staged_batch_is_deterministic_and_emits_power_v4_receipts() {
-        let image = std::path::PathBuf::from(
+    async fn real_mixed_shape_batch_matches_scalar_and_emits_power_v4_receipts() {
+        let source_path = std::path::PathBuf::from(
             std::env::var_os("A3S_PPOCR_V6_REAL_IMAGE")
                 .expect("A3S_PPOCR_V6_REAL_IMAGE must name the pinned official image"),
         );
+        let source_bytes = std::fs::read(&source_path).unwrap();
+        let source = crate::preprocess::decode_image(&source_bytes).unwrap();
+        let fixtures = tempfile::tempdir().unwrap();
+        let wide_path = fixtures.path().join("wide.png");
+        let square_path = fixtures.path().join("square.png");
+        let tall_path = fixtures.path().join("tall.png");
+        let mut wide = image::RgbImage::from_pixel(320, 288, image::Rgb([0, 0, 0]));
+        let wide_content =
+            image::imageops::resize(&source, 288, 170, image::imageops::FilterType::Triangle);
+        image::imageops::replace(&mut wide, &wide_content, 16, 59);
+        wide.save(&wide_path).unwrap();
+        let mut square = image::RgbImage::from_pixel(320, 320, image::Rgb([0, 0, 0]));
+        image::imageops::replace(&mut square, &wide_content, 16, 75);
+        square.save(&square_path).unwrap();
+        let tall_source = image::imageops::crop_imm(&source, 248, 0, 400, 528).to_image();
+        let mut tall = image::RgbImage::from_pixel(256, 320, image::Rgb([0, 0, 0]));
+        let tall_content = image::imageops::resize(
+            &tall_source,
+            224,
+            296,
+            image::imageops::FilterType::Triangle,
+        );
+        image::imageops::replace(&mut tall, &tall_content, 16, 12);
+        tall.save(&tall_path).unwrap();
+
         let client = crate::OcrClient::with_provider(PpOcrV6Provider::from_env().unwrap()).unwrap();
+        let wide_scalar = client
+            .extract(crate::OcrRequest {
+                path: wide_path.clone(),
+            })
+            .await
+            .unwrap();
+        let tall_scalar = client
+            .extract(crate::OcrRequest {
+                path: tall_path.clone(),
+            })
+            .await
+            .unwrap();
+        let square_scalar = client
+            .extract(crate::OcrRequest {
+                path: square_path.clone(),
+            })
+            .await
+            .unwrap();
         let batch = client
             .extract_batch(
                 crate::OcrBatchRequest::new(
@@ -230,11 +273,15 @@ mod tests {
                     vec![
                         crate::OcrBatchSlotRequest::new(
                             crate::OcrBatchSlotId::new("target-a").unwrap(),
-                            image.clone(),
+                            wide_path,
                         ),
                         crate::OcrBatchSlotRequest::new(
                             crate::OcrBatchSlotId::new("target-b").unwrap(),
-                            image.clone(),
+                            square_path,
+                        ),
+                        crate::OcrBatchSlotRequest::new(
+                            crate::OcrBatchSlotId::new("target-c").unwrap(),
+                            tall_path,
                         ),
                     ],
                 )
@@ -242,24 +289,127 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(batch.slots.len(), 2);
+        assert_eq!(batch.slots.len(), 3);
         assert_eq!(batch.slots[0].status, crate::OcrBatchSlotStatus::Completed);
         assert_eq!(batch.slots[1].status, crate::OcrBatchSlotStatus::Completed);
-        assert_eq!(batch.slots[0].result, batch.slots[1].result);
-        assert!(!batch.execution_receipts.is_empty());
+        assert_eq!(batch.slots[2].status, crate::OcrBatchSlotStatus::Completed);
+        let wide_batch = batch.slots[0].result.as_ref().unwrap();
+        let square_batch = batch.slots[1].result.as_ref().unwrap();
+        let tall_batch = batch.slots[2].result.as_ref().unwrap();
+        assert!(!wide_scalar.blocks.is_empty());
+        assert!(!square_scalar.blocks.is_empty());
+        assert!(!tall_scalar.blocks.is_empty());
+        assert_token_f1("wide slot", &wide_scalar.text, &wide_batch.text);
+        assert_token_f1("square slot", &square_scalar.text, &square_batch.text);
+        assert_token_f1("tall slot", &tall_scalar.text, &tall_batch.text);
+        assert_source_bounds(wide_batch, 320, 288);
+        assert_source_bounds(square_batch, 320, 320);
+        assert_source_bounds(tall_batch, 256, 320);
+        assert_eq!(
+            wide_batch.execution_receipts[0].input.item_count,
+            square_batch.execution_receipts[0].input.item_count
+        );
+        assert!(
+            wide_batch.execution_receipts[0].input.item_count
+                > wide_scalar.execution_receipts[0].input.item_count
+        );
+        assert_eq!(
+            square_batch.execution_receipts[0].input.item_count,
+            square_scalar.execution_receipts[0].input.item_count * 2
+        );
+        assert_eq!(
+            tall_batch.execution_receipts[0].input.item_count,
+            tall_scalar.execution_receipts[0].input.item_count
+        );
+        let mut cohort_slot_counts = batch
+            .execution_receipts
+            .iter()
+            .map(|receipt| receipt.microbatch.as_ref().unwrap().slot_count)
+            .collect::<Vec<_>>();
+        cohort_slot_counts.sort_unstable();
+        assert_eq!(cohort_slot_counts, vec![1, 2]);
         assert_eq!(
             batch
                 .execution_receipts
                 .iter()
                 .map(|receipt| receipt.microbatch.as_ref().unwrap().slot_count)
                 .sum::<usize>(),
-            2
+            3
         );
         for receipt in &batch.execution_receipts {
             assert_eq!(receipt.schema, "a3s.power.embedded-execution-receipt.v4");
             let evidence = receipt.microbatch.as_ref().unwrap();
             assert!(evidence.session_declaration_sha256.is_some());
-            assert_eq!(evidence.batch_count, batch.execution_receipts.len());
+            assert_eq!(evidence.batch_count, 1);
+            assert_eq!(evidence.batch_index, 0);
+        }
+        assert_ne!(
+            batch.execution_receipts[0]
+                .microbatch
+                .as_ref()
+                .unwrap()
+                .plan_sha256,
+            batch.execution_receipts[1]
+                .microbatch
+                .as_ref()
+                .unwrap()
+                .plan_sha256
+        );
+    }
+
+    fn assert_token_f1(label: &str, scalar: &str, batch: &str) {
+        let expected = ascii_tokens(scalar);
+        let actual = ascii_tokens(batch);
+        let mut unmatched = actual.clone();
+        let mut matches = 0_usize;
+        for token in &expected {
+            if let Some(index) = unmatched.iter().position(|candidate| candidate == token) {
+                unmatched.swap_remove(index);
+                matches += 1;
+            }
+        }
+        let precision = matches as f64 / actual.len().max(1) as f64;
+        let recall = matches as f64 / expected.len().max(1) as f64;
+        let f1 = if precision + recall == 0.0 {
+            0.0
+        } else {
+            2.0 * precision * recall / (precision + recall)
+        };
+        assert!(
+            f1 >= 0.95,
+            "{label} batch/scalar ASCII-token F1 {f1:.3} is below 0.950"
+        );
+    }
+
+    fn ascii_tokens(text: &str) -> Vec<String> {
+        text.to_ascii_lowercase()
+            .split(|character: char| !character.is_ascii_alphanumeric())
+            .filter(|token| !token.is_empty())
+            .map(ToOwned::to_owned)
+            .collect()
+    }
+
+    fn assert_source_bounds(result: &crate::OcrResult, width: u32, height: u32) {
+        for block in &result.blocks {
+            if let Some(polygon) = block.polygon {
+                assert!(
+                    polygon
+                        .iter()
+                        .all(|point| point.x < width && point.y < height),
+                    "batch polygon escaped the source image"
+                );
+            }
+            if let Some(bounds) = block.bounding_box {
+                assert!(
+                    bounds.x.saturating_add(bounds.width) <= width
+                        && bounds.y.saturating_add(bounds.height) <= height,
+                    "batch bounding box escaped the source image"
+                );
+            }
+            assert!(block.bounding_boxes.iter().all(|bounds| {
+                bounds.x.saturating_add(bounds.width) <= width
+                    && bounds.y.saturating_add(bounds.height) <= height
+            }));
         }
     }
 }

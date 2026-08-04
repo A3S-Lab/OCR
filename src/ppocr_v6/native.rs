@@ -35,6 +35,11 @@ pub(crate) struct NativeGraphOutput {
     pub(crate) receipt: ExecutionReceipt,
 }
 
+pub(crate) struct NativeGraphBatchOutput {
+    pub(crate) tensors: Vec<TensorOutput>,
+    pub(crate) receipt: ExecutionReceipt,
+}
+
 /// The model architecture, reviewed graph plans, and revision pins live here
 /// in a3s-ocr. Power supplies the shared execution and security substrate.
 pub(crate) struct NativePpOcrV6 {
@@ -87,6 +92,7 @@ impl NativePpOcrV6 {
             .map_err(|error| power_error("admit the OCR request", error))
     }
 
+    #[cfg(test)]
     pub(crate) fn detect(
         &self,
         data: Vec<f32>,
@@ -94,14 +100,62 @@ impl NativePpOcrV6 {
         permit: &ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<NativeGraphOutput> {
-        self.execute(
+        let batch = self.detect_batch(vec![(data, shape)], permit, cancellation)?;
+        let tensor = batch.tensors.into_iter().next().ok_or_else(|| {
+            UseError::new(
+                "use.ocr.provider_output_invalid",
+                "PP-OCRv6 detection returned no output tensor.",
+            )
+        })?;
+        Ok(NativeGraphOutput {
+            tensor,
+            receipt: batch.receipt,
+        })
+    }
+
+    pub(crate) fn detect_batch(
+        &self,
+        inputs: Vec<(Vec<f32>, [usize; 4])>,
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<NativeGraphBatchOutput> {
+        if inputs.is_empty() {
+            return Err(UseError::new(
+                "use.ocr.provider_input_invalid",
+                "PP-OCRv6 detection requires at least one input tensor.",
+            ));
+        }
+        let slot_count = inputs.len();
+        let inputs = inputs
+            .into_iter()
+            .map(|(data, shape)| {
+                if shape[0] != 1 || shape[1] != 3 {
+                    return Err(UseError::new(
+                        "use.ocr.provider_input_invalid",
+                        "PP-OCRv6 detection slots must use singleton NCHW tensors with three channels.",
+                    ));
+                }
+                TensorInput::new(shape.to_vec(), data, self.runtime.limits())
+                    .map_err(|error| power_error("validate an OCR detection tensor", error))
+            })
+            .collect::<UseResult<Vec<_>>>()?;
+        let input = TensorInput::stack_leading(inputs, self.runtime.limits())
+            .map_err(|error| power_error("assemble the OCR detection batch", error))?;
+        let output = self.execute_input(
             &self.detection,
             &self.detection_identity,
-            data,
-            shape,
+            input,
             permit,
             cancellation,
-        )
+        )?;
+        let tensors = output
+            .tensor
+            .split_leading(&vec![1; slot_count], self.runtime.limits())
+            .map_err(|error| power_error("slice the OCR detection batch", error))?;
+        Ok(NativeGraphBatchOutput {
+            tensors,
+            receipt: output.receipt,
+        })
     }
 
     pub(crate) fn recognize(
@@ -144,6 +198,17 @@ impl NativePpOcrV6 {
         }
         let input = TensorInput::new(shape.to_vec(), data, self.runtime.limits())
             .map_err(|error| power_error("validate the OCR input tensor", error))?;
+        self.execute_input(graph, identity, input, permit, cancellation)
+    }
+
+    fn execute_input(
+        &self,
+        graph: &GraphExecutor,
+        identity: &ModelIdentity,
+        input: TensorInput,
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<NativeGraphOutput> {
         let input_digest = ExecutionDigest::f32_tensor(&input.shape, &input.values);
         let tensor = graph
             .run(input, permit, cancellation)
@@ -179,8 +244,8 @@ pub(crate) fn session_spec(assets: &ModelAssets) -> UseResult<ModelSessionSpec> 
 pub(crate) fn batch_binding() -> UseResult<ExecutionBatchBinding> {
     ExecutionBatchBinding::new(
         bundle_weights_sha256(),
-        named_sha256(b"a3s-ocr-ppocr-v6-staged-slot-layout-v1\0"),
-        named_sha256(b"a3s-ocr-ppocr-v6-contiguous-scheduler-v1\0"),
+        named_sha256(b"a3s-ocr-ppocr-v6-staged-slot-layout-v2\0"),
+        named_sha256(b"a3s-ocr-ppocr-v6-shape-cohort-scheduler-v3\0"),
     )
     .map_err(|error| power_error("bind the PP-OCRv6 staged batch", error))
 }
@@ -213,7 +278,7 @@ fn session_execution_sha256(assets: &ModelAssets) -> UseResult<String> {
         ))
     })?;
     let mut digest = Sha256::new();
-    digest.update(b"a3s-ocr-ppocr-v6-session-execution-v1\0");
+    digest.update(b"a3s-ocr-ppocr-v6-session-execution-v2\0");
     update_bytes(&mut digest, DETECTION_GRAPH.as_bytes())?;
     update_bytes(&mut digest, RECOGNITION_GRAPH.as_bytes())?;
     update_bytes(&mut digest, &detection_config)?;
@@ -350,6 +415,11 @@ mod tests {
         let recognition: serde_json::Value = serde_json::from_str(RECOGNITION_GRAPH).unwrap();
         assert_eq!(detection["nodes"].as_array().unwrap().len(), 242);
         assert_eq!(recognition["nodes"].as_array().unwrap().len(), 481);
+        assert_eq!(detection["inputs"][0]["shape"][0], "DynamicDimension.0");
+        assert_eq!(
+            detection["outputs"][0]["shape"][0],
+            "ConvTranspose_459_o0__d0"
+        );
     }
 
     #[test]
@@ -423,8 +493,31 @@ mod tests {
                 &cancellation,
             )
             .unwrap();
+        let batched_detection = native
+            .detect_batch(
+                vec![
+                    (vec![0.0; 3 * 64 * 64], [1, 3, 64, 64]),
+                    (vec![0.0; 3 * 64 * 64], [1, 3, 64, 64]),
+                ],
+                &permit,
+                &cancellation,
+            )
+            .unwrap();
         assert_eq!(detection.tensor.shape, [1, 1, 64, 64]);
         assert_eq!(detection.tensor, repeated_detection.tensor);
+        assert_eq!(batched_detection.tensors.len(), 2);
+        assert!(batched_detection
+            .tensors
+            .iter()
+            .all(|tensor| tensor == &detection.tensor));
+        assert_eq!(
+            batched_detection.receipt.input.item_count,
+            detection.receipt.input.item_count * 2
+        );
+        assert_eq!(
+            batched_detection.receipt.output.item_count,
+            detection.receipt.output.item_count * 2
+        );
         assert_eq!(detection.receipt.output, repeated_detection.receipt.output);
         assert_eq!(detection.receipt.output.byte_length, 16_384);
         assert_eq!(detection.receipt.output.item_count, 4_096);

@@ -20,7 +20,7 @@ use crate::{
 
 mod planning;
 
-use planning::{microbatch_candidate, microbatch_policy};
+use planning::{detection_cohort_ranges, microbatch_candidates, microbatch_policy};
 
 pub(super) async fn recognize_one(
     provider: &PpOcrV6Provider,
@@ -227,10 +227,42 @@ async fn execute_prepared(
     outputs: &mut [Option<OcrProviderBatchSlotOutput>],
     receipts: &mut Vec<crate::OcrExecutionReceipt>,
 ) {
-    let candidates = prepared
-        .iter()
-        .map(|slot| microbatch_candidate(session, slot))
-        .collect::<UseResult<Vec<_>>>();
+    let images = prepared.iter().map(|slot| &slot.image).collect::<Vec<_>>();
+    let ranges = match detection_cohort_ranges(&images) {
+        Ok(ranges) => ranges,
+        Err(error) => {
+            fail_prepared(stages, prepared, error, outputs);
+            return;
+        }
+    };
+    let cohorts = ranges
+        .into_iter()
+        .map(|range| prepared[range].to_vec())
+        .collect::<Vec<_>>();
+    for cohort in cohorts {
+        execute_cohort(
+            session,
+            spec,
+            stages,
+            cohort,
+            cancellation,
+            outputs,
+            receipts,
+        )
+        .await;
+    }
+}
+
+async fn execute_cohort(
+    session: &ModelSession<PpOcrV6Session>,
+    spec: &ModelSessionSpec,
+    stages: &[OcrStage],
+    prepared: Vec<PreparedSlot>,
+    cancellation: &CancellationToken,
+    outputs: &mut [Option<OcrProviderBatchSlotOutput>],
+    receipts: &mut Vec<crate::OcrExecutionReceipt>,
+) {
+    let candidates = microbatch_candidates(session, &prepared);
     let candidates = match candidates {
         Ok(candidates) => candidates,
         Err(error) => {
@@ -332,16 +364,22 @@ async fn run_engine_batch(
                 .engine
                 .lock()
                 .map_err(|_| runtime_error("The pooled PP-OCRv6 engine lock is poisoned."))?;
-            let mut outputs = Vec::with_capacity(slots.len());
+            let images = slots.iter().map(|slot| &slot.image).collect::<Vec<_>>();
+            let outputs = engine
+                .extract_batch_admitted(&images, execution.permit(), &cancellation)?
+                .into_iter()
+                .map(|result| result.and_then(build_output))
+                .collect::<Vec<_>>();
+            if outputs.len() != slots.len() {
+                return Err(runtime_error(
+                    "PP-OCRv6 changed admitted microbatch output cardinality.",
+                ));
+            }
             let mut output_declaration = Sha256::new();
             output_declaration.update(b"a3s-ocr-ppocr-v6-batch-output-v1\0");
-            for slot in &slots {
-                check_cancelled(&cancellation)?;
-                let result = engine
-                    .extract_admitted(&slot.image, execution.permit(), &cancellation)
-                    .and_then(build_output);
+            for (slot, result) in slots.iter().zip(&outputs) {
                 update_text(&mut output_declaration, slot.slot_id.as_str())?;
-                match &result {
+                match result {
                     Ok(output) => {
                         output_declaration.update([1]);
                         for receipt in &output.execution_receipts {
@@ -353,7 +391,6 @@ async fn run_engine_batch(
                         update_text(&mut output_declaration, &error.code)?;
                     }
                 }
-                outputs.push(result);
             }
             drop(engine);
             let input = ExecutionDigest::image_request(&input_bytes, slots.len());

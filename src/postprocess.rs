@@ -19,9 +19,11 @@ pub(crate) struct Recognition {
     pub(crate) confidence: f32,
 }
 
-pub(crate) fn detection_boxes(
+pub(crate) fn detection_boxes_in_content(
     output: &[f32],
     shape: &[usize],
+    content_width: u32,
+    content_height: u32,
     original_width: u32,
     original_height: u32,
     config: &DetectionConfig,
@@ -41,11 +43,22 @@ pub(crate) fn detection_boxes(
             "PP-OCRv6 detection output length does not match its shape.",
         ));
     }
-    let width_u32 = u32::try_from(width)
+    let output_width = u32::try_from(width)
         .map_err(|_| output_error("PP-OCRv6 detection output width is too large."))?;
-    let height_u32 = u32::try_from(height)
+    let output_height = u32::try_from(height)
         .map_err(|_| output_error("PP-OCRv6 detection output height is too large."))?;
-    let mask = GrayImage::from_fn(width_u32, height_u32, |x, y| {
+    if content_width == 0
+        || content_height == 0
+        || content_width > output_width
+        || content_height > output_height
+    {
+        return Err(output_error(
+            "PP-OCRv6 detection content extent must fit the output canvas.",
+        ));
+    }
+    let content_width_usize = content_width as usize;
+    let content_height_usize = content_height as usize;
+    let mask = GrayImage::from_fn(content_width, content_height, |x, y| {
         let index = y as usize * width + x as usize;
         Luma([if output[index] > config.threshold {
             255
@@ -66,7 +79,13 @@ pub(crate) fn detection_boxes(
         if minimum_side(&mini) < 3.0 {
             continue;
         }
-        let score = box_score(output, width, height, &mini);
+        let score = box_score(
+            output,
+            width,
+            content_width_usize,
+            content_height_usize,
+            &mini,
+        );
         if score < config.box_threshold {
             continue;
         }
@@ -105,10 +124,10 @@ pub(crate) fn detection_boxes(
         }
         let polygon = expanded.map(|point| {
             Point::new(
-                (point.x as f32 / width as f32 * original_width as f32)
+                (point.x as f32 / content_width as f32 * original_width as f32)
                     .round()
                     .clamp(0.0, original_width.saturating_sub(1) as f32),
-                (point.y as f32 / height as f32 * original_height as f32)
+                (point.y as f32 / content_height as f32 * original_height as f32)
                     .round()
                     .clamp(0.0, original_height.saturating_sub(1) as f32),
             )
@@ -179,7 +198,13 @@ pub(crate) fn decode_ctc(
     })
 }
 
-fn box_score(output: &[f32], width: usize, height: usize, polygon: &[Point<i32>; 4]) -> f32 {
+fn box_score(
+    output: &[f32],
+    output_stride: usize,
+    width: usize,
+    height: usize,
+    polygon: &[Point<i32>; 4],
+) -> f32 {
     let min_x = polygon
         .iter()
         .map(|point| point.x)
@@ -214,7 +239,7 @@ fn box_score(output: &[f32], width: usize, height: usize, polygon: &[Point<i32>;
             // boundary. Sampling integer pixel coordinates reproduces that
             // contract more closely than sampling pixel centers.
             if point_in_convex_polygon(Point::new(x as f32, y as f32), &polygon) {
-                sum += output[y * width + x];
+                sum += output[y * output_stride + x];
                 count += 1;
             }
         }
@@ -311,6 +336,18 @@ fn output_error(message: impl Into<String>) -> UseError {
 mod tests {
     use super::*;
 
+    fn detection_config() -> DetectionConfig {
+        DetectionConfig {
+            scale: 1.0 / 255.0,
+            mean: [0.485, 0.456, 0.406],
+            std: [0.229, 0.224, 0.225],
+            threshold: 0.3,
+            box_threshold: 0.5,
+            max_candidates: 1_000,
+            unclip_ratio: 1.0,
+        }
+    }
+
     #[test]
     fn ctc_decoder_removes_blanks_and_repeated_classes() {
         let config = RecognitionConfig {
@@ -340,7 +377,7 @@ mod tests {
             Point::new(1, 2),
             Point::new(0, 1),
         ];
-        assert!((box_score(&output, 3, 3, &polygon) - 4.0).abs() < f32::EPSILON);
+        assert!((box_score(&output, 3, 3, 3, &polygon) - 4.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -367,5 +404,59 @@ mod tests {
         ];
         sort_reading_order(&mut detections);
         assert_eq!(detections[0].polygon[0], Point::new(0.0, 10.0));
+    }
+
+    #[test]
+    fn letterbox_padding_never_produces_detection_boxes() {
+        let mut output = vec![0.0_f32; 64 * 64];
+        for y in 8..24 {
+            for x in 40..56 {
+                output[y * 64 + x] = 1.0;
+            }
+        }
+
+        let detections = detection_boxes_in_content(
+            &output,
+            &[1, 1, 64, 64],
+            32,
+            32,
+            320,
+            320,
+            &detection_config(),
+        )
+        .unwrap();
+
+        assert!(detections.is_empty());
+    }
+
+    #[test]
+    fn detection_coordinates_use_each_slots_content_extent() {
+        let mut output = vec![0.0_f32; 64 * 64];
+        for y in 20..29 {
+            for x in 24..31 {
+                output[y * 64 + x] = 1.0;
+            }
+        }
+
+        let detections = detection_boxes_in_content(
+            &output,
+            &[1, 1, 64, 64],
+            32,
+            32,
+            320,
+            320,
+            &detection_config(),
+        )
+        .unwrap();
+
+        assert_eq!(detections.len(), 1);
+        assert!(
+            detections[0]
+                .polygon
+                .iter()
+                .map(|point| point.x)
+                .fold(0.0_f32, f32::max)
+                > 200.0
+        );
     }
 }

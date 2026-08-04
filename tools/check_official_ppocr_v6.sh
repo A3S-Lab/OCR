@@ -63,3 +63,17 @@ cargo test \
 grep -Fq \
   "test result: ok. 1 passed; 0 failed; 0 ignored" \
   "${test_root}/official-real-image-test.log"
+
+cargo test \
+  --locked \
+  --no-default-features \
+  --features ppocr-v6 \
+  --lib \
+  ppocr_v6::tests::real_mixed_shape_batch_matches_scalar_and_emits_power_v4_receipts \
+  -- \
+  --ignored \
+  --exact | tee "${test_root}/official-batch-parity-test.log"
+
+grep -Fq \
+  "test result: ok. 1 passed; 0 failed; 0 ignored" \
+  "${test_root}/official-batch-parity-test.log"
