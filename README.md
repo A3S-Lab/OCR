@@ -17,7 +17,8 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
-  <a href="#the-contract-ocr-plus-provenance">Contract</a> ·
+  <a href="#responsibility-boundary">Boundary</a> ·
+  <a href="#result-contract-ocr-plus-provenance">Contract</a> ·
   <a href="#providers">Providers</a> ·
   <a href="#cli-and-mcp-surfaces">CLI &amp; MCP</a> ·
   <a href="#development">Development</a>
@@ -36,6 +37,21 @@ must declare its source-transfer policy and cannot replace the source path,
 media type, size, or SHA-256 recorded by `OcrClient`. Both built-in providers
 reuse A3S Power's embedded, model-neutral inference substrate; neither enables
 Power's HTTP server or opens its own listener.
+
+## Responsibility boundary
+
+A3S OCR recognizes one bounded image and returns OCR evidence. It is not a
+document parser.
+
+| A3S OCR owns | Delegated to A3S Power | Outside this repository |
+| --- | --- | --- |
+| PP-OCRv6 and Unlimited-OCR topology, assets, preprocessing, decoding, labels, confidence, and source-pixel geometry | Typed devices, admission, weight integrity and residency, cancellation, private telemetry, TEE-compatible controls, and execution receipts | Office/PDF page inventory, rendering, cross-page hierarchy, evidence reconciliation, agent planning, and document checkpoints |
+
+PDF rasterization and Office parsing belong to their owning components. A
+document-level consumer such as A3S Parser may preserve `OcrResult` blocks and
+receipts inside a larger graph, but it must not move OCR model ownership into
+the parser. Power remains model-neutral and contains no OCR architecture or
+asset.
 
 ## Quick start
 
@@ -84,7 +100,7 @@ async fn extract(path: impl Into<std::path::PathBuf>) -> UseResult<String> {
 Use `default-features = false` when an application only needs the neutral
 contract and client.
 
-## The contract: OCR plus provenance
+## Result contract: OCR plus provenance
 
 The provider owns recognition. `OcrClient` owns the evidence envelope.
 
@@ -150,11 +166,11 @@ text.
 
 Provider choice is a typed object, never a raw backend-name switch.
 
-| Provider | Runtime | Source boundary |
-| --- | --- | --- |
-| `PpOcrV6Provider` | Embedded A3S Power native graph runtime | Always on device |
-| `UnlimitedOcrProvider` | Embedded A3S Power native VLM runtime | Always on device |
-| Custom `OcrProvider` | Defined by the implementation | Required in its descriptor |
+| Provider | OCR-owned implementation | Execution substrate | Source boundary |
+| --- | --- | --- | --- |
+| `PpOcrV6Provider` | Detection/recognition graphs, image pipeline, DB/CTC postprocessing | Embedded A3S Power | Always on device |
+| `UnlimitedOcrProvider` | Vision towers, projector, decoder, tokenizer, generation, and grounding | Embedded A3S Power | Always on device |
+| Custom `OcrProvider` | Defined by the implementation | Defined by the implementation | Required in its descriptor |
 
 ### Default: PP-OCRv6
 
