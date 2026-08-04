@@ -31,9 +31,9 @@ digest. Power validates the complete plan and inventory before execution.
 
 ```text
 bounded image
-  -> OCR preprocessing
-  -> Power detection graph
-  -> OCR DB postprocessing and perspective crops
+  -> OCR batch letterbox with per-slot content extents
+  -> one Power detection graph call for the admitted image batch
+  -> OCR per-slot output slicing, DB postprocessing, and perspective crops
   -> Power recognition graph
   -> OCR CTC decoding and source-coordinate blocks
   -> Power execution receipts carried by OcrResult
@@ -108,25 +108,45 @@ validated slots and exact caller IDs
   -> cancellation-aware bounded decode; corrupt images fail only their slots
   -> exact OCR-owned model/execution/resource declaration
   -> Power model-session pool with finite load and device queues
+  -> OCR shape cohorts with at least 90% per-slot canvas fill
   -> deterministic contiguous plan from live host/device memory
   -> one admitted Power microbatch permit across each planned slot group
+  -> one dynamic leading-axis detection call and exact ordered output slices
   -> per-slot OCR results plus digest-only Power receipt v4 evidence
 ```
 
 The pool is local to the injected provider and retains at most two exact
 sessions with a 1 GiB aggregate resident-weight declaration. A session permits
-one active device execution and at most 32 queued executions. A microbatch
-contains at most eight slots and is revalidated against current capacity and
-topology before admission. CPU accounting declares decoded bytes plus bounded
-per-slot scratch; accelerator accounting separates host and device peaks while
-Power counts unified memory only once.
+one active device execution and at most 32 queued executions. Before invoking
+the Power planner, OCR partitions caller-contiguous inputs into at-most-eight
+model-quality cohorts. A proposed common canvas is accepted only when every
+slot retains at least 90% content fill; a lower-fill outlier starts a new
+cohort. Each cohort still receives a canonical Power plan, current-pressure
+revalidation, admission permit, and receipt, so the OCR rule does not replace
+the shared scheduler. OCR derives the cohort canvas from the maximum resized
+width and height, includes that F32 canvas in every slot's conservative
+host/device peak declaration, and pads each smaller image with a black pixel
+transformed by the exact detection mean and standard deviation. Power counts
+Metal unified memory only once.
 
-The detector and recognizer are still invoked sequentially per image under the
-shared permit and engine lock. The batch boundary currently supplies bounded
-admission, cancellation, stable identity, partial failure, deterministic
-ordering, and auditable memory/queue evidence. It does not yet claim fused
-multi-image kernels or a throughput improvement. Those claims require the TO5
-single-image, mixed-Office, and scale benchmarks.
+The detector accepts dynamic `B`, executes the stacked `[B,3,H,W]` tensor once,
+and returns `[B,1,H,W]`. Power's model-neutral leading-axis contract validates
+assembly, exact order, limits, and one positive output partition per input.
+OCR masks every partition to its own content width and height before DB
+postprocessing, so padding cannot produce a box and source-coordinate mapping
+does not use the larger batch canvas. Recognition remains per-image with up to
+eight crops per graph call. Cross-image crop flattening and width buckets are a
+separate numerical-parity milestone. The fused detection path does not become
+a throughput claim until the real TO5 single-image, mixed-Office, and scale
+benchmarks pass.
+
+Normalized-black letterboxing changes convolution boundary context compared
+with an independently sized scalar tensor. The official mixed-shape gate
+therefore mirrors TurboOCR's batch contract: scalar/batch ASCII-token F1 must
+remain at least 0.95, exact slot order and cardinality must hold, and all
+geometry must remain source-bounded. It does not claim bit-identical detector
+maps across different canvas shapes. The gate also proves that compatible
+mixed shapes fuse while a quality outlier falls back to a separate Power plan.
 
 OCR does not own document order or cross-page semantics. A parser may use slot
 IDs to bind OCR evidence to exact rendered surfaces, but retry/cache authority,
@@ -239,9 +259,11 @@ Before changing a pinned model or graph plan, verify:
 2. complete tensor name, dtype, and shape inventory;
 3. deterministic conversion and canonical Power weight digests;
 4. fixture and real-image parity against the pinned source implementation;
-5. identical model output with placement optimizations enabled and disabled;
-6. cancellation, limit, malformed-plan, and wrong-digest failures;
-7. an embedded dependency closure without ONNX Runtime, a Web server, browser
+5. per-slot scalar/batch parity for mixed aspect ratios, padding exclusion,
+   source-coordinate projection, and exact caller-order restoration;
+6. identical model output with placement optimizations enabled and disabled;
+7. cancellation, limit, malformed-plan, and wrong-digest failures;
+8. an embedded dependency closure without ONNX Runtime, a Web server, browser
    automation, Python inference, or external OCR services.
 
 The official-bundle CPU graph, PP-OCRv6 real-image parity, Unlimited-OCR

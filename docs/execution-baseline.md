@@ -1,7 +1,7 @@
 # PP-OCRv6 Execution Baseline Protocol
 
-`a3s-use-ocr-execution-bench` records the real single-image A3S OCR evidence
-needed before changing batching, pooling, or admission APIs. It executes the
+`a3s-use-ocr-execution-bench` records the real single-image A3S OCR baseline
+used to evaluate batching, pooling, and admission changes. It executes the
 public `OcrClient` path with the embedded PP-OCRv6 provider and A3S Power native
 graph runtime. It does not invoke TurboOCR, Paddle, Python, ONNX Runtime, an OCR
 service, or a subprocess.
@@ -123,3 +123,17 @@ systems, Power queue/residency observations when those public contracts exist,
 and production A3S Office multi-surface render plus OCR evidence. Synthetic
 Parser fixtures and this single-image OCR workload cannot substitute for those
 claims.
+
+The cross-image detection path additionally requires a batch report that runs
+mixed aspect ratios through the public staged API, compares every slot with its
+scalar result, records actual microbatch width and graph receipts, and measures
+peak host/device memory. Until that clean named-hardware report is persisted,
+the implementation is available without a release-wide throughput claim.
+The checked-in official-model CI gate follows TurboOCR's accuracy contract: the
+ASCII-token F1 between each mixed-shape batch slot and its scalar result must be
+at least 0.95, while every polygon and box must remain inside its own source
+image. Letterboxing changes convolution boundary context, so this is a bounded
+quality gate rather than a claim of bit-identical detector tensors.
+It also verifies both branches of the OCR-owned 90% canvas-fill rule: compatible
+mixed shapes share one Power-admitted graph call, while a quality outlier starts
+a distinct Power plan with its own receipt.

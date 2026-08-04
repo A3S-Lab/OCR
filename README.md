@@ -20,6 +20,7 @@
   <a href="#responsibility-boundary">Boundary</a> ·
   <a href="#result-contract-ocr-plus-provenance">Contract</a> ·
   <a href="#providers">Providers</a> ·
+  <a href="ROADMAP.md">Roadmap</a> ·
   <a href="#cli-and-mcp-surfaces">CLI &amp; MCP</a> ·
   <a href="#development">Development</a>
 </p>
@@ -188,7 +189,7 @@ The stable result shape keeps the source next to the OCR evidence:
     {
       "schema": "a3s.power.embedded-execution-receipt.v1",
       "model": {"family": "baidu/Unlimited-OCR", "revision": "07dea832...", "weightsSha256": "..."},
-      "runtime": {"name": "a3s-power-native", "version": "0.7.0", "device": "metal:0"},
+      "runtime": {"name": "a3s-power-native", "version": "0.8.0", "device": "metal:0"},
       "input": {"representation": "image-request", "sha256": "...", "byteLength": 12345, "itemCount": 1},
       "output": {"representation": "utf8-text", "sha256": "...", "byteLength": 321, "itemCount": 287}
     }
@@ -226,8 +227,9 @@ The default A3S integration uses:
 Its pipeline is explicit:
 
 ~~~text
-decode → detect → DB post-process → reading order → perspective crop
-       → batched recognition → CTC decode → source-pixel evidence
+bounded decode → cross-image letterbox → batched detection → per-slot DB
+               → reading order → perspective crop → crop-batch recognition
+               → CTC decode → source-pixel evidence
 ~~~
 
 The OCR-owned release packages pinned detection and recognition SafeTensors
@@ -252,10 +254,17 @@ plan deterministic contiguous microbatches from live host/device memory
 snapshots. Each admitted microbatch holds one cancellation token, device
 permit, and engine lock across its slots and emits a schema-v4 receipt with the
 session declaration, plan digest, batch index/count, slot count, and queue
-evidence. The current graph calls remain sequential within that admitted
-microbatch; this is bounded scheduling and memory shaping, not fused multi-image
-tensor execution. Throughput gains are therefore not claimed until the TO5
-real-hardware gates pass.
+evidence. Images with different resized dimensions are letterboxed at the
+top-left of one normalized-black canvas when every slot retains at least 90%
+canvas fill. OCR deterministically splits lower-fill shape outliers before
+Power planning, protecting the TurboOCR-derived scalar/batch F1 floor without
+creating a second admission scheduler. Each compatible cohort executes one
+dynamic `[B,3,H,W]` detection graph call. Power validates leading-axis assembly
+and output partitions; OCR retains each slot's content extent, excludes padding
+from DB postprocessing, and maps polygons through that extent into source
+pixels. Recognition still batches crops within each image; cross-image width
+bucketing remains a roadmap item. No throughput gain is claimed until the
+named-hardware release gates pass.
 
 Linux CI installs that exact pinned bundle and executes both reviewed graphs on
 the CPU. The gate checks the canonical Power weight digests, exact output
@@ -280,7 +289,8 @@ release procedure and claim boundary.
 
 See [Native Inference Architecture](docs/native-inference.md) for the Power/OCR
 ownership boundary, model conversion and install integrity, execution receipts,
-and TEE/privacy release gates.
+and TEE/privacy release gates. See [`ROADMAP.md`](ROADMAP.md) for the aligned
+Power/OCR/Parser delivery sequence and TurboOCR-derived workstream.
 
 ### Optional: baidu/Unlimited-OCR
 
@@ -502,11 +512,12 @@ The library depends on the released `a3s-use-core` machine contracts. A3S Use
 pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
 
-The staged PP-OCRv6 source integration also consumes the unreleased Power
-session-pool and microbatch contracts. Cross-repository development is verified
-with a temporary Cargo path override; publication must release that Power API
-before updating this crate's exact `a3s-power` version. No permanent path or
-`[patch.crates-io]` override belongs in this repository.
+The staged PP-OCRv6 integration pins the release-ready A3S Power 0.8.0 revision
+`3b1f95864b3b594ec3ffc5f65e808a74a38405aa`. Source builds and CI execute that
+exact Git revision. Package verification additionally resolves the declared
+`=0.8.0` registry dependency, so the package gate remains closed until the same
+Power release is visible on crates.io. No path or `[patch.crates-io]` override
+belongs in this repository.
 
 <details>
 <summary>Release ownership</summary>

@@ -8,9 +8,9 @@ use tokio_util::sync::CancellationToken;
 use crate::assets::ModelAssets;
 use crate::cancellation::check_cancelled;
 use crate::config::{load_detection, load_recognition, DetectionConfig, RecognitionConfig};
-use crate::postprocess::{decode_ctc, detection_boxes, Detection};
+use crate::postprocess::{decode_ctc, detection_boxes_in_content, Detection};
 use crate::ppocr_v6::native::NativePpOcrV6;
-use crate::preprocess::{detection_input, recognition_input};
+use crate::preprocess::{detection_batch_inputs, recognition_input};
 
 const RECOGNITION_BATCH_SIZE: usize = 8;
 const MAX_CROP_PIXELS: u64 = 64 * 1024 * 1024;
@@ -72,30 +72,81 @@ impl PpOcrV6Engine {
         self.extract_admitted(image, &permit, cancellation)
     }
 
+    #[cfg(test)]
     pub(crate) fn extract_admitted(
         &mut self,
         image: &RgbImage,
         permit: &a3s_power::inference::ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<EngineExtraction> {
+        self.extract_batch_admitted(&[image], permit, cancellation)?
+            .pop()
+            .ok_or_else(|| {
+                engine_error(
+                    "use.ocr.provider_output_invalid",
+                    "PP-OCRv6 returned no output for a single admitted image.",
+                )
+            })?
+    }
+
+    pub(crate) fn extract_batch_admitted(
+        &mut self,
+        images: &[&RgbImage],
+        permit: &a3s_power::inference::ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<Vec<UseResult<EngineExtraction>>> {
         check_cancelled(cancellation)?;
-        let input = detection_input(image, &self.detection_config)?;
+        let mut inputs = detection_batch_inputs(images, &self.detection_config)?;
+        let graph_inputs = inputs
+            .iter_mut()
+            .map(|input| (std::mem::take(&mut input.data), input.shape))
+            .collect();
         let detection = self
             .native
-            .detect(input.data, input.shape, permit, cancellation)?;
-        let shape = detection.tensor.shape;
-        let output = detection.tensor.values;
-        let detections = detection_boxes(
-            &output,
-            &shape,
-            input.original_width,
-            input.original_height,
-            &self.detection_config,
-        )?;
+            .detect_batch(graph_inputs, permit, cancellation)?;
+        if detection.tensors.len() != images.len() || inputs.len() != images.len() {
+            return Err(engine_error(
+                "use.ocr.provider_output_invalid",
+                "PP-OCRv6 detection changed exact batch cardinality.",
+            ));
+        }
+        let mut outputs = Vec::with_capacity(images.len());
+        for ((image, input), tensor) in images.iter().zip(inputs).zip(detection.tensors) {
+            check_cancelled(cancellation)?;
+            let detections = detection_boxes_in_content(
+                &tensor.values,
+                &tensor.shape,
+                input.content_width,
+                input.content_height,
+                input.original_width,
+                input.original_height,
+                &self.detection_config,
+            );
+            outputs.push(detections.and_then(|detections| {
+                self.recognize_detections(
+                    image,
+                    detections,
+                    detection.receipt.clone(),
+                    permit,
+                    cancellation,
+                )
+            }));
+        }
+        Ok(outputs)
+    }
+
+    fn recognize_detections(
+        &mut self,
+        image: &RgbImage,
+        detections: Vec<Detection>,
+        detection_receipt: ExecutionReceipt,
+        permit: &a3s_power::inference::ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<EngineExtraction> {
         if detections.is_empty() {
             return Ok(EngineExtraction {
                 blocks: Vec::new(),
-                receipts: vec![detection.receipt],
+                receipts: vec![detection_receipt],
             });
         }
 
@@ -104,7 +155,7 @@ impl PpOcrV6Engine {
             .map(|detection| perspective_crop(image, detection))
             .collect::<UseResult<Vec<_>>>()?;
         let mut blocks = Vec::with_capacity(detections.len());
-        let mut receipts = vec![detection.receipt];
+        let mut receipts = vec![detection_receipt];
         for (detection_batch, crop_batch) in detections
             .chunks(RECOGNITION_BATCH_SIZE)
             .zip(crops.chunks(RECOGNITION_BATCH_SIZE))
