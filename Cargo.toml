@@ -30,6 +30,7 @@ required-features = ["ppocr-v6"]
 default = ["ppocr-v6", "mcp", "cli"]
 ppocr-v6 = [
     "dep:clipper2",
+    "dep:flate2",
     "dep:fs2",
     "dep:image",
     "dep:imageproc",
@@ -47,6 +48,7 @@ a3s-use-core = "0.2.0"
 async-trait = "0.1"
 clap = { version = "4", features = ["derive"], optional = true }
 clipper2 = { version = "=0.5.3", default-features = false, optional = true }
+flate2 = { version = "1", optional = true }
 fs2 = { version = "0.4", optional = true }
 image = { version = "=0.25.5", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"], optional = true }
 imageproc = { version = "=0.25.0", default-features = false, optional = true }

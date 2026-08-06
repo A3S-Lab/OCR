@@ -7,11 +7,11 @@ use tokio::io::AsyncWriteExt;
 
 use super::ocr_error;
 
-const DOWNLOAD_HOST: &str = "paddle-model-ecology.bj.bcebos.com";
+const DOWNLOAD_HOST: &str = "github.com";
 const DOWNLOAD_ATTEMPTS: usize = 8;
 const DOWNLOAD_RETRY_DELAY: Duration = Duration::from_secs(2);
 const DOWNLOAD_MAX_RETRY_DELAY: Duration = Duration::from_secs(30);
-const MAX_ARCHIVE_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_ARCHIVE_BYTES: u64 = 64 * 1024 * 1024;
 
 pub(super) struct Downloaded {
     pub(super) bytes: u64,
@@ -22,7 +22,7 @@ pub(super) fn client() -> UseResult<reqwest::Client> {
     let redirects = reqwest::redirect::Policy::custom(|attempt| {
         let approved = attempt.previous().len() < 5
             && attempt.url().scheme() == "https"
-            && attempt.url().host_str() == Some(DOWNLOAD_HOST);
+            && attempt.url().host_str().is_some_and(approved_host);
         if approved {
             attempt.follow()
         } else {
@@ -66,7 +66,7 @@ pub(super) async fn pinned(
     if expected_bytes == 0 || expected_bytes > MAX_ARCHIVE_BYTES {
         return Err(ocr_error(
             "use.ocr.download_too_large",
-            "Pinned PP-OCRv6 archive length is outside the 256 MiB limit.",
+            "Pinned PP-OCRv6 archive length is outside the 64 MiB limit.",
         ));
     }
     validated(
@@ -77,6 +77,10 @@ pub(super) async fn pinned(
         DOWNLOAD_RETRY_DELAY,
     )
     .await
+}
+
+fn approved_host(host: &str) -> bool {
+    matches!(host, DOWNLOAD_HOST | "release-assets.githubusercontent.com")
 }
 
 pub(super) async fn validated(

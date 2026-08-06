@@ -91,13 +91,15 @@ a3s install use/ocr
 a3s install use/ocr --force
 ```
 
-Model downloads bound connection setup and stalled reads without imposing a
-total transfer deadline, so a healthy slow link can still complete the pinned
-archive. Interrupted bodies retry from an exact validated byte range; a server
-that ignores the range restarts the staging file instead of appending. The
-same bounded retry budget covers transient connection and origin failures. The
-complete archive still must match its pinned length and SHA-256 before
-activation.
+Model installation uses the immutable A3S OCR release bundle derived from the
+pinned PaddleOCR artifacts, rather than depending on the upstream CDN at
+install time. Downloads bound connection setup and stalled reads without a
+total transfer deadline, so a healthy slow link can still complete the bundle.
+Interrupted bodies retry from an exact validated byte range; a server that
+ignores the range restarts the staging file instead of appending. The same
+bounded retry budget covers transient connection and origin failures. The
+complete bundle still must match its pinned length and SHA-256 before
+activation, and extraction admits only the four declared model assets.
 
 `A3S_OCR_MODEL_DIR` can point development builds at an explicit PP-OCRv6 model
 bundle. `A3S_USE_OCR_HOME` overrides its managed model root for packaging,

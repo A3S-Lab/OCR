@@ -20,25 +20,14 @@ const INSTALL_LOCK: &str = ".install.lock";
 const STAGE_PREFIX: &str = ".stage-";
 const BACKUP_PREFIX: &str = ".backup-";
 
-const DETECTION_ARCHIVE: PinnedArchive = PinnedArchive {
-    role: "det",
-    directory: "PP-OCRv6_small_det_onnx_infer",
-    url: "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_det_onnx_infer.tar",
-    bytes: 9_891_840,
-    sha256: "d218f6fbf0f1c23d2161bd6ac7f5eaa6104fa89955c09290497e31008e2618e4",
-};
-const RECOGNITION_ARCHIVE: PinnedArchive = PinnedArchive {
-    role: "rec",
-    directory: "PP-OCRv6_small_rec_onnx_infer",
-    url: "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_rec_onnx_infer.tar",
-    bytes: 21_319_680,
-    sha256: "d267ab077a44a0eedb1ea8f8c542d263f211de8e9d7a029bf9fcfff7e5a88fb1",
+const MODEL_BUNDLE: PinnedBundle = PinnedBundle {
+    url: "https://github.com/A3S-Lab/OCR/releases/download/v0.3.0/a3s-use-ocr-assets-0.3.0.tar.gz",
+    bytes: 26_105_899,
+    sha256: "3376f84f400590c3c9c06ccef11494aac9877d7c19b8ffa38254e64db55c6d75",
 };
 
 #[derive(Debug, Clone, Copy)]
-struct PinnedArchive {
-    role: &'static str,
-    directory: &'static str,
+struct PinnedBundle {
     url: &'static str,
     bytes: u64,
     sha256: &'static str,
@@ -50,9 +39,17 @@ struct InstallReceipt {
     schema_version: u32,
     provider: String,
     model: String,
+    #[serde(default)]
+    bundle_url: String,
+    #[serde(default)]
+    bundle_sha256: String,
+    #[serde(default)]
     detection_url: String,
+    #[serde(default)]
     detection_sha256: String,
+    #[serde(default)]
     recognition_url: String,
+    #[serde(default)]
     recognition_sha256: String,
 }
 
@@ -127,127 +124,120 @@ pub async fn uninstall_managed_ppocr_v6() -> UseResult<bool> {
 
 async fn install_into(stage: &Path) -> UseResult<()> {
     let client = download::client()?;
-    for archive in [DETECTION_ARCHIVE, RECOGNITION_ARCHIVE] {
-        let archive_path = stage.join(format!("{}.tar", archive.role));
-        let downloaded =
-            download::pinned(&client, archive.url, &archive_path, archive.bytes).await?;
-        if downloaded.bytes != archive.bytes || downloaded.sha256 != archive.sha256 {
-            return Err(ocr_error(
-                "use.ocr.integrity_mismatch",
-                format!(
-                    "{} archive integrity mismatch: expected {} bytes and {}, got {} bytes and {}.",
-                    archive.directory,
-                    archive.bytes,
-                    archive.sha256,
-                    downloaded.bytes,
-                    downloaded.sha256
-                ),
-            ));
-        }
-        let archive_path_for_task = archive_path.clone();
-        let destination = stage.join(archive.role);
-        tokio::task::spawn_blocking(move || {
-            extract_archive(&archive_path_for_task, &destination, archive)
-        })
+    let bundle_path = stage.join("a3s-use-ocr-assets-0.3.0.tar.gz");
+    let downloaded =
+        download::pinned(&client, MODEL_BUNDLE.url, &bundle_path, MODEL_BUNDLE.bytes).await?;
+    if downloaded.bytes != MODEL_BUNDLE.bytes || downloaded.sha256 != MODEL_BUNDLE.sha256 {
+        return Err(ocr_error(
+            "use.ocr.integrity_mismatch",
+            format!(
+                "PP-OCRv6 release bundle integrity mismatch: expected {} bytes and {}, got {} bytes and {}.",
+                MODEL_BUNDLE.bytes,
+                MODEL_BUNDLE.sha256,
+                downloaded.bytes,
+                downloaded.sha256
+            ),
+        ));
+    }
+    let bundle_path_for_task = bundle_path.clone();
+    let destination = stage.to_path_buf();
+    tokio::task::spawn_blocking(move || extract_bundle(&bundle_path_for_task, &destination))
         .await
         .map_err(|error| {
             ocr_error(
                 "use.ocr.install_failed",
-                format!("PP-OCRv6 archive extraction task failed: {error}"),
+                format!("PP-OCRv6 bundle extraction task failed: {error}"),
             )
         })??;
-        tokio::fs::remove_file(&archive_path)
-            .await
-            .map_err(|error| {
-                ocr_error(
-                    "use.ocr.install_failed",
-                    format!(
-                        "Failed to remove staged archive '{}': {error}",
-                        archive_path.display()
-                    ),
-                )
-            })?;
-    }
+    tokio::fs::remove_file(&bundle_path)
+        .await
+        .map_err(|error| {
+            ocr_error(
+                "use.ocr.install_failed",
+                format!(
+                    "Failed to remove staged bundle '{}': {error}",
+                    bundle_path.display()
+                ),
+            )
+        })?;
     write_receipt(stage).await?;
     validate_assets(stage, OcrInstallSource::Managed)?;
     Ok(())
 }
 
-fn extract_archive(archive_path: &Path, destination: &Path, spec: PinnedArchive) -> UseResult<()> {
-    std::fs::create_dir(destination).map_err(|error| {
+fn extract_bundle(bundle_path: &Path, destination: &Path) -> UseResult<()> {
+    let file = std::fs::File::open(bundle_path).map_err(|error| {
         ocr_error(
             "use.ocr.install_failed",
             format!(
-                "Failed to create PP-OCRv6 model directory '{}': {error}",
-                destination.display()
+                "Failed to open PP-OCRv6 release bundle '{}': {error}",
+                bundle_path.display()
             ),
         )
     })?;
-    let file = std::fs::File::open(archive_path).map_err(|error| {
-        ocr_error(
-            "use.ocr.install_failed",
-            format!(
-                "Failed to open PP-OCRv6 archive '{}': {error}",
-                archive_path.display()
-            ),
-        )
-    })?;
-    let mut archive = tar::Archive::new(file);
-    let mut extracted = [false; 2];
+    let decoder = flate2::read::GzDecoder::new(file);
+    let mut archive = tar::Archive::new(decoder);
+    let mut extracted = [false; 4];
     for entry in archive.entries().map_err(archive_error)? {
         let entry = entry.map_err(archive_error)?;
-        let path = entry.path().map_err(archive_error)?;
-        let components = path.components().collect::<Vec<_>>();
-        if components.len() == 1
-            && matches!(components[0], Component::Normal(value) if value == spec.directory)
-            && entry.header().entry_type().is_dir()
-        {
+        let path = entry.path().map_err(archive_error)?.into_owned();
+        let mut components = Vec::new();
+        for component in path.components() {
+            match component {
+                Component::CurDir => {}
+                Component::Normal(value) => components.push(value),
+                _ => return Err(unexpected_bundle_entry(&path)),
+            }
+        }
+        if entry.header().entry_type().is_dir() && allowed_bundle_directory(&components) {
             continue;
         }
-        if components.len() != 2
-            || !matches!(components[0], Component::Normal(value) if value == spec.directory)
-            || !entry.header().entry_type().is_file()
-        {
+        if !entry.header().entry_type().is_file() {
+            return Err(unexpected_bundle_entry(&path));
+        }
+        if ignored_bundle_file(&components) {
+            if entry.size() == 0 || entry.size() > 2 * 1024 * 1024 {
+                return Err(ocr_error(
+                    "use.ocr.archive_invalid",
+                    format!(
+                        "PP-OCRv6 metadata entry '{}' has an invalid size.",
+                        path.display()
+                    ),
+                ));
+            }
+            continue;
+        }
+        let Some((role, name, index, max)) = model_bundle_entry(&components) else {
+            return Err(unexpected_bundle_entry(&path));
+        };
+        if extracted[index] {
             return Err(ocr_error(
                 "use.ocr.archive_invalid",
                 format!(
-                    "PP-OCRv6 archive contains an unexpected entry '{}'.",
+                    "PP-OCRv6 release bundle repeats entry '{}'.",
                     path.display()
                 ),
             ));
         }
-        let name = match components[1] {
-            Component::Normal(name) if name == "inference.onnx" => {
-                extracted[0] = true;
-                "inference.onnx"
-            }
-            Component::Normal(name) if name == "inference.yml" => {
-                extracted[1] = true;
-                "inference.yml"
-            }
-            _ => {
-                return Err(ocr_error(
-                    "use.ocr.archive_invalid",
-                    format!(
-                        "PP-OCRv6 archive contains an unexpected entry '{}'.",
-                        path.display()
-                    ),
-                ))
-            }
-        };
-        let max = if name.ends_with(".onnx") {
-            256 * 1024 * 1024
-        } else {
-            2 * 1024 * 1024
-        };
+        extracted[index] = true;
         if entry.size() == 0 || entry.size() > max {
             return Err(ocr_error(
                 "use.ocr.archive_invalid",
-                format!("PP-OCRv6 archive entry '{name}' has an invalid size."),
+                format!("PP-OCRv6 release bundle entry '{name}' has an invalid size."),
             ));
         }
         let expected_size = entry.size();
-        let output_path = destination.join(name);
+        let role_directory = destination.join(role);
+        std::fs::create_dir_all(&role_directory).map_err(|error| {
+            ocr_error(
+                "use.ocr.install_failed",
+                format!(
+                    "Failed to create PP-OCRv6 model directory '{}': {error}",
+                    role_directory.display()
+                ),
+            )
+        })?;
+        let output_path = role_directory.join(name);
         let mut output = OpenOptions::new()
             .create_new(true)
             .write(true)
@@ -265,7 +255,7 @@ fn extract_archive(archive_path: &Path, destination: &Path, spec: PinnedArchive)
         if copied != expected_size {
             return Err(ocr_error(
                 "use.ocr.archive_invalid",
-                format!("PP-OCRv6 archive entry '{name}' was truncated."),
+                format!("PP-OCRv6 release bundle entry '{name}' was truncated."),
             ));
         }
         output.flush().map_err(archive_error)?;
@@ -274,21 +264,84 @@ fn extract_archive(archive_path: &Path, destination: &Path, spec: PinnedArchive)
     if !extracted.into_iter().all(|present| present) {
         return Err(ocr_error(
             "use.ocr.archive_invalid",
-            "PP-OCRv6 archive is missing inference.onnx or inference.yml.",
+            "PP-OCRv6 release bundle is missing a detection or recognition asset.",
         ));
     }
     Ok(())
 }
 
+fn allowed_bundle_directory(components: &[&std::ffi::OsStr]) -> bool {
+    match components {
+        [] => true,
+        [root] => *root == "ocr-models" || *root == "ocr-skills",
+        [root, model] => {
+            (*root == "ocr-models" && *model == MODEL_FAMILY)
+                || (*root == "ocr-skills" && *model == "a3s-use-ocr")
+        }
+        [root, model, role] => {
+            *root == "ocr-models" && *model == MODEL_FAMILY && (*role == "det" || *role == "rec")
+        }
+        _ => false,
+    }
+}
+
+fn ignored_bundle_file(components: &[&std::ffi::OsStr]) -> bool {
+    match components {
+        [name] => *name == "LICENSE" || *name == "THIRD_PARTY_NOTICES.md",
+        [root, scope, name] => {
+            (*root == "ocr-skills" && *scope == "a3s-use-ocr" && *name == "SKILL.md")
+                || (*root == "ocr-models" && *scope == MODEL_FAMILY && *name == RECEIPT_FILE)
+        }
+        _ => false,
+    }
+}
+
+fn model_bundle_entry(
+    components: &[&std::ffi::OsStr],
+) -> Option<(&'static str, &'static str, usize, u64)> {
+    match components {
+        [root, model, role, name] if *root == "ocr-models" && *model == MODEL_FAMILY => {
+            match (*role, *name) {
+                (role, name) if role == "det" && name == "inference.onnx" => {
+                    Some(("det", "inference.onnx", 0, 256 * 1024 * 1024))
+                }
+                (role, name) if role == "det" && name == "inference.yml" => {
+                    Some(("det", "inference.yml", 1, 2 * 1024 * 1024))
+                }
+                (role, name) if role == "rec" && name == "inference.onnx" => {
+                    Some(("rec", "inference.onnx", 2, 256 * 1024 * 1024))
+                }
+                (role, name) if role == "rec" && name == "inference.yml" => {
+                    Some(("rec", "inference.yml", 3, 2 * 1024 * 1024))
+                }
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn unexpected_bundle_entry(path: &Path) -> UseError {
+    ocr_error(
+        "use.ocr.archive_invalid",
+        format!(
+            "PP-OCRv6 release bundle contains an unexpected entry '{}'.",
+            path.display()
+        ),
+    )
+}
+
 async fn write_receipt(stage: &Path) -> UseResult<()> {
     let receipt = InstallReceipt {
-        schema_version: 1,
+        schema_version: 2,
         provider: "pp-ocr-v6".to_string(),
         model: MODEL_FAMILY.to_string(),
-        detection_url: DETECTION_ARCHIVE.url.to_string(),
-        detection_sha256: DETECTION_ARCHIVE.sha256.to_string(),
-        recognition_url: RECOGNITION_ARCHIVE.url.to_string(),
-        recognition_sha256: RECOGNITION_ARCHIVE.sha256.to_string(),
+        bundle_url: MODEL_BUNDLE.url.to_string(),
+        bundle_sha256: MODEL_BUNDLE.sha256.to_string(),
+        detection_url: String::new(),
+        detection_sha256: String::new(),
+        recognition_url: String::new(),
+        recognition_sha256: String::new(),
     };
     let bytes = serde_json::to_vec_pretty(&receipt).map_err(|error| {
         ocr_error(
@@ -515,9 +568,16 @@ fn owned_install(path: &Path) -> bool {
         return false;
     };
     serde_json::from_slice::<InstallReceipt>(&bytes).is_ok_and(|receipt| {
-        receipt.schema_version == 1
-            && receipt.provider == "pp-ocr-v6"
+        receipt.provider == "pp-ocr-v6"
             && receipt.model == MODEL_FAMILY
+            && match receipt.schema_version {
+                1 => true,
+                2 => {
+                    receipt.bundle_url == MODEL_BUNDLE.url
+                        && receipt.bundle_sha256 == MODEL_BUNDLE.sha256
+                }
+                _ => false,
+            }
     })
 }
 
@@ -737,5 +797,106 @@ mod download_tests {
         server.join().unwrap();
         assert_eq!(std::fs::read(destination).unwrap(), archive);
         assert_eq!(requests.lock().unwrap().len(), 6);
+    }
+}
+
+#[cfg(test)]
+mod bundle_tests {
+    use super::*;
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
+    use std::io::Cursor;
+
+    const MODEL_ENTRIES: [(&str, &[u8]); 4] = [
+        ("ocr-models/PP-OCRv6_small/det/inference.onnx", b"det-model"),
+        ("ocr-models/PP-OCRv6_small/det/inference.yml", b"det-config"),
+        ("ocr-models/PP-OCRv6_small/rec/inference.onnx", b"rec-model"),
+        ("ocr-models/PP-OCRv6_small/rec/inference.yml", b"rec-config"),
+    ];
+
+    fn append_file(builder: &mut tar::Builder<GzEncoder<std::fs::File>>, name: &str, bytes: &[u8]) {
+        let mut header = tar::Header::new_gnu();
+        header.set_entry_type(tar::EntryType::Regular);
+        header.set_mode(0o600);
+        header.set_size(bytes.len() as u64);
+        header.set_cksum();
+        builder
+            .append_data(&mut header, name, Cursor::new(bytes))
+            .unwrap();
+    }
+
+    fn bundle_with(entries: &[(&str, &[u8])]) -> (tempfile::TempDir, PathBuf) {
+        let temporary = tempfile::tempdir().unwrap();
+        let path = temporary.path().join("bundle.tar.gz");
+        let encoder = GzEncoder::new(
+            std::fs::File::create(&path).unwrap(),
+            Compression::default(),
+        );
+        let mut builder = tar::Builder::new(encoder);
+        append_file(&mut builder, "LICENSE", b"license");
+        for (name, bytes) in entries {
+            append_file(&mut builder, name, bytes);
+        }
+        builder.into_inner().unwrap().finish().unwrap();
+        (temporary, path)
+    }
+
+    #[test]
+    fn release_bundle_extracts_only_the_four_model_assets() {
+        let (temporary, bundle) = bundle_with(&MODEL_ENTRIES);
+        let destination = temporary.path().join("models");
+        std::fs::create_dir(&destination).unwrap();
+
+        extract_bundle(&bundle, &destination).unwrap();
+
+        for (source, bytes) in MODEL_ENTRIES {
+            let relative = source.strip_prefix("ocr-models/PP-OCRv6_small/").unwrap();
+            assert_eq!(std::fs::read(destination.join(relative)).unwrap(), bytes);
+        }
+        assert!(!destination.join("LICENSE").exists());
+    }
+
+    #[test]
+    fn release_bundle_rejects_missing_and_unexpected_entries() {
+        let (temporary, bundle) = bundle_with(&MODEL_ENTRIES[..3]);
+        let destination = temporary.path().join("missing");
+        std::fs::create_dir(&destination).unwrap();
+        assert!(extract_bundle(&bundle, &destination).is_err());
+
+        let mut unexpected = MODEL_ENTRIES.to_vec();
+        unexpected.push(("unexpected", b"content"));
+        let (temporary, bundle) = bundle_with(&unexpected);
+        let destination = temporary.path().join("unexpected");
+        std::fs::create_dir(&destination).unwrap();
+        assert!(extract_bundle(&bundle, &destination).is_err());
+    }
+
+    #[test]
+    fn release_bundle_receipt_is_revision_bound_with_legacy_migration() {
+        let temporary = tempfile::tempdir().unwrap();
+        let receipt_path = temporary.path().join(RECEIPT_FILE);
+        let mut receipt = InstallReceipt {
+            schema_version: 2,
+            provider: "pp-ocr-v6".to_string(),
+            model: MODEL_FAMILY.to_string(),
+            bundle_url: MODEL_BUNDLE.url.to_string(),
+            bundle_sha256: MODEL_BUNDLE.sha256.to_string(),
+            detection_url: String::new(),
+            detection_sha256: String::new(),
+            recognition_url: String::new(),
+            recognition_sha256: String::new(),
+        };
+        std::fs::write(&receipt_path, serde_json::to_vec(&receipt).unwrap()).unwrap();
+        assert!(owned_install(temporary.path()));
+
+        receipt.bundle_sha256 = "0".repeat(64);
+        std::fs::write(&receipt_path, serde_json::to_vec(&receipt).unwrap()).unwrap();
+        assert!(!owned_install(temporary.path()));
+
+        receipt.schema_version = 1;
+        receipt.bundle_url.clear();
+        receipt.bundle_sha256.clear();
+        std::fs::write(&receipt_path, serde_json::to_vec(&receipt).unwrap()).unwrap();
+        assert!(owned_install(temporary.path()));
     }
 }

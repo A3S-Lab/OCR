@@ -25,6 +25,7 @@ dependencies = [
  "async-trait",
  "clap",
  "clipper2",
+ "flate2",
  "fs2",
  "image",
  "imageproc",
