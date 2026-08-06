@@ -242,6 +242,10 @@ a3s install use/ocr
 a3s install use/ocr --force
 ~~~
 
+Model downloads bound connection setup and stalled reads without imposing a
+total transfer deadline, so a healthy slow link can still complete the pinned
+archive before its exact length and SHA-256 are verified.
+
 `A3S_OCR_MODEL_DIR` can point development builds at an explicit model bundle.
 `A3S_USE_OCR_HOME` overrides the managed model root for packaging, tests, or an
 isolated installation. The provider executes reviewed OCR-owned graph plans

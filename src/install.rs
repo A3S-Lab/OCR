@@ -180,7 +180,10 @@ fn download_client() -> UseResult<reqwest::Client> {
     reqwest::Client::builder()
         .user_agent(concat!("a3s-use-ocr/", env!("CARGO_PKG_VERSION")))
         .redirect(redirects)
-        .timeout(std::time::Duration::from_secs(300))
+        .connect_timeout(std::time::Duration::from_secs(30))
+        // Bound stalled reads, not the complete transfer. The pinned model
+        // archives can take more than five minutes on a healthy slow link.
+        .read_timeout(std::time::Duration::from_secs(60))
         .build()
         .map_err(|error| {
             ocr_error(
