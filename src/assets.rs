@@ -30,9 +30,9 @@ pub struct OcrRuntimeStatus {
 #[derive(Debug, Clone)]
 pub(crate) struct ModelAssets {
     pub(crate) root: PathBuf,
-    pub(crate) detection_model: PathBuf,
+    pub(crate) detection_weights: PathBuf,
     pub(crate) detection_config: PathBuf,
-    pub(crate) recognition_model: PathBuf,
+    pub(crate) recognition_weights: PathBuf,
     pub(crate) recognition_config: PathBuf,
     pub(crate) source: OcrInstallSource,
 }
@@ -111,9 +111,11 @@ pub(crate) fn validate_assets(root: &Path, source: OcrInstallSource) -> UseResul
             ),
         )
     })?;
-    let detection_model = checked_file(&root, "det/inference.onnx", 256 * 1024 * 1024, source)?;
+    let detection_weights =
+        checked_file(&root, "det/model.safetensors", 256 * 1024 * 1024, source)?;
     let detection_config = checked_file(&root, "det/inference.yml", 2 * 1024 * 1024, source)?;
-    let recognition_model = checked_file(&root, "rec/inference.onnx", 256 * 1024 * 1024, source)?;
+    let recognition_weights =
+        checked_file(&root, "rec/model.safetensors", 256 * 1024 * 1024, source)?;
     let recognition_config = checked_file(&root, "rec/inference.yml", 2 * 1024 * 1024, source)?;
 
     load_detection(&detection_config)?;
@@ -121,9 +123,9 @@ pub(crate) fn validate_assets(root: &Path, source: OcrInstallSource) -> UseResul
 
     Ok(ModelAssets {
         root,
-        detection_model,
+        detection_weights,
         detection_config,
-        recognition_model,
+        recognition_weights,
         recognition_config,
         source,
     })

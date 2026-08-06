@@ -1,6 +1,6 @@
 [package]
 name = "a3s-use-ocr"
-version = "0.3.1"
+version = "0.5.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/A3S-Lab/OCR"
@@ -9,7 +9,7 @@ authors = ["A3S Lab"]
 rust-version = "1.82"
 description = "Provider-oriented optical character recognition interfaces for A3S"
 readme = "README.md"
-keywords = ["ocr", "onnx", "pp-ocrv6", "a3s"]
+keywords = ["ocr", "embedded", "pp-ocrv6", "unlimited-ocr", "a3s"]
 categories = ["computer-vision", "multimedia::images"]
 
 [lib]
@@ -21,6 +21,11 @@ name = "a3s-use-ocr"
 path = "src/main.rs"
 required-features = ["cli"]
 
+[[bin]]
+name = "a3s-use-ocr-execution-bench"
+path = "src/bin/execution-baseline/main.rs"
+required-features = ["benchmark"]
+
 [[example]]
 name = "install_models"
 path = "examples/install_models.rs"
@@ -28,12 +33,39 @@ required-features = ["ppocr-v6"]
 
 [features]
 default = ["ppocr-v6", "mcp", "cli"]
+benchmark = ["ppocr-v6", "dep:anyhow"]
+power-runtime = ["dep:a3s-power", "dep:tokio-util"]
+unlimited-ocr = [
+    "power-runtime",
+    "dep:candle-core",
+    "dep:candle-nn",
+    "dep:image",
+    "dep:serde_json",
+    "dep:tokenizers",
+]
+unlimited-ocr-accelerate = [
+    "unlimited-ocr",
+    "candle-core/accelerate",
+    "candle-nn/accelerate",
+]
+unlimited-ocr-cuda = [
+    "unlimited-ocr",
+    "a3s-power/embedded-cuda",
+    "candle-core/cuda",
+    "candle-nn/cuda",
+]
+unlimited-ocr-metal = [
+    "unlimited-ocr",
+    "a3s-power/embedded-metal",
+    "candle-core/metal",
+    "candle-nn/metal",
+]
 ppocr-v6 = [
+    "power-runtime",
     "dep:clipper2",
     "dep:fs2",
     "dep:image",
     "dep:imageproc",
-    "dep:ort",
     "dep:reqwest",
     "dep:serde_json",
     "dep:serde_yaml",
@@ -43,14 +75,17 @@ mcp = ["dep:rmcp", "dep:serde_json", "tokio/io-std"]
 cli = ["ppocr-v6", "mcp", "dep:clap"]
 
 [dependencies]
+a3s-power = { version = "=0.8.0", git = "https://github.com/A3S-Lab/Power.git", rev = "3b1f95864b3b594ec3ffc5f65e808a74a38405aa", default-features = false, features = ["embedded-inference"], optional = true }
 a3s-use-core = "0.2.0"
+anyhow = { version = "1", optional = true }
 async-trait = "0.1"
+candle-core = { version = "0.10.2", default-features = false, optional = true }
+candle-nn = { version = "0.10.2", default-features = false, optional = true }
 clap = { version = "4", features = ["derive"], optional = true }
 clipper2 = { version = "=0.5.3", default-features = false, optional = true }
 fs2 = { version = "0.4", optional = true }
 image = { version = "=0.25.5", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"], optional = true }
 imageproc = { version = "=0.25.0", default-features = false, optional = true }
-ort = { version = "=2.0.0-rc.10", default-features = false, features = ["copy-dylibs", "download-binaries", "ndarray", "std"], optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"], optional = true }
 rmcp = { version = "=0.8.5", default-features = false, features = ["base64", "macros", "server", "transport-io"], optional = true }
 schemars = "1.2"
@@ -60,6 +95,11 @@ serde_yaml = { version = "0.9", optional = true }
 sha2 = "0.10"
 tar = { version = "0.4", optional = true }
 tokio = { version = "1", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync"] }
+tokio-util = { version = "0.7", default-features = false, features = ["rt"], optional = true }
+tokenizers = { version = "0.22.2", default-features = false, features = ["fancy-regex"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"

@@ -3,10 +3,14 @@
 //! [`OcrClient`] owns bounded source validation and evidence while recognition
 //! is delegated to an injected [`OcrProvider`]. The optional PP-OCRv6 feature
 //! supplies the local default used by A3S Use without making that model the
-//! library's architectural boundary.
+//! library's architectural boundary. Local model implementations reuse the
+//! model-neutral A3S Power embedded runtime without enabling its Web server.
 
 #[cfg(feature = "ppocr-v6")]
 mod assets;
+mod batch;
+#[cfg(feature = "power-runtime")]
+mod cancellation;
 #[cfg(feature = "cli")]
 pub mod cli;
 mod client;
@@ -19,6 +23,7 @@ mod install;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 mod models;
+mod output_validation;
 #[cfg(feature = "ppocr-v6")]
 mod postprocess;
 #[cfg(feature = "ppocr-v6")]
@@ -26,19 +31,43 @@ mod ppocr_v6;
 #[cfg(feature = "ppocr-v6")]
 mod preprocess;
 mod provider;
+#[cfg(feature = "power-runtime")]
+mod receipt;
+#[cfg(feature = "unlimited-ocr")]
+mod unlimited_ocr;
 
+#[cfg(feature = "power-runtime")]
+pub use a3s_power::inference::{
+    DevicePreference, InferenceLimits, ResidencyAllocationOrder, ResidencyBudgetPolicy,
+    ResidencyPolicy, TelemetryMode, WeightSourceConfig, WeightSourceCoverage,
+    WeightSourceWeighting, WeightStoreConfig,
+};
 #[cfg(feature = "ppocr-v6")]
 pub use assets::{ocr_status, OcrInstallSource, OcrRuntimeStatus};
+pub use batch::{
+    OcrBatchRequest, OcrBatchResult, OcrBatchSlotId, OcrBatchSlotRequest, OcrBatchSlotResult,
+    OcrBatchSlotStatus, OcrModelFingerprint, OcrProviderBatchOutput, OcrProviderBatchRequest,
+    OcrProviderBatchSlot, OcrProviderBatchSlotOutput, OcrProviderFingerprint, OcrStage,
+    OcrStageOutcome, OcrStageStatus,
+};
 pub use client::OcrClient;
 #[cfg(feature = "ppocr-v6")]
 pub use install::{install_ppocr_v6, repair_ppocr_v6, uninstall_managed_ppocr_v6};
 #[cfg(feature = "mcp")]
 pub use mcp::OcrMcpServer;
-pub use models::{OcrBlock, OcrBoundingBox, OcrDiagnostic, OcrPoint, OcrRequest, OcrResult};
+pub use models::{
+    OcrBlock, OcrBlockCategory, OcrBlockRole, OcrBoundingBox, OcrDiagnostic, OcrExecutionDigest,
+    OcrExecutionModel, OcrExecutionReceipt, OcrExecutionRuntime, OcrMicrobatchExecutionEvidence,
+    OcrPoint, OcrRequest, OcrResult,
+};
 #[cfg(feature = "ppocr-v6")]
 pub use ppocr_v6::{PpOcrV6Provider, PP_OCR_V6_PROVIDER_ID};
 pub use provider::{
     OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
+};
+#[cfg(feature = "unlimited-ocr")]
+pub use unlimited_ocr::{
+    UnlimitedOcrConfig, UnlimitedOcrProvider, UNLIMITED_OCR_MODEL, UNLIMITED_OCR_PROVIDER_ID,
 };
 
 pub use a3s_use_core::{Artifact, Readiness, UseError, UseResult};

@@ -26,11 +26,46 @@ pub struct OcrBoundingBox {
     pub height: u32,
 }
 
+/// Conservative provider-neutral meaning for one OCR block.
+///
+/// Provider taxonomies may be open-ended. [`OcrBlockCategory::raw_label`]
+/// preserves the bounded provider label while this enum exposes only roles
+/// that OCR evidence can support without inventing document structure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum OcrBlockRole {
+    Text,
+    Title,
+    Heading,
+    Paragraph,
+    Table,
+    Caption,
+    EquationBlock,
+    EquationInline,
+    Header,
+    Footer,
+    Footnote,
+    PageNumber,
+    CodeBlock,
+    Unknown,
+}
+
+/// Lossless provider label paired with its conservative canonical role.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrBlockCategory {
+    #[schemars(description = "Bounded provider label preserved without closing its taxonomy")]
+    pub raw_label: String,
+    pub role: OcrBlockRole,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OcrBlock {
     pub page: u32,
     pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<OcrBlockCategory>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(description = "Provider recognition confidence from 0 through 1, when available")]
     pub confidence: Option<f32>,
@@ -44,6 +79,66 @@ pub struct OcrBlock {
     pub polygon: Option<[OcrPoint; 4]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounding_box: Option<OcrBoundingBox>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(
+        description = "Ordered provider-supplied component boxes in source-image coordinates"
+    )]
+    pub bounding_boxes: Vec<OcrBoundingBox>,
+}
+
+/// Provider-neutral projection of one execution receipt produced by the
+/// shared inference substrate. Receipt digests are computed and bound by the
+/// runtime; OCR only carries the typed evidence to downstream consumers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExecutionReceipt {
+    pub schema: String,
+    pub model: OcrExecutionModel,
+    pub runtime: OcrExecutionRuntime,
+    pub input: OcrExecutionDigest,
+    pub output: OcrExecutionDigest,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub microbatch: Option<OcrMicrobatchExecutionEvidence>,
+}
+
+/// Digest-only projection of A3S Power's admitted microbatch evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OcrMicrobatchExecutionEvidence {
+    pub schema: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_declaration_sha256: Option<String>,
+    pub plan_sha256: String,
+    pub batch_index: usize,
+    pub batch_count: usize,
+    pub slot_count: usize,
+    pub model_admission_queued: bool,
+    pub device_admission_queued: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExecutionModel {
+    pub family: String,
+    pub revision: String,
+    pub weights_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExecutionRuntime {
+    pub name: String,
+    pub version: String,
+    pub device: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrExecutionDigest {
+    pub representation: String,
+    pub sha256: String,
+    pub byte_length: usize,
+    pub item_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -58,6 +153,8 @@ pub struct OcrResult {
     pub text: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<OcrBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub execution_receipts: Vec<OcrExecutionReceipt>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
 }

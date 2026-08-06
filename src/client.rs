@@ -6,6 +6,9 @@ use sha2::{Digest, Sha256};
 use tokio::io::AsyncReadExt;
 
 use crate::models::{OcrDiagnostic, OcrRequest, OcrResult};
+use crate::output_validation::validate_provider_output;
+#[cfg(test)]
+use crate::output_validation::MAX_COMPONENT_BOXES_PER_BLOCK;
 use crate::provider::{OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput};
 
 const MAX_INPUT_BYTES: u64 = 32 * 1024 * 1024;
@@ -16,8 +19,8 @@ const MAX_INPUT_BYTES: u64 = 32 * 1024 * 1024;
 /// one injected [`OcrProvider`].
 #[derive(Clone)]
 pub struct OcrClient {
-    provider: Arc<dyn OcrProvider>,
-    descriptor: OcrProviderDescriptor,
+    pub(crate) provider: Arc<dyn OcrProvider>,
+    pub(crate) descriptor: OcrProviderDescriptor,
 }
 
 impl OcrClient {
@@ -64,6 +67,14 @@ impl OcrClient {
         let input = read_source(&request.path).await?;
         let source = input.source().clone();
         let output = self.provider.recognize(input).await?;
+        self.finish_output(source, output)
+    }
+
+    pub(crate) fn finish_output(
+        &self,
+        source: Artifact,
+        output: OcrProviderOutput,
+    ) -> UseResult<OcrResult> {
         validate_provider_output(&output)?;
         Ok(OcrResult {
             provider: self.descriptor.id.clone(),
@@ -72,37 +83,13 @@ impl OcrClient {
             source,
             text: output.text,
             blocks: output.blocks,
+            execution_receipts: output.execution_receipts,
             warnings: output.warnings,
         })
     }
 }
 
-fn validate_provider_output(output: &OcrProviderOutput) -> UseResult<()> {
-    for block in &output.blocks {
-        if block.page == 0 {
-            return Err(provider_output_error(
-                "OCR providers must number pages starting at 1.",
-            ));
-        }
-        for (name, value) in [
-            ("confidence", block.confidence),
-            ("detection confidence", block.detection_confidence),
-        ] {
-            if value.is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value)) {
-                return Err(provider_output_error(format!(
-                    "OCR provider {name} must be between 0 and 1."
-                )));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn provider_output_error(message: impl Into<String>) -> UseError {
-    UseError::new("use.ocr.provider_output_invalid", message)
-}
-
-async fn read_source(path: &Path) -> UseResult<OcrInput> {
+pub(crate) async fn read_source(path: &Path) -> UseResult<OcrInput> {
     let canonical = tokio::fs::canonicalize(path).await.map_err(|error| {
         UseError::new(
             "use.ocr.source_unreadable",
@@ -210,7 +197,7 @@ mod tests {
     use a3s_use_core::Readiness;
     use async_trait::async_trait;
 
-    use crate::{OcrBlock, OcrProviderStatus};
+    use crate::{OcrBlock, OcrBlockCategory, OcrBlockRole, OcrBoundingBox, OcrProviderStatus};
 
     use super::*;
 
@@ -241,11 +228,14 @@ mod tests {
                 blocks: vec![OcrBlock {
                     page: 1,
                     text: "fixture text".to_string(),
+                    category: None,
                     confidence: None,
                     detection_confidence: None,
                     polygon: None,
                     bounding_box: None,
+                    bounding_boxes: Vec::new(),
                 }],
+                execution_receipts: Vec::new(),
                 warnings: Vec::new(),
             })
         }
@@ -259,6 +249,65 @@ mod tests {
         );
         assert_eq!(detect_image_type(b"\xff\xd8\xffrest"), Some("image/jpeg"));
         assert_eq!(detect_image_type(b"not an image"), None);
+    }
+
+    #[test]
+    fn validates_bounded_categories_and_exact_component_envelopes() {
+        let component = OcrBoundingBox {
+            x: 10,
+            y: 20,
+            width: 30,
+            height: 40,
+        };
+        let block = OcrBlock {
+            page: 1,
+            text: "grounded".into(),
+            category: Some(OcrBlockCategory {
+                raw_label: "vendor-special".into(),
+                role: OcrBlockRole::Unknown,
+            }),
+            confidence: None,
+            detection_confidence: None,
+            polygon: None,
+            bounding_box: Some(component),
+            bounding_boxes: vec![component],
+        };
+        let output = |block| OcrProviderOutput {
+            model: None,
+            text: "grounded".into(),
+            blocks: vec![block],
+            execution_receipts: Vec::new(),
+            warnings: Vec::new(),
+        };
+
+        assert!(validate_provider_output(&output(block.clone())).is_ok());
+
+        let mut invalid_label = block.clone();
+        invalid_label.category.as_mut().unwrap().raw_label = "not a label".into();
+        assert_eq!(
+            validate_provider_output(&output(invalid_label))
+                .unwrap_err()
+                .code,
+            "use.ocr.provider_output_invalid"
+        );
+
+        let mut wrong_envelope = block.clone();
+        wrong_envelope.bounding_box.as_mut().unwrap().width += 1;
+        assert_eq!(
+            validate_provider_output(&output(wrong_envelope))
+                .unwrap_err()
+                .code,
+            "use.ocr.provider_output_invalid"
+        );
+
+        let mut too_many = block;
+        too_many.bounding_boxes = vec![component; MAX_COMPONENT_BOXES_PER_BLOCK + 1];
+        assert_eq!(
+            validate_provider_output(&output(too_many))
+                .unwrap_err()
+                .code,
+            "use.ocr.provider_output_invalid"
+        );
     }
 
     #[tokio::test]

@@ -1,11 +1,44 @@
 # Third-Party Notices
 
+## Baidu Unlimited-OCR
+
+The optional `unlimited-ocr` feature implements the reviewed
+`baidu/Unlimited-OCR` topology in native Rust and loads an operator-supplied
+checkpoint at the pinned upstream revision. The crate does not redistribute
+model weights, upstream Python code, vLLM, or container images. No upstream
+source code is copied into the native implementation.
+
+Unlimited-OCR is licensed under the MIT License.
+
+Upstream repositories:
+
+- <https://github.com/baidu/Unlimited-OCR>
+- <https://huggingface.co/baidu/Unlimited-OCR>
+
+## Pillow-Compatible Bicubic Preprocessing
+
+The native Unlimited-OCR preprocessor independently implements the reviewed
+8-bit bicubic coefficient, antialiasing, boundary, and fixed-point rounding
+semantics used by Pillow. Numeric fixtures were derived from Pillow 11.3.0.
+No Pillow runtime or Python dependency is included.
+
+Pillow is licensed under the HPND License.
+
+Reference: <https://github.com/python-pillow/Pillow/blob/11.3.0/src/libImaging/Resample.c>
+
 ## PaddlePaddle/PaddleOCR PP-OCRv6 Models
 
-A3S OCR release archives redistribute the official `PP-OCRv6_small_det` and
-`PP-OCRv6_small_rec` ONNX inference model bundles published by
-PaddlePaddle/PaddleOCR. The installer pins the upstream archive URLs, byte
-sizes, and SHA-256 digests and does not modify the model weights.
+A3S OCR release archives redistribute weights converted without numerical
+changes from the official `PP-OCRv6_small_det` and `PP-OCRv6_small_rec`
+inference bundles published by PaddlePaddle/PaddleOCR. ONNX is used only as the
+audited offline interchange input to the OCR-owned conversion tool. Runtime
+packages contain SafeTensors weights and inference configuration only. The
+installer pins the A3S OCR release archive URL, byte size, SHA-256 digest, and
+the canonical A3S Power weight digests. The explicit CI parity gate downloads
+PaddleOCR's `general_ocr_002` demonstration image by a pinned byte length and
+SHA-256 and compares the Rust output with a one-time Paddle 3.3.1 / PaddleOCR
+3.7.0 reference. The image and Paddle runtime are not redistributed in the
+crate.
 
 PaddleOCR is licensed under the Apache License, Version 2.0.
 
@@ -13,23 +46,17 @@ Upstream repository: <https://github.com/PaddlePaddle/PaddleOCR>
 
 Model collection: <https://huggingface.co/collections/PaddlePaddle/pp-ocrv6>
 
-## Microsoft ONNX Runtime
+## A3S Power and Candle
 
-`a3s-use-ocr` executes the models with Microsoft ONNX Runtime 1.22.0, obtained
-through the pinned `ort`/`ort-sys` Rust dependencies. ONNX Runtime is licensed
-under the MIT License.
+Native OCR providers execute through the model-neutral `a3s-power` embedded
+runtime. A3S Power uses the Candle Rust tensor library for embedded tensor
+operations. Both projects are licensed under the MIT License or the Apache
+License, Version 2.0, as applicable to their distributions.
 
-Copyright (c) Microsoft Corporation.
+Upstream repositories:
 
-Upstream repository: <https://github.com/microsoft/onnxruntime>
-
-## pykeio/ort
-
-The `ort` and `ort-sys` Rust crates, version `2.0.0-rc.10`, provide the native
-ONNX Runtime bindings and build integration. They are available under the MIT
-License or the Apache License, Version 2.0.
-
-Upstream repository: <https://github.com/pykeio/ort>
+- <https://github.com/A3S-Lab/Power>
+- <https://github.com/huggingface/candle>
 
 ## image-rs/imageproc
 
