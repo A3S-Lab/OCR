@@ -244,7 +244,11 @@ a3s install use/ocr --force
 
 Model downloads bound connection setup and stalled reads without imposing a
 total transfer deadline, so a healthy slow link can still complete the pinned
-archive before its exact length and SHA-256 are verified.
+archive. Interrupted bodies retry from an exact validated byte range; a server
+that ignores the range restarts the staging file instead of appending. The
+same bounded retry budget covers transient connection and origin failures. The
+complete archive still must match its pinned length and SHA-256 before
+activation.
 
 `A3S_OCR_MODEL_DIR` can point development builds at an explicit model bundle.
 `A3S_USE_OCR_HOME` overrides the managed model root for packaging, tests, or an
