@@ -6,8 +6,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use a3s_use_core::{UseError, UseResult};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
+
+mod download;
 
 use crate::assets::{
     managed_model_dir, managed_root, ocr_status, validate_assets, OcrInstallSource,
@@ -18,8 +19,6 @@ use crate::config::MODEL_FAMILY;
 const INSTALL_LOCK: &str = ".install.lock";
 const STAGE_PREFIX: &str = ".stage-";
 const BACKUP_PREFIX: &str = ".backup-";
-const DOWNLOAD_HOST: &str = "github.com";
-const MAX_ARCHIVE_BYTES: u64 = 64 * 1024 * 1024;
 
 const NATIVE_ARCHIVE: PinnedArchive = PinnedArchive {
     url: "https://github.com/A3S-Lab/OCR/releases/download/ppocr-v6-paddlex-paddle3.0.0-native-v1/ppocr-v6-small-native-v1.tar",
@@ -52,11 +51,6 @@ struct InstallReceipt {
 
 struct InstallLock {
     _file: std::fs::File,
-}
-
-struct Downloaded {
-    bytes: u64,
-    sha256: String,
 }
 
 pub async fn install_ppocr_v6(force: bool) -> UseResult<OcrRuntimeStatus> {
@@ -125,9 +119,15 @@ pub async fn uninstall_managed_ppocr_v6() -> UseResult<bool> {
 }
 
 async fn install_into(stage: &Path) -> UseResult<()> {
-    let client = download_client()?;
+    let client = download::client()?;
     let archive_path = stage.join("ppocr-v6-small-native-v1.tar");
-    let downloaded = download(&client, NATIVE_ARCHIVE.url, &archive_path).await?;
+    let downloaded = download::pinned(
+        &client,
+        NATIVE_ARCHIVE.url,
+        &archive_path,
+        NATIVE_ARCHIVE.bytes,
+    )
+    .await?;
     if downloaded.bytes != NATIVE_ARCHIVE.bytes || downloaded.sha256 != NATIVE_ARCHIVE.sha256 {
         return Err(ocr_error(
             "use.ocr.integrity_mismatch",
@@ -164,146 +164,6 @@ async fn install_into(stage: &Path) -> UseResult<()> {
     write_receipt(stage).await?;
     validate_assets(stage, OcrInstallSource::Managed)?;
     Ok(())
-}
-
-fn download_client() -> UseResult<reqwest::Client> {
-    let redirects = reqwest::redirect::Policy::custom(|attempt| {
-        let approved = attempt.previous().len() < 5
-            && attempt.url().scheme() == "https"
-            && attempt.url().host_str().is_some_and(approved_download_host);
-        if approved {
-            attempt.follow()
-        } else {
-            attempt.error("PP-OCRv6 download redirected to an unapproved host")
-        }
-    });
-    reqwest::Client::builder()
-        .user_agent(concat!("a3s-use-ocr/", env!("CARGO_PKG_VERSION")))
-        .redirect(redirects)
-        .connect_timeout(std::time::Duration::from_secs(30))
-        // Bound stalled reads, not the complete transfer. The pinned model
-        // archives can take more than five minutes on a healthy slow link.
-        .read_timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|error| {
-            ocr_error(
-                "use.ocr.download_failed",
-                format!("Failed to create PP-OCRv6 download client: {error}"),
-            )
-        })
-}
-
-fn approved_download_host(host: &str) -> bool {
-    matches!(host, DOWNLOAD_HOST | "release-assets.githubusercontent.com")
-}
-
-async fn download(
-    client: &reqwest::Client,
-    value: &str,
-    destination: &Path,
-) -> UseResult<Downloaded> {
-    let url = reqwest::Url::parse(value).map_err(|error| {
-        ocr_error(
-            "use.ocr.download_source_invalid",
-            format!("Invalid PP-OCRv6 download URL: {error}"),
-        )
-    })?;
-    if url.scheme() != "https" || url.host_str() != Some(DOWNLOAD_HOST) {
-        return Err(ocr_error(
-            "use.ocr.download_source_invalid",
-            "PP-OCRv6 download source is not the pinned official HTTPS host.",
-        ));
-    }
-    let mut response = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|error| {
-            ocr_error(
-                "use.ocr.download_failed",
-                format!("Failed to download PP-OCRv6: {error}"),
-            )
-        })?
-        .error_for_status()
-        .map_err(|error| {
-            ocr_error(
-                "use.ocr.download_failed",
-                format!("PP-OCRv6 download failed: {error}"),
-            )
-        })?;
-    if response
-        .content_length()
-        .is_some_and(|length| length > MAX_ARCHIVE_BYTES)
-    {
-        return Err(ocr_error(
-            "use.ocr.download_too_large",
-            "PP-OCRv6 native archive exceeds the 64 MiB limit.",
-        ));
-    }
-    let mut file = tokio::fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(destination)
-        .await
-        .map_err(|error| {
-            ocr_error(
-                "use.ocr.install_failed",
-                format!(
-                    "Failed to create PP-OCRv6 download '{}': {error}",
-                    destination.display()
-                ),
-            )
-        })?;
-    let mut hasher = Sha256::new();
-    let mut total = 0_u64;
-    while let Some(chunk) = response.chunk().await.map_err(|error| {
-        ocr_error(
-            "use.ocr.download_failed",
-            format!("Failed to read PP-OCRv6 download: {error}"),
-        )
-    })? {
-        total = total
-            .checked_add(chunk.len() as u64)
-            .ok_or_else(|| ocr_error("use.ocr.download_too_large", "Download size overflowed."))?;
-        if total > MAX_ARCHIVE_BYTES {
-            return Err(ocr_error(
-                "use.ocr.download_too_large",
-                "PP-OCRv6 native archive exceeds the 64 MiB limit.",
-            ));
-        }
-        hasher.update(&chunk);
-        file.write_all(&chunk).await.map_err(|error| {
-            ocr_error(
-                "use.ocr.install_failed",
-                format!(
-                    "Failed to write PP-OCRv6 download '{}': {error}",
-                    destination.display()
-                ),
-            )
-        })?;
-    }
-    file.flush().await.map_err(|error| {
-        ocr_error(
-            "use.ocr.install_failed",
-            format!(
-                "Failed to flush PP-OCRv6 download '{}': {error}",
-                destination.display()
-            ),
-        )
-    })?;
-    file.sync_all().await.map_err(|error| {
-        ocr_error(
-            "use.ocr.install_failed",
-            format!(
-                "Failed to sync PP-OCRv6 download '{}': {error}",
-                destination.display()
-            ),
-        )
-    })?;
-    Ok(Downloaded {
-        bytes: total,
-        sha256: format!("{:x}", hasher.finalize()),
-    })
 }
 
 fn extract_archive(archive_path: &Path, destination: &Path) -> UseResult<()> {
@@ -816,12 +676,12 @@ mod tests {
 
     #[test]
     fn download_redirect_hosts_are_closed() {
-        assert!(approved_download_host("github.com"));
-        assert!(approved_download_host(
+        assert!(download::approved_host("github.com"));
+        assert!(download::approved_host(
             "release-assets.githubusercontent.com"
         ));
-        assert!(!approved_download_host("github.com.evil.example"));
-        assert!(!approved_download_host("objects.githubusercontent.com"));
+        assert!(!download::approved_host("github.com.evil.example"));
+        assert!(!download::approved_host("objects.githubusercontent.com"));
     }
 
     #[test]
