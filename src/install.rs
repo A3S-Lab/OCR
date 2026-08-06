@@ -711,4 +711,31 @@ mod download_tests {
         assert!(result.is_err());
         assert_eq!(std::fs::read(destination).unwrap(), &archive[..split]);
     }
+
+    #[tokio::test]
+    async fn retryable_origin_failures_recover_after_a_short_outage() {
+        let archive = b"immutable-model-archive";
+        let mut responses = (0..5)
+            .map(|_| response("503 Service Unavailable", 0, &[], &[]))
+            .collect::<Vec<_>>();
+        responses.push(response("200 OK", archive.len(), &[], archive));
+        let (url, requests, server) = scripted_server(responses);
+        let temporary = tempfile::tempdir().unwrap();
+        let destination = temporary.path().join("bundle.tar");
+        let client = reqwest::Client::builder().build().unwrap();
+
+        download::validated(
+            &client,
+            url,
+            &destination,
+            archive.len() as u64,
+            Duration::ZERO,
+        )
+        .await
+        .unwrap();
+
+        server.join().unwrap();
+        assert_eq!(std::fs::read(destination).unwrap(), archive);
+        assert_eq!(requests.lock().unwrap().len(), 6);
+    }
 }

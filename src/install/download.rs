@@ -8,8 +8,9 @@ use tokio::io::AsyncWriteExt;
 use super::ocr_error;
 
 const DOWNLOAD_HOST: &str = "paddle-model-ecology.bj.bcebos.com";
-const DOWNLOAD_ATTEMPTS: usize = 5;
-const DOWNLOAD_RETRY_DELAY: Duration = Duration::from_secs(1);
+const DOWNLOAD_ATTEMPTS: usize = 8;
+const DOWNLOAD_RETRY_DELAY: Duration = Duration::from_secs(2);
+const DOWNLOAD_MAX_RETRY_DELAY: Duration = Duration::from_secs(30);
 const MAX_ARCHIVE_BYTES: u64 = 256 * 1024 * 1024;
 
 pub(super) struct Downloaded {
@@ -106,7 +107,12 @@ pub(super) async fn validated(
     for attempt in 1..=DOWNLOAD_ATTEMPTS {
         if attempt > 1 && !retry_delay.is_zero() {
             let multiplier = 1_u32 << (attempt - 2);
-            tokio::time::sleep(retry_delay.saturating_mul(multiplier)).await;
+            tokio::time::sleep(
+                retry_delay
+                    .saturating_mul(multiplier)
+                    .min(DOWNLOAD_MAX_RETRY_DELAY),
+            )
+            .await;
         }
 
         let mut request = client
