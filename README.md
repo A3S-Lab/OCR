@@ -246,6 +246,7 @@ Model downloads bound connection setup and stalled reads without imposing a
 total transfer deadline, so a healthy slow link can still complete the pinned
 archive. Interrupted bodies retry from an exact validated byte range; a server
 that ignores the range restarts the staging file instead of appending. The
+same bounded retry budget covers transient connection and origin failures. The
 complete archive still must match its pinned length and SHA-256 before
 activation.
 

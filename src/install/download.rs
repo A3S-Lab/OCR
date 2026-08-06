@@ -11,8 +11,9 @@ use super::ocr_error;
 mod tests;
 
 const DOWNLOAD_HOST: &str = "github.com";
-const DOWNLOAD_ATTEMPTS: usize = 5;
-const DOWNLOAD_RETRY_DELAY: Duration = Duration::from_secs(1);
+const DOWNLOAD_ATTEMPTS: usize = 8;
+const DOWNLOAD_RETRY_DELAY: Duration = Duration::from_secs(2);
+const DOWNLOAD_MAX_RETRY_DELAY: Duration = Duration::from_secs(30);
 const MAX_ARCHIVE_BYTES: u64 = 64 * 1024 * 1024;
 
 pub(super) struct Downloaded {
@@ -113,7 +114,12 @@ pub(super) async fn validated(
     for attempt in 1..=DOWNLOAD_ATTEMPTS {
         if attempt > 1 && !retry_delay.is_zero() {
             let multiplier = 1_u32 << (attempt - 2);
-            tokio::time::sleep(retry_delay.saturating_mul(multiplier)).await;
+            tokio::time::sleep(
+                retry_delay
+                    .saturating_mul(multiplier)
+                    .min(DOWNLOAD_MAX_RETRY_DELAY),
+            )
+            .await;
         }
 
         let mut request = client
