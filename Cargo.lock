@@ -5,10 +5,11 @@ version = 3
 [[package]]
 name = "a3s-power"
 version = "0.8.0"
-source = "git+https://github.com/A3S-Lab/Power.git?rev=aa13f741785598879b372235c8bfcd6fb2bf6928#aa13f741785598879b372235c8bfcd6fb2bf6928"
+source = "git+https://github.com/A3S-Lab/Power.git?rev=9455bd43d9a0b77c3ad868ead46a799c7347618f#9455bd43d9a0b77c3ad868ead46a799c7347618f"
 dependencies = [
  "aes-gcm",
  "async-trait",
+ "bytemuck",
  "candle-core",
  "candle-nn",
  "chrono",

@@ -545,7 +545,7 @@ pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
 
 The staged PP-OCRv6 integration pins the release-ready A3S Power 0.8.0 revision
-`aa13f741785598879b372235c8bfcd6fb2bf6928`. Source builds and CI execute that
+`9455bd43d9a0b77c3ad868ead46a799c7347618f`. Source builds and CI execute that
 exact Git revision. Package verification additionally resolves the declared
 `=0.8.0` registry dependency, so the package gate remains closed until the same
 Power release is visible on crates.io. No path or `[patch.crates-io]` override
