@@ -100,7 +100,7 @@ impl NativePpOcrV6 {
         permit: &ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<NativeGraphOutput> {
-        let batch = self.detect_batch(vec![(data, shape)], permit, cancellation)?;
+        let batch = self.detect_batch(data, shape, permit, cancellation)?;
         let tensor = batch.tensors.into_iter().next().ok_or_else(|| {
             UseError::new(
                 "use.ocr.provider_output_invalid",
@@ -115,32 +115,26 @@ impl NativePpOcrV6 {
 
     pub(crate) fn detect_batch(
         &self,
-        inputs: Vec<(Vec<f32>, [usize; 4])>,
+        data: Vec<f32>,
+        shape: [usize; 4],
         permit: &ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<NativeGraphBatchOutput> {
-        if inputs.is_empty() {
+        if shape[0] == 0 {
             return Err(UseError::new(
                 "use.ocr.provider_input_invalid",
                 "PP-OCRv6 detection requires at least one input tensor.",
             ));
         }
-        let slot_count = inputs.len();
-        let inputs = inputs
-            .into_iter()
-            .map(|(data, shape)| {
-                if shape[0] != 1 || shape[1] != 3 {
-                    return Err(UseError::new(
-                        "use.ocr.provider_input_invalid",
-                        "PP-OCRv6 detection slots must use singleton NCHW tensors with three channels.",
-                    ));
-                }
-                TensorInput::new(shape.to_vec(), data, self.runtime.limits())
-                    .map_err(|error| power_error("validate an OCR detection tensor", error))
-            })
-            .collect::<UseResult<Vec<_>>>()?;
-        let input = TensorInput::stack_leading(inputs, self.runtime.limits())
-            .map_err(|error| power_error("assemble the OCR detection batch", error))?;
+        if shape[1] != 3 {
+            return Err(UseError::new(
+                "use.ocr.provider_input_invalid",
+                "PP-OCRv6 detection input must use NCHW tensors with three channels.",
+            ));
+        }
+        let slot_count = shape[0];
+        let input = TensorInput::new(shape.to_vec(), data, self.runtime.limits())
+            .map_err(|error| power_error("validate an OCR detection tensor", error))?;
         let output = self.execute_input(
             &self.detection,
             &self.detection_identity,
@@ -495,10 +489,8 @@ mod tests {
             .unwrap();
         let batched_detection = native
             .detect_batch(
-                vec![
-                    (vec![0.0; 3 * 64 * 64], [1, 3, 64, 64]),
-                    (vec![0.0; 3 * 64 * 64], [1, 3, 64, 64]),
-                ],
+                vec![0.0; 2 * 3 * 64 * 64],
+                [2, 3, 64, 64],
                 &permit,
                 &cancellation,
             )

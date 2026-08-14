@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use a3s_power::error::PowerError;
 use a3s_power::inference::{ExecutionDigest, MicrobatchExecution, ModelSession, ModelSessionSpec};
@@ -88,7 +88,7 @@ pub(super) async fn recognize_batch(
                 original_index: slot.index,
                 slot_id: slot.slot_id,
                 input: slot.input,
-                image,
+                image: Arc::new(image),
             }),
             Ok(_) => {
                 outputs[slot.index] = Some(OcrProviderBatchSlotOutput {
@@ -227,7 +227,10 @@ async fn execute_prepared(
     outputs: &mut [Option<OcrProviderBatchSlotOutput>],
     receipts: &mut Vec<crate::OcrExecutionReceipt>,
 ) {
-    let images = prepared.iter().map(|slot| &slot.image).collect::<Vec<_>>();
+    let images = prepared
+        .iter()
+        .map(|slot| slot.image.as_ref())
+        .collect::<Vec<_>>();
     let ranges =
         match detection_cohort_ranges(&images, session.runtime().limits().max_tensor_elements) {
             Ok(ranges) => ranges,
@@ -365,7 +368,10 @@ async fn run_engine_batch(
                 .engine
                 .lock()
                 .map_err(|_| runtime_error("The pooled PP-OCRv6 engine lock is poisoned."))?;
-            let images = slots.iter().map(|slot| &slot.image).collect::<Vec<_>>();
+            let images = slots
+                .iter()
+                .map(|slot| slot.image.as_ref())
+                .collect::<Vec<_>>();
             let outputs = engine
                 .extract_batch_admitted(&images, execution.permit(), &cancellation)?
                 .into_iter()
@@ -474,7 +480,10 @@ struct PreparedSlot {
     original_index: usize,
     slot_id: OcrBatchSlotId,
     input: OcrInput,
-    image: RgbImage,
+    // Scheduling, admission, and the blocking inference hand-off all retain
+    // the same immutable decoded surface. Cloning a prepared slot must never
+    // clone page pixels.
+    image: Arc<RgbImage>,
 }
 
 struct BatchRun {

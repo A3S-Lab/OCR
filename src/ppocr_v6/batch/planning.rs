@@ -112,7 +112,10 @@ pub(super) fn microbatch_candidates(
     session: &ModelSession<PpOcrV6Session>,
     slots: &[PreparedSlot],
 ) -> UseResult<Vec<MicrobatchCandidate>> {
-    let images = slots.iter().map(|slot| &slot.image).collect::<Vec<_>>();
+    let images = slots
+        .iter()
+        .map(|slot| slot.image.as_ref())
+        .collect::<Vec<_>>();
     let (canvas_width, canvas_height) = detection_canvas_dimensions(&images)?;
     let canvas_tensor_bytes = u64::from(canvas_width)
         .checked_mul(u64::from(canvas_height))

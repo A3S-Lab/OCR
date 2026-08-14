@@ -1,8 +1,9 @@
+use std::borrow::Cow;
 use std::io::Cursor;
 
 use a3s_use_core::{UseError, UseResult};
 use image::imageops::FilterType;
-use image::{DynamicImage, ImageReader, Limits, RgbImage};
+use image::{ImageReader, Limits, RgbImage};
 
 use crate::config::{DetectionConfig, RecognitionConfig};
 
@@ -24,10 +25,21 @@ const RECOGNITION_MAX_WIDTH: u32 = 3_200;
 pub(crate) struct DetectionInput {
     pub(crate) data: Vec<f32>,
     pub(crate) shape: [usize; 4],
+    pub(crate) geometry: DetectionGeometry,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct DetectionGeometry {
     pub(crate) original_width: u32,
     pub(crate) original_height: u32,
     pub(crate) content_width: u32,
     pub(crate) content_height: u32,
+}
+
+pub(crate) struct DetectionBatchInput {
+    pub(crate) data: Vec<f32>,
+    pub(crate) shape: [usize; 4],
+    pub(crate) geometries: Vec<DetectionGeometry>,
 }
 
 pub(crate) struct RecognitionInput {
@@ -64,18 +76,18 @@ pub(crate) fn decode_image(bytes: &[u8]) -> UseResult<RgbImage> {
     Ok(image.to_rgb8())
 }
 
-pub(crate) fn detection_batch_inputs(
+pub(crate) fn detection_batch_input(
     images: &[&RgbImage],
     config: &DetectionConfig,
-) -> UseResult<Vec<DetectionInput>> {
-    detection_batch_inputs_with_max_side(images, config, DETECTION_FAST_MAX_SIDE)
+) -> UseResult<DetectionBatchInput> {
+    detection_batch_input_with_max_side(images, config, DETECTION_FAST_MAX_SIDE)
 }
 
-pub(crate) fn detection_batch_inputs_with_max_side(
+fn detection_batch_input_with_max_side(
     images: &[&RgbImage],
     config: &DetectionConfig,
     max_side: u32,
-) -> UseResult<Vec<DetectionInput>> {
+) -> UseResult<DetectionBatchInput> {
     if images.is_empty() || images.len() > DETECTION_MAX_BATCH_SIZE {
         return Err(image_error(format!(
             "PP-OCRv6 detection batches must contain from 1 through {DETECTION_MAX_BATCH_SIZE} images."
@@ -91,31 +103,40 @@ pub(crate) fn detection_batch_inputs_with_max_side(
     let tensor_elements = plane
         .checked_mul(3)
         .ok_or_else(|| image_error("Detection batch tensor dimensions overflowed."))?;
+    let batch_elements = tensor_elements
+        .checked_mul(images.len())
+        .ok_or_else(|| image_error("Detection batch tensor dimensions overflowed."))?;
+    let mut data = vec![0.0_f32; batch_elements];
     if images.len() == 1 {
-        return detection_input(
+        let geometry = write_detection_input(
             images[0],
             dimensions[0],
             (canvas_width, canvas_height),
             plane,
-            tensor_elements,
+            &mut data,
             config,
-        )
-        .map(|input| vec![input]);
+        )?;
+        return Ok(DetectionBatchInput {
+            data,
+            shape: [1, 3, canvas_height as usize, canvas_width as usize],
+            geometries: vec![geometry],
+        });
     }
 
-    std::thread::scope(|scope| {
+    let geometries = std::thread::scope(|scope| {
         let workers = images
             .iter()
             .copied()
             .zip(dimensions.iter().copied())
-            .map(|(image, dimensions)| {
+            .zip(data.chunks_exact_mut(tensor_elements))
+            .map(|((image, dimensions), slot_data)| {
                 scope.spawn(move || {
-                    detection_input(
+                    write_detection_input(
                         image,
                         dimensions,
                         (canvas_width, canvas_height),
                         plane,
-                        tensor_elements,
+                        slot_data,
                         config,
                     )
                 })
@@ -133,28 +154,60 @@ pub(crate) fn detection_batch_inputs_with_max_side(
                     "PP-OCRv6 detection preprocessing worker failed.",
                 )),
             })
-            .collect()
+            .collect::<UseResult<Vec<_>>>()
+    })?;
+    Ok(DetectionBatchInput {
+        data,
+        shape: [
+            images.len(),
+            3,
+            canvas_height as usize,
+            canvas_width as usize,
+        ],
+        geometries,
     })
 }
 
-fn detection_input(
+pub(crate) fn detection_input_with_max_side(
+    image: &RgbImage,
+    config: &DetectionConfig,
+    max_side: u32,
+) -> UseResult<DetectionInput> {
+    let dimensions = detection_dimensions_with_max_side(image.width(), image.height(), max_side)?;
+    let plane = usize::try_from(u64::from(dimensions.0) * u64::from(dimensions.1))
+        .map_err(|_| image_error("Detection tensor dimensions overflowed."))?;
+    let tensor_elements = plane
+        .checked_mul(3)
+        .ok_or_else(|| image_error("Detection tensor dimensions overflowed."))?;
+    let mut data = vec![0.0_f32; tensor_elements];
+    let geometry = write_detection_input(image, dimensions, dimensions, plane, &mut data, config)?;
+    Ok(DetectionInput {
+        data,
+        shape: [1, 3, dimensions.1 as usize, dimensions.0 as usize],
+        geometry,
+    })
+}
+
+fn write_detection_input(
     image: &RgbImage,
     (content_width, content_height): (u32, u32),
-    (canvas_width, canvas_height): (u32, u32),
+    (canvas_width, _canvas_height): (u32, u32),
     plane: usize,
-    tensor_elements: usize,
+    data: &mut [f32],
     config: &DetectionConfig,
-) -> UseResult<DetectionInput> {
+) -> UseResult<DetectionGeometry> {
     let original_width = image.width();
     let original_height = image.height();
     let resized = if content_width == original_width && content_height == original_height {
-        image.clone()
+        Cow::Borrowed(image)
     } else {
-        DynamicImage::ImageRgb8(image.clone())
-            .resize_exact(content_width, content_height, FilterType::Triangle)
-            .to_rgb8()
+        Cow::Owned(image::imageops::resize(
+            image,
+            content_width,
+            content_height,
+            FilterType::Triangle,
+        ))
     };
-    let mut data = vec![0.0_f32; tensor_elements];
     for channel in 0..3 {
         data[channel * plane..(channel + 1) * plane]
             .fill(-config.mean[channel] / config.std[channel]);
@@ -171,9 +224,7 @@ fn detection_input(
             }
         }
     }
-    Ok(DetectionInput {
-        data,
-        shape: [1, 3, canvas_height as usize, canvas_width as usize],
+    Ok(DetectionGeometry {
         original_width,
         original_height,
         content_width,
@@ -234,9 +285,8 @@ pub(crate) fn recognition_input(
         .ok_or_else(|| image_error("Recognition tensor dimensions overflowed."))?;
     let mut data = vec![0.0_f32; images.len() * batch_stride];
     for (batch, (image, resized_width)) in images.iter().zip(resized_widths).enumerate() {
-        let resized = DynamicImage::ImageRgb8((*image).clone())
-            .resize_exact(resized_width, model_height, FilterType::Triangle)
-            .to_rgb8();
+        let resized =
+            image::imageops::resize(*image, resized_width, model_height, FilterType::Triangle);
         for y in 0..model_height {
             for x in 0..resized_width {
                 let pixel = resized.get_pixel(x, y);
@@ -378,39 +428,45 @@ mod tests {
         let wide = RgbImage::from_pixel(40, 20, image::Rgb([255, 0, 0]));
         let tall = RgbImage::from_pixel(20, 40, image::Rgb([0, 255, 0]));
 
-        let inputs = detection_batch_inputs(&[&wide, &tall], &detection_config()).unwrap();
+        let input = detection_batch_input(&[&wide, &tall], &detection_config()).unwrap();
 
-        assert_eq!(inputs.len(), 2);
-        assert_eq!(inputs[0].shape, [1, 3, 128, 128]);
-        assert_eq!(inputs[1].shape, [1, 3, 128, 128]);
+        assert_eq!(input.shape, [2, 3, 128, 128]);
+        assert_eq!(input.geometries.len(), 2);
         assert_eq!(
-            (inputs[0].content_width, inputs[0].content_height),
+            (
+                input.geometries[0].content_width,
+                input.geometries[0].content_height
+            ),
             (128, 64)
         );
         assert_eq!(
-            (inputs[1].content_width, inputs[1].content_height),
+            (
+                input.geometries[1].content_width,
+                input.geometries[1].content_height
+            ),
             (64, 128)
         );
         let plane = 128 * 128;
+        let slot_stride = 3 * plane;
         for channel in 0..3 {
             let config = detection_config();
             let normalized_black = -config.mean[channel] / config.std[channel];
+            assert_eq!(input.data[channel * plane + 100 * 128], normalized_black);
             assert_eq!(
-                inputs[0].data[channel * plane + 100 * 128],
+                input.data[slot_stride + channel * plane + 100],
                 normalized_black
             );
-            assert_eq!(inputs[1].data[channel * plane + 100], normalized_black);
         }
-        assert_ne!(inputs[0].data[0], 0.0);
-        assert_ne!(inputs[1].data[0], 0.0);
+        assert_ne!(input.data[0], 0.0);
+        assert_ne!(input.data[slot_stride], 0.0);
     }
 
     #[test]
     fn detection_batch_rejects_empty_and_oversized_groups() {
         let image = RgbImage::new(32, 32);
-        assert!(detection_batch_inputs(&[], &detection_config()).is_err());
+        assert!(detection_batch_input(&[], &detection_config()).is_err());
         let images = std::iter::repeat_n(&image, 17).collect::<Vec<_>>();
-        assert!(detection_batch_inputs(&images, &detection_config()).is_err());
+        assert!(detection_batch_input(&images, &detection_config()).is_err());
     }
 
     #[test]
@@ -420,11 +476,19 @@ mod tests {
         let blue = RgbImage::from_pixel(64, 64, image::Rgb([0, 0, 255]));
         let config = detection_config();
 
-        let batch = detection_batch_inputs(&[&red, &green, &blue], &config).unwrap();
-        for (batch_input, image) in batch.iter().zip([&red, &green, &blue]) {
-            let single = detection_batch_inputs(&[image], &config).unwrap().remove(0);
-            assert_eq!(batch_input.shape, single.shape);
-            assert_eq!(batch_input.data, single.data);
+        let batch = detection_batch_input(&[&red, &green, &blue], &config).unwrap();
+        let slot_stride = batch.data.len() / 3;
+        for (index, image) in [&red, &green, &blue].into_iter().enumerate() {
+            let single = detection_batch_input(&[image], &config).unwrap();
+            assert_eq!(&batch.shape[1..], &single.shape[1..]);
+            assert_eq!(
+                &batch.data[index * slot_stride..(index + 1) * slot_stride],
+                single.data
+            );
+            assert_eq!(
+                batch.geometries[index].content_width,
+                single.geometries[0].content_width
+            );
         }
     }
 

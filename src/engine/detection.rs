@@ -8,13 +8,13 @@ use crate::cancellation::check_cancelled;
 use crate::config::DetectionConfig;
 use crate::postprocess::{detection_boxes_in_content, Detection};
 use crate::preprocess::{
-    detection_batch_inputs_with_max_side, DetectionInput, DETECTION_QUALITY_MAX_SIDE,
+    detection_input_with_max_side, DetectionGeometry, DETECTION_QUALITY_MAX_SIDE,
 };
 
 const QUALITY_RETRY_MIN_CHANNEL_RANGE: u8 = 32;
 
 pub(super) fn postprocess_batch(
-    inputs: Vec<DetectionInput>,
+    inputs: Vec<DetectionGeometry>,
     tensors: Vec<TensorOutput>,
     config: &DetectionConfig,
 ) -> UseResult<Vec<UseResult<Vec<Detection>>>> {
@@ -63,7 +63,7 @@ pub(super) fn postprocess_batch(
 }
 
 fn postprocess_one(
-    input: DetectionInput,
+    input: DetectionGeometry,
     tensor: TensorOutput,
     config: &DetectionConfig,
 ) -> UseResult<Vec<Detection>> {
@@ -115,23 +115,14 @@ impl PpOcrV6Engine {
         permit: &ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<(Vec<Detection>, ExecutionReceipt)> {
-        let mut input = detection_batch_inputs_with_max_side(
-            &[image],
+        let input = detection_input_with_max_side(
+            image,
             &self.detection_config,
             DETECTION_QUALITY_MAX_SIDE,
-        )?
-        .pop()
-        .ok_or_else(|| {
-            engine_error(
-                "use.ocr.provider_output_invalid",
-                "PP-OCRv6 quality retry produced no detection input.",
-            )
-        })?;
-        let output = self.native.detect_batch(
-            vec![(std::mem::take(&mut input.data), input.shape)],
-            permit,
-            cancellation,
         )?;
+        let output = self
+            .native
+            .detect_batch(input.data, input.shape, permit, cancellation)?;
         if output.tensors.len() != 1 {
             return Err(engine_error(
                 "use.ocr.provider_output_invalid",
@@ -147,10 +138,10 @@ impl PpOcrV6Engine {
         let detections = detection_boxes_in_content(
             &tensor.values,
             &tensor.shape,
-            input.content_width,
-            input.content_height,
-            input.original_width,
-            input.original_height,
+            input.geometry.content_width,
+            input.geometry.content_height,
+            input.geometry.original_width,
+            input.geometry.original_height,
             &self.detection_config,
         )?;
         Ok((detections, output.receipt))
@@ -194,11 +185,9 @@ mod tests {
         }
     }
 
-    fn empty_detection_pair(side: usize) -> (DetectionInput, TensorOutput) {
+    fn empty_detection_pair(side: usize) -> (DetectionGeometry, TensorOutput) {
         (
-            DetectionInput {
-                data: Vec::new(),
-                shape: [1, 3, side, side],
+            DetectionGeometry {
                 original_width: side as u32,
                 original_height: side as u32,
                 content_width: side as u32,
