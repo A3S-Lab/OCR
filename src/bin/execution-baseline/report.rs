@@ -14,7 +14,7 @@ pub(crate) const FIXTURE_WIDTH: u32 = 896;
 pub(crate) const FIXTURE_HEIGHT: u32 = 528;
 pub(crate) const FIXTURE_MEDIA_TYPE: &str = "image/jpeg";
 pub(crate) const EXPECTED_BLOCKS: u32 = 30;
-pub(crate) const EXPECTED_RECEIPTS: u32 = 5;
+pub(crate) const EXPECTED_RECEIPTS: u32 = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

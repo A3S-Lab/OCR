@@ -12,8 +12,13 @@ const MAX_DECODED_BYTES: u64 = 256 * 1024 * 1024;
 // `limit_side_len = 64`. The model's HPI metadata also names 736 as an
 // optimization profile, but that is not the pipeline resize policy.
 const DETECTION_MIN_SIDE: u32 = 64;
-const DETECTION_MAX_SIDE: u32 = 4_000;
-const DETECTION_MAX_BATCH_SIZE: usize = 8;
+// Whole-page detection is bounded independently from recognition. Detected
+// polygons are mapped back to the immutable source image, and recognition
+// crops that higher-resolution source rather than this detector raster.
+const DETECTION_FAST_MAX_SIDE: u32 = 896;
+pub(crate) const DETECTION_QUALITY_MAX_SIDE: u32 = 4_000;
+const DETECTION_MAX_BATCH_SIZE: usize = 16;
+const RECOGNITION_MAX_BATCH_SIZE: usize = 8;
 const RECOGNITION_MAX_WIDTH: u32 = 3_200;
 
 pub(crate) struct DetectionInput {
@@ -63,6 +68,14 @@ pub(crate) fn detection_batch_inputs(
     images: &[&RgbImage],
     config: &DetectionConfig,
 ) -> UseResult<Vec<DetectionInput>> {
+    detection_batch_inputs_with_max_side(images, config, DETECTION_FAST_MAX_SIDE)
+}
+
+pub(crate) fn detection_batch_inputs_with_max_side(
+    images: &[&RgbImage],
+    config: &DetectionConfig,
+    max_side: u32,
+) -> UseResult<Vec<DetectionInput>> {
     if images.is_empty() || images.len() > DETECTION_MAX_BATCH_SIZE {
         return Err(image_error(format!(
             "PP-OCRv6 detection batches must contain from 1 through {DETECTION_MAX_BATCH_SIZE} images."
@@ -70,7 +83,7 @@ pub(crate) fn detection_batch_inputs(
     }
     let dimensions = images
         .iter()
-        .map(|image| detection_dimensions(image.width(), image.height()))
+        .map(|image| detection_dimensions_with_max_side(image.width(), image.height(), max_side))
         .collect::<UseResult<Vec<_>>>()?;
     let (canvas_width, canvas_height) = canvas_dimensions(&dimensions)?;
     let plane = usize::try_from(u64::from(canvas_width) * u64::from(canvas_height))
@@ -78,44 +91,94 @@ pub(crate) fn detection_batch_inputs(
     let tensor_elements = plane
         .checked_mul(3)
         .ok_or_else(|| image_error("Detection batch tensor dimensions overflowed."))?;
-    let mut inputs = Vec::with_capacity(images.len());
-    for (image, (content_width, content_height)) in images.iter().zip(dimensions) {
-        let original_width = image.width();
-        let original_height = image.height();
-        let resized = if content_width == original_width && content_height == original_height {
-            (*image).clone()
-        } else {
-            DynamicImage::ImageRgb8((*image).clone())
-                .resize_exact(content_width, content_height, FilterType::Triangle)
-                .to_rgb8()
-        };
-        let mut data = vec![0.0_f32; tensor_elements];
-        for channel in 0..3 {
-            data[channel * plane..(channel + 1) * plane]
-                .fill(-config.mean[channel] / config.std[channel]);
-        }
-        for y in 0..content_height {
-            for x in 0..content_width {
-                let pixel = resized.get_pixel(x, y);
-                let target = y as usize * canvas_width as usize + x as usize;
-                let channels = [pixel[2], pixel[1], pixel[0]];
-                for channel in 0..3 {
-                    data[channel * plane + target] = (f32::from(channels[channel]) * config.scale
-                        - config.mean[channel])
-                        / config.std[channel];
-                }
+    if images.len() == 1 {
+        return detection_input(
+            images[0],
+            dimensions[0],
+            (canvas_width, canvas_height),
+            plane,
+            tensor_elements,
+            config,
+        )
+        .map(|input| vec![input]);
+    }
+
+    std::thread::scope(|scope| {
+        let workers = images
+            .iter()
+            .copied()
+            .zip(dimensions.iter().copied())
+            .map(|(image, dimensions)| {
+                scope.spawn(move || {
+                    detection_input(
+                        image,
+                        dimensions,
+                        (canvas_width, canvas_height),
+                        plane,
+                        tensor_elements,
+                        config,
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        let completed = workers
+            .into_iter()
+            .map(|worker| worker.join())
+            .collect::<Vec<_>>();
+        completed
+            .into_iter()
+            .map(|result| match result {
+                Ok(input) => input,
+                Err(_) => Err(image_error(
+                    "PP-OCRv6 detection preprocessing worker failed.",
+                )),
+            })
+            .collect()
+    })
+}
+
+fn detection_input(
+    image: &RgbImage,
+    (content_width, content_height): (u32, u32),
+    (canvas_width, canvas_height): (u32, u32),
+    plane: usize,
+    tensor_elements: usize,
+    config: &DetectionConfig,
+) -> UseResult<DetectionInput> {
+    let original_width = image.width();
+    let original_height = image.height();
+    let resized = if content_width == original_width && content_height == original_height {
+        image.clone()
+    } else {
+        DynamicImage::ImageRgb8(image.clone())
+            .resize_exact(content_width, content_height, FilterType::Triangle)
+            .to_rgb8()
+    };
+    let mut data = vec![0.0_f32; tensor_elements];
+    for channel in 0..3 {
+        data[channel * plane..(channel + 1) * plane]
+            .fill(-config.mean[channel] / config.std[channel]);
+    }
+    for y in 0..content_height {
+        for x in 0..content_width {
+            let pixel = resized.get_pixel(x, y);
+            let target = y as usize * canvas_width as usize + x as usize;
+            let channels = [pixel[2], pixel[1], pixel[0]];
+            for channel in 0..3 {
+                data[channel * plane + target] = (f32::from(channels[channel]) * config.scale
+                    - config.mean[channel])
+                    / config.std[channel];
             }
         }
-        inputs.push(DetectionInput {
-            data,
-            shape: [1, 3, canvas_height as usize, canvas_width as usize],
-            original_width,
-            original_height,
-            content_width,
-            content_height,
-        });
     }
-    Ok(inputs)
+    Ok(DetectionInput {
+        data,
+        shape: [1, 3, canvas_height as usize, canvas_width as usize],
+        original_width,
+        original_height,
+        content_width,
+        content_height,
+    })
 }
 
 pub(crate) fn detection_canvas_dimensions(images: &[&RgbImage]) -> UseResult<(u32, u32)> {
@@ -143,10 +206,10 @@ pub(crate) fn recognition_input(
     images: &[&RgbImage],
     config: &RecognitionConfig,
 ) -> UseResult<RecognitionInput> {
-    if images.is_empty() || images.len() > 8 {
-        return Err(image_error(
-            "PP-OCRv6 recognition batches must contain from 1 through 8 text crops.",
-        ));
+    if images.is_empty() || images.len() > RECOGNITION_MAX_BATCH_SIZE {
+        return Err(image_error(format!(
+            "PP-OCRv6 recognition batches must contain from 1 through {RECOGNITION_MAX_BATCH_SIZE} text crops."
+        )));
     }
     if images
         .iter()
@@ -234,8 +297,21 @@ fn recognition_default_width(config: &RecognitionConfig) -> UseResult<u32> {
 }
 
 pub(crate) fn detection_dimensions(width: u32, height: u32) -> UseResult<(u32, u32)> {
+    detection_dimensions_with_max_side(width, height, DETECTION_FAST_MAX_SIDE)
+}
+
+fn detection_dimensions_with_max_side(
+    width: u32,
+    height: u32,
+    max_side_limit: u32,
+) -> UseResult<(u32, u32)> {
     if width == 0 || height == 0 {
         return Err(image_error("OCR image has zero width or height."));
+    }
+    if !(DETECTION_MIN_SIDE..=DETECTION_QUALITY_MAX_SIDE).contains(&max_side_limit) {
+        return Err(image_error(format!(
+            "OCR detection maximum side must contain {DETECTION_MIN_SIDE} through {DETECTION_QUALITY_MAX_SIDE} pixels."
+        )));
     }
     let mut ratio = 1.0_f64;
     let min_side = width.min(height);
@@ -243,8 +319,8 @@ pub(crate) fn detection_dimensions(width: u32, height: u32) -> UseResult<(u32, u
     if min_side < DETECTION_MIN_SIDE {
         ratio = f64::from(DETECTION_MIN_SIDE) / f64::from(min_side);
     }
-    if f64::from(max_side) * ratio > f64::from(DETECTION_MAX_SIDE) {
-        ratio = f64::from(DETECTION_MAX_SIDE) / f64::from(max_side);
+    if f64::from(max_side) * ratio > f64::from(max_side_limit) {
+        ratio = f64::from(max_side_limit) / f64::from(max_side);
     }
     let resized_width = round_stride(f64::from(width) * ratio, 32);
     let resized_height = round_stride(f64::from(height) * ratio, 32);
@@ -288,11 +364,13 @@ mod tests {
     #[test]
     fn detection_dimensions_are_bounded_stride_multiples() {
         assert_eq!(detection_dimensions(10, 20).unwrap(), (64, 128));
-        assert_eq!(detection_dimensions(4_000, 1_000).unwrap(), (4_000, 992));
+        assert_eq!(detection_dimensions(4_000, 1_000).unwrap(), (896, 224));
+        assert_eq!(detection_dimensions(20_000, 10_000).unwrap(), (896, 448));
         assert_eq!(
-            detection_dimensions(20_000, 10_000).unwrap(),
-            (4_000, 1_984)
+            detection_dimensions_with_max_side(4_000, 1_000, DETECTION_QUALITY_MAX_SIDE).unwrap(),
+            (4_000, 992)
         );
+        assert!(detection_dimensions_with_max_side(320, 320, 32).is_err());
     }
 
     #[test]
@@ -331,8 +409,23 @@ mod tests {
     fn detection_batch_rejects_empty_and_oversized_groups() {
         let image = RgbImage::new(32, 32);
         assert!(detection_batch_inputs(&[], &detection_config()).is_err());
-        let images = std::iter::repeat_n(&image, 9).collect::<Vec<_>>();
+        let images = std::iter::repeat_n(&image, 17).collect::<Vec<_>>();
         assert!(detection_batch_inputs(&images, &detection_config()).is_err());
+    }
+
+    #[test]
+    fn detection_batch_preserves_input_order_and_single_input_values() {
+        let red = RgbImage::from_pixel(64, 64, image::Rgb([255, 0, 0]));
+        let green = RgbImage::from_pixel(64, 64, image::Rgb([0, 255, 0]));
+        let blue = RgbImage::from_pixel(64, 64, image::Rgb([0, 0, 255]));
+        let config = detection_config();
+
+        let batch = detection_batch_inputs(&[&red, &green, &blue], &config).unwrap();
+        for (batch_input, image) in batch.iter().zip([&red, &green, &blue]) {
+            let single = detection_batch_inputs(&[image], &config).unwrap().remove(0);
+            assert_eq!(batch_input.shape, single.shape);
+            assert_eq!(batch_input.data, single.data);
+        }
     }
 
     #[test]
@@ -352,5 +445,8 @@ mod tests {
             RECOGNITION_MAX_WIDTH
         );
         assert!(recognition_canvas_width(0, 20, &config).is_err());
+        let oversized =
+            std::iter::repeat_n(&narrow, RECOGNITION_MAX_BATCH_SIZE + 1).collect::<Vec<_>>();
+        assert!(recognition_input(&oversized, &config).is_err());
     }
 }

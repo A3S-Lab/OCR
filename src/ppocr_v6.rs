@@ -377,7 +377,7 @@ mod tests {
         };
         assert!(
             f1 >= 0.95,
-            "{label} batch/scalar ASCII-token F1 {f1:.3} is below 0.950"
+            "{label} batch/scalar ASCII-token F1 {f1:.3} is below 0.950; scalar={expected:?}; batch={actual:?}"
         );
     }
 

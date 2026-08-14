@@ -11,7 +11,11 @@ use super::{power_error, runtime_error, update_text, PreparedSlot};
 use crate::ppocr_v6::PpOcrV6Session;
 use crate::preprocess::{detection_canvas_dimensions, detection_dimensions};
 
-const MAX_MICROBATCH_ITEMS: usize = 8;
+const MAX_MICROBATCH_ITEMS: usize = 16;
+// The reviewed detection graph reaches its largest activation at Concat.0:
+// 12 elements per pixel in the shared detection canvas for every batch slot.
+// Cohorts must fit this intermediate tensor, not just their input tensor.
+const PEAK_TENSOR_ELEMENTS_PER_CANVAS_PIXEL: usize = 12;
 const MIN_DETECTION_CANVAS_FILL_BPS: u64 = 9_000;
 const HOST_RESERVE_BYTES: u64 = 256 * 1024 * 1024;
 const DEVICE_RESERVE_BYTES: u64 = 256 * 1024 * 1024;
@@ -19,10 +23,18 @@ const CPU_SLOT_SCRATCH_BYTES: u64 = 256 * 1024 * 1024;
 const ACCELERATOR_HOST_SLOT_SCRATCH_BYTES: u64 = 64 * 1024 * 1024;
 const ACCELERATOR_DEVICE_SLOT_SCRATCH_BYTES: u64 = 256 * 1024 * 1024;
 
-pub(super) fn detection_cohort_ranges(images: &[&RgbImage]) -> UseResult<Vec<Range<usize>>> {
+pub(super) fn detection_cohort_ranges(
+    images: &[&RgbImage],
+    max_tensor_elements: usize,
+) -> UseResult<Vec<Range<usize>>> {
     if images.is_empty() {
         return Err(runtime_error(
             "PP-OCRv6 detection cohort planning requires at least one image.",
+        ));
+    }
+    if max_tensor_elements == 0 {
+        return Err(runtime_error(
+            "PP-OCRv6 detection cohort planning requires a positive tensor element limit.",
         ));
     }
     let dimensions = images
@@ -35,7 +47,8 @@ pub(super) fn detection_cohort_ranges(images: &[&RgbImage]) -> UseResult<Vec<Ran
     for (index, dimensions) in dimensions.into_iter().enumerate() {
         if !cohort.is_empty()
             && (cohort.len() == MAX_MICROBATCH_ITEMS
-                || !canvas_fill_is_compatible(&cohort, dimensions))
+                || !canvas_fill_is_compatible(&cohort, dimensions)
+                || !peak_tensor_fits(&cohort, dimensions, max_tensor_elements))
         {
             ranges.push(start..index);
             start = index;
@@ -45,6 +58,30 @@ pub(super) fn detection_cohort_ranges(images: &[&RgbImage]) -> UseResult<Vec<Ran
     }
     ranges.push(start..images.len());
     Ok(ranges)
+}
+
+fn peak_tensor_fits(
+    cohort: &[(u32, u32)],
+    candidate: (u32, u32),
+    max_tensor_elements: usize,
+) -> bool {
+    let canvas_width = cohort
+        .iter()
+        .map(|dimensions| dimensions.0)
+        .chain(std::iter::once(candidate.0))
+        .max()
+        .unwrap_or(candidate.0);
+    let canvas_height = cohort
+        .iter()
+        .map(|dimensions| dimensions.1)
+        .chain(std::iter::once(candidate.1))
+        .max()
+        .unwrap_or(candidate.1);
+    usize::try_from(u64::from(canvas_width) * u64::from(canvas_height))
+        .ok()
+        .and_then(|pixels| pixels.checked_mul(PEAK_TENSOR_ELEMENTS_PER_CANVAS_PIXEL))
+        .and_then(|slot_elements| slot_elements.checked_mul(cohort.len() + 1))
+        .is_some_and(|elements| elements <= max_tensor_elements)
 }
 
 fn canvas_fill_is_compatible(cohort: &[(u32, u32)], candidate: (u32, u32)) -> bool {
@@ -168,7 +205,7 @@ mod tests {
         let square = RgbImage::new(320, 320);
         let tall = RgbImage::new(256, 320);
 
-        let ranges = detection_cohort_ranges(&[&wide, &square, &tall]).unwrap();
+        let ranges = detection_cohort_ranges(&[&wide, &square, &tall], usize::MAX).unwrap();
 
         assert_eq!(ranges, vec![0..2, 2..3]);
     }
@@ -178,8 +215,32 @@ mod tests {
         let image = RgbImage::new(320, 320);
         let images = std::iter::repeat_n(&image, 17).collect::<Vec<_>>();
 
-        let ranges = detection_cohort_ranges(&images).unwrap();
+        let ranges = detection_cohort_ranges(&images, usize::MAX).unwrap();
 
-        assert_eq!(ranges, vec![0..8, 8..16, 16..17]);
+        assert_eq!(ranges, vec![0..16, 16..17]);
+    }
+
+    #[test]
+    fn detection_cohorts_respect_the_intermediate_tensor_limit() {
+        let image = RgbImage::new(1_224, 1_584);
+        let images = std::iter::repeat_n(&image, 16).collect::<Vec<_>>();
+        let (width, height) = detection_dimensions(image.width(), image.height()).unwrap();
+        let eleven_slot_limit = usize::try_from(u64::from(width) * u64::from(height)).unwrap()
+            * PEAK_TENSOR_ELEMENTS_PER_CANVAS_PIXEL
+            * 11;
+
+        let ranges = detection_cohort_ranges(&images, eleven_slot_limit).unwrap();
+
+        assert_eq!(ranges, vec![0..11, 11..16]);
+    }
+
+    #[test]
+    fn smaller_canvases_retain_the_full_detection_batch() {
+        let image = RgbImage::new(816, 1_056);
+        let images = std::iter::repeat_n(&image, 16).collect::<Vec<_>>();
+
+        let ranges = detection_cohort_ranges(&images, 256 * 1024 * 1024).unwrap();
+
+        assert_eq!(ranges, vec![0..16]);
     }
 }

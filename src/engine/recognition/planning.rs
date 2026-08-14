@@ -15,15 +15,27 @@ pub(super) fn plan_width_batches(canvas_widths: &[u32]) -> UseResult<Vec<Vec<usi
         return Ok(Vec::new());
     }
 
-    // For a fixed maximum batch size, sorting by dynamic canvas width before
-    // contiguous chunking minimizes padded columns without adding graph calls.
+    // The recognition graph has global context across its dynamic width, so
+    // padding a crop to a wider peer's canvas can change decoded text. Group
+    // only identical canvas widths to preserve scalar preprocessing semantics.
     let mut sorted_indices = (0..canvas_widths.len()).collect::<Vec<_>>();
     sorted_indices.sort_by_key(|index| canvas_widths[*index]);
-
-    Ok(sorted_indices
-        .chunks(RECOGNITION_BATCH_SIZE)
-        .map(<[usize]>::to_vec)
-        .collect())
+    let mut batches = Vec::new();
+    let mut start = 0;
+    while start < sorted_indices.len() {
+        let width = canvas_widths[sorted_indices[start]];
+        let mut end = start + 1;
+        while end < sorted_indices.len() && canvas_widths[sorted_indices[end]] == width {
+            end += 1;
+        }
+        batches.extend(
+            sorted_indices[start..end]
+                .chunks(RECOGNITION_BATCH_SIZE)
+                .map(<[usize]>::to_vec),
+        );
+        start = end;
+    }
+    Ok(batches)
 }
 
 #[cfg(test)]
@@ -34,14 +46,14 @@ mod tests {
     fn width_batches_stably_sort_compatible_crops() {
         let batches = plan_width_batches(&[400, 320, 384, 320]).unwrap();
 
-        assert_eq!(batches, vec![vec![1, 3, 2, 0]]);
+        assert_eq!(batches, vec![vec![1, 3], vec![2], vec![0]]);
     }
 
     #[test]
-    fn width_batches_put_wider_crops_last_without_adding_launches() {
+    fn width_batches_never_mix_dynamic_canvas_widths() {
         let batches = plan_width_batches(&[1_024, 320, 1_050, 352]).unwrap();
 
-        assert_eq!(batches, vec![vec![1, 3, 0, 2]]);
+        assert_eq!(batches, vec![vec![1], vec![3], vec![0], vec![2]]);
     }
 
     #[test]

@@ -262,22 +262,38 @@ plan deterministic contiguous microbatches from live host/device memory
 snapshots. Each admitted microbatch holds one cancellation token, device
 permit, and engine lock across its slots and emits a schema-v4 receipt with the
 session declaration, plan digest, batch index/count, slot count, and queue
-evidence. Images with different resized dimensions are letterboxed at the
-top-left of one normalized-black canvas when every slot retains at least 90%
-canvas fill. OCR deterministically splits lower-fill shape outliers before
-Power planning, protecting the TurboOCR-derived scalar/batch F1 floor without
-creating a second admission scheduler. Each compatible cohort executes one
-dynamic `[B,3,H,W]` detection graph call. Power validates leading-axis assembly
-and output partitions; OCR retains each slot's content extent, excludes padding
+evidence. Detection preprocessing and DB postprocessing use at most 16 bounded
+workers and preserve exact slot order. The fast detector bounds the longest
+side at 896 pixels, while polygons are mapped back to the immutable source and
+recognition crops that original image. An empty fast result on a source with at
+least 32 levels of channel variation receives one scalar quality retry with a
+4,000-pixel maximum side; both detection receipts remain attached. This retry
+protects empty-result quality but is not a guarantee against partial small-text
+misses.
+
+Images with different resized dimensions are letterboxed at the top-left of
+one normalized-black canvas when every slot retains at least 90% canvas fill.
+OCR deterministically splits lower-fill shape outliers and any cohort whose
+reviewed peak intermediate would exceed Power's tensor-element limit. Each
+compatible cohort contains at most 16 images and executes one dynamic
+`[B,3,H,W]` detection graph call. Power validates leading-axis assembly and
+output partitions; OCR retains each slot's content extent, excludes padding
 from DB postprocessing, and maps polygons through that extent into source
 pixels. OCR then flattens detected crops across the admitted images while
-retaining exact slot, detection, and reading-order identity. It stable-sorts
-crops by the exact dynamic recognition canvas width, chunks at most eight crops
-per graph call, materializes only the active chunk, and restores blocks and
-receipts to their source slots. A failed shared graph call retries its affected
-crops through the scalar path so a non-cancellation failure remains isolated;
-cancellation still terminates the admitted request. No throughput gain is
-claimed until the named-hardware release gates pass.
+retaining exact slot, detection, and reading-order identity. It groups only
+identical dynamic recognition canvas widths, chunks each width group into at
+most eight crops per graph call, materializes only the active chunk, and
+restores blocks and receipts to their source slots. Different widths are never
+mixed because PP-OCRv6 recognition has global width context and wider padding
+can change decoded text. A failed shared graph call retries its affected crops
+through the scalar path so a non-cancellation failure remains isolated;
+cancellation still terminates the admitted request.
+
+The current quality evidence covers the pinned 30-block official image and
+clear 8-point and 12-point PDF text rendered at 144 DPI. Five-point synthetic
+text did not pass exact publication and is not a supported quality claim. The
+named-hardware Parser integration gate is documented by the consuming Parser;
+this crate does not turn that workload into a universal OCR throughput claim.
 
 Linux CI installs that exact pinned bundle and executes both reviewed graphs on
 the CPU. The gate checks the canonical Power weight digests, exact output
@@ -285,7 +301,7 @@ shapes, item counts, and byte lengths for the zero-tensor detection and
 recognition fixtures. It then downloads PaddleOCR's SHA-256-pinned
 `general_ocr_002` image and executes the complete Rust pipeline: resize,
 detection, DB postprocessing, reading-order sort, perspective crops, batched
-recognition, CTC decoding, source-coordinate polygons, and five Power execution
+recognition, CTC decoding, source-coordinate polygons, and eight Power execution
 receipts. The 30 output blocks are checked against a reference generated with
 Paddle 3.3.1 and PaddleOCR 3.7.0 using explicit text, score, and four-point
 coordinate tolerances. The same gate compares one official crop at scalar and
@@ -529,7 +545,7 @@ pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
 
 The staged PP-OCRv6 integration pins the release-ready A3S Power 0.8.0 revision
-`3b1f95864b3b594ec3ffc5f65e808a74a38405aa`. Source builds and CI execute that
+`aa13f741785598879b372235c8bfcd6fb2bf6928`. Source builds and CI execute that
 exact Git revision. Package verification additionally resolves the declared
 `=0.8.0` registry dependency, so the package gate remains closed until the same
 Power release is visible on crates.io. No path or `[patch.crates-io]` override

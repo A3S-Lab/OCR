@@ -28,7 +28,7 @@ dimension.
 The existing official-image test remains the accuracy gate. It checks 30
 ordered blocks against the pinned Paddle reference with reviewed text,
 confidence, and polygon tolerances. The benchmark additionally requires every
-sample to return those 30 blocks, five schema-v1 A3S Power execution receipts,
+sample to return those 30 blocks, eight schema-v1 A3S Power execution receipts,
 no warnings, and byte-identical canonical output.
 
 ## Cold and warm sessions
@@ -142,3 +142,13 @@ quality gate rather than a claim of bit-identical detector tensors.
 It also verifies both branches of the OCR-owned 90% canvas-fill rule: compatible
 mixed shapes share one Power-admitted graph call, while a quality outlier starts
 a distinct Power plan with its own receipt.
+
+Recognition batching has a stricter geometry rule. A CUDA diagnostic that
+mixed different dynamic widths produced 0.933 ASCII-token F1 for the wide slot;
+the same result occurred with the prior pinned Power revision. The checked path
+therefore batches only crops with identical recognition canvas widths. The
+mixed-shape gate then passes without weakening its 0.95 threshold, while equal
+width crops still share calls of at most eight items. Detector inputs use a
+896-pixel fast bound and preserve original-source crops. Visually non-uniform
+empty results receive one scalar retry at the 4,000-pixel quality bound; this
+does not certify partially detected small text.

@@ -228,13 +228,14 @@ async fn execute_prepared(
     receipts: &mut Vec<crate::OcrExecutionReceipt>,
 ) {
     let images = prepared.iter().map(|slot| &slot.image).collect::<Vec<_>>();
-    let ranges = match detection_cohort_ranges(&images) {
-        Ok(ranges) => ranges,
-        Err(error) => {
-            fail_prepared(stages, prepared, error, outputs);
-            return;
-        }
-    };
+    let ranges =
+        match detection_cohort_ranges(&images, session.runtime().limits().max_tensor_elements) {
+            Ok(ranges) => ranges,
+            Err(error) => {
+                fail_prepared(stages, prepared, error, outputs);
+                return;
+            }
+        };
     let cohorts = ranges
         .into_iter()
         .map(|range| prepared[range].to_vec())

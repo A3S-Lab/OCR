@@ -40,11 +40,11 @@ impl PpOcrV6Engine {
         &self,
         images: &[&RgbImage],
         detections: Vec<UseResult<Vec<Detection>>>,
-        detection_receipt: ExecutionReceipt,
+        detection_receipts: Vec<Vec<ExecutionReceipt>>,
         permit: &ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<Vec<UseResult<EngineExtraction>>> {
-        if detections.len() != images.len() {
+        if detections.len() != images.len() || detection_receipts.len() != images.len() {
             return Err(engine_error(
                 "use.ocr.provider_output_invalid",
                 "PP-OCRv6 recognition received mismatched image and detection cardinality.",
@@ -52,7 +52,7 @@ impl PpOcrV6Engine {
         }
 
         let (mut states, work) =
-            self.prepare_recognition_work(images, detections, detection_receipt);
+            self.prepare_recognition_work(images, detections, detection_receipts);
         let canvas_widths = work
             .iter()
             .map(|item| item.canvas_width)
@@ -99,11 +99,13 @@ impl PpOcrV6Engine {
         &self,
         images: &[&RgbImage],
         detections: Vec<UseResult<Vec<Detection>>>,
-        detection_receipt: ExecutionReceipt,
+        detection_receipts: Vec<Vec<ExecutionReceipt>>,
     ) -> (Vec<ImageRecognition>, Vec<RecognitionWorkItem>) {
         let mut states = Vec::with_capacity(images.len());
         let mut work = Vec::new();
-        for (image_index, detections) in detections.into_iter().enumerate() {
+        for (image_index, (detections, receipts)) in
+            detections.into_iter().zip(detection_receipts).enumerate()
+        {
             let detections = match detections {
                 Ok(detections) => detections,
                 Err(error) => {
@@ -144,7 +146,7 @@ impl PpOcrV6Engine {
             }
             states.push(ImageRecognition::Pending {
                 blocks: vec![None; detections.len()],
-                receipts: vec![detection_receipt.clone()],
+                receipts,
             });
             work.extend(image_work);
         }
@@ -339,16 +341,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn width_sorted_results_restore_detection_order_and_share_one_receipt() {
-        let work = vec![work_item(0, 0, 500.0), work_item(0, 1, 100.0)];
-        let batches = plan_width_batches(&[500, 320]).unwrap();
-        assert_eq!(batches, vec![vec![1, 0]]);
+    fn same_width_results_preserve_detection_order_and_share_one_receipt() {
+        let work = vec![work_item(0, 0, 100.0), work_item(0, 1, 100.0)];
+        let batches = plan_width_batches(&[320, 320]).unwrap();
+        assert_eq!(batches, vec![vec![0, 1]]);
         let mut states = vec![pending_image(2)];
 
         apply_recognized_batch(
             &batches[0],
             RecognizedBatch {
-                items: vec![recognized("second"), recognized("first")],
+                items: vec![recognized("first"), recognized("second")],
                 receipt: receipt(),
             },
             &work,

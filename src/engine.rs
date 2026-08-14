@@ -7,10 +7,10 @@ use tokio_util::sync::CancellationToken;
 use crate::assets::ModelAssets;
 use crate::cancellation::check_cancelled;
 use crate::config::{load_detection, load_recognition, DetectionConfig, RecognitionConfig};
-use crate::postprocess::detection_boxes_in_content;
 use crate::ppocr_v6::native::NativePpOcrV6;
 use crate::preprocess::detection_batch_inputs;
 
+mod detection;
 mod recognition;
 
 #[derive(Debug, Clone)]
@@ -94,7 +94,10 @@ impl PpOcrV6Engine {
         cancellation: &CancellationToken,
     ) -> UseResult<Vec<UseResult<EngineExtraction>>> {
         check_cancelled(cancellation)?;
+        let trace = std::env::var_os("A3S_OCR_TRACE_STAGE_TIMINGS").is_some();
+        let batch_started = std::time::Instant::now();
         let mut inputs = detection_batch_inputs(images, &self.detection_config)?;
+        let preprocessed = batch_started.elapsed();
         let graph_inputs = inputs
             .iter_mut()
             .map(|input| (std::mem::take(&mut input.data), input.shape))
@@ -102,26 +105,47 @@ impl PpOcrV6Engine {
         let detection = self
             .native
             .detect_batch(graph_inputs, permit, cancellation)?;
+        let detected = batch_started.elapsed();
         if detection.tensors.len() != images.len() || inputs.len() != images.len() {
             return Err(engine_error(
                 "use.ocr.provider_output_invalid",
                 "PP-OCRv6 detection changed exact batch cardinality.",
             ));
         }
-        let mut detections = Vec::with_capacity(images.len());
-        for (input, tensor) in inputs.into_iter().zip(detection.tensors) {
-            check_cancelled(cancellation)?;
-            detections.push(detection_boxes_in_content(
-                &tensor.values,
-                &tensor.shape,
-                input.content_width,
-                input.content_height,
-                input.original_width,
-                input.original_height,
-                &self.detection_config,
-            ));
+        let mut detections =
+            detection::postprocess_batch(inputs, detection.tensors, &self.detection_config)?;
+        check_cancelled(cancellation)?;
+        let postprocessed = batch_started.elapsed();
+        let mut detection_receipts = vec![vec![detection.receipt]; images.len()];
+        self.retry_empty_detections(
+            images,
+            &mut detections,
+            &mut detection_receipts,
+            permit,
+            cancellation,
+        )?;
+        let retried = batch_started.elapsed();
+        let outputs = self.recognize_detected_batch(
+            images,
+            detections,
+            detection_receipts,
+            permit,
+            cancellation,
+        );
+        if trace {
+            let completed = batch_started.elapsed();
+            eprintln!(
+                "A3S_OCR_STAGE_TIMING slots={} preprocess_ms={:.3} detect_ms={:.3} postprocess_ms={:.3} retry_ms={:.3} recognize_ms={:.3} total_ms={:.3}",
+                images.len(),
+                preprocessed.as_secs_f64() * 1_000.0,
+                (detected - preprocessed).as_secs_f64() * 1_000.0,
+                (postprocessed - detected).as_secs_f64() * 1_000.0,
+                (retried - postprocessed).as_secs_f64() * 1_000.0,
+                (completed - retried).as_secs_f64() * 1_000.0,
+                completed.as_secs_f64() * 1_000.0,
+            );
         }
-        self.recognize_detected_batch(images, detections, detection.receipt, permit, cancellation)
+        outputs
     }
 }
 
@@ -334,7 +358,11 @@ mod tests {
         assert_eq!(image.dimensions(), (896, 528));
         let cancellation = CancellationToken::new();
         let extraction = engine.extract(&image, &cancellation).unwrap();
-        assert_eq!(extraction.receipts.len(), 5);
+        assert_eq!(extraction.receipts.len(), 8);
+        assert!(extraction.receipts[0].model.family.ends_with("-detection"));
+        assert!(extraction.receipts[1..]
+            .iter()
+            .all(|receipt| receipt.model.family.ends_with("-recognition")));
         assert_eq!(extraction.blocks.len(), UPSTREAM_BLOCKS.len());
 
         for (index, (actual, expected)) in extraction.blocks.iter().zip(UPSTREAM_BLOCKS).enumerate()
@@ -377,7 +405,7 @@ mod tests {
             .recognize_detected_batch(
                 &[&image],
                 vec![Ok(vec![detection.clone()])],
-                extraction.receipts[0].clone(),
+                vec![vec![extraction.receipts[0].clone()]],
                 &scalar_permit,
                 &cancellation,
             )
@@ -389,7 +417,10 @@ mod tests {
             .recognize_detected_batch(
                 &[&image, &image],
                 vec![Ok(vec![detection.clone()]), Ok(vec![detection])],
-                extraction.receipts[0].clone(),
+                vec![
+                    vec![extraction.receipts[0].clone()],
+                    vec![extraction.receipts[0].clone()],
+                ],
                 &batch_permit,
                 &cancellation,
             )

@@ -112,6 +112,7 @@ validated slots and exact caller IDs
   -> deterministic contiguous plan from live host/device memory
   -> one admitted Power microbatch permit across each planned slot group
   -> one dynamic leading-axis detection call and exact ordered output slices
+  -> scalar high-resolution retry for visually non-uniform empty detections
   -> bounded cross-slot recognition batches and exact identity restoration
   -> per-slot OCR results plus digest-only Power receipt v4 evidence
 ```
@@ -119,37 +120,50 @@ validated slots and exact caller IDs
 The pool is local to the injected provider and retains at most two exact
 sessions with a 1 GiB aggregate resident-weight declaration. A session permits
 one active device execution and at most 32 queued executions. Before invoking
-the Power planner, OCR partitions caller-contiguous inputs into at-most-eight
+the Power planner, OCR partitions caller-contiguous inputs into at-most-16
 model-quality cohorts. A proposed common canvas is accepted only when every
-slot retains at least 90% content fill; a lower-fill outlier starts a new
-cohort. Each cohort still receives a canonical Power plan, current-pressure
-revalidation, admission permit, and receipt, so the OCR rule does not replace
-the shared scheduler. OCR derives the cohort canvas from the maximum resized
-width and height, includes that F32 canvas in every slot's conservative
-host/device peak declaration, and pads each smaller image with a black pixel
-transformed by the exact detection mean and standard deviation. Power counts
-Metal unified memory only once.
+slot retains at least 90% content fill and the detection graph's reviewed peak
+intermediate remains within Power's tensor-element limit; a lower-fill or
+oversized candidate starts a new cohort. Each cohort still receives a
+canonical Power plan, current-pressure revalidation, admission permit, and
+receipt, so the OCR rule does not replace the shared scheduler. OCR derives the
+cohort canvas from the maximum resized width and height, includes that F32
+canvas in every slot's conservative host/device peak declaration, and pads each
+smaller image with a black pixel transformed by the exact detection mean and
+standard deviation. Power counts Metal unified memory only once.
 
 The detector accepts dynamic `B`, executes the stacked `[B,3,H,W]` tensor once,
-and returns `[B,1,H,W]`. Power's model-neutral leading-axis contract validates
-assembly, exact order, limits, and one positive output partition per input.
-OCR masks every partition to its own content width and height before DB
-postprocessing, so padding cannot produce a box and source-coordinate mapping
-does not use the larger batch canvas.
+and returns `[B,1,H,W]`. The fast detector bounds the longest side at 896
+pixels. Tensor construction and DB postprocessing use no more than the 16
+admitted slots as bounded workers and restore exact order. Power's model-neutral
+leading-axis contract validates assembly, exact order, limits, and one positive
+output partition per input. OCR masks every partition to its own content width
+and height before DB postprocessing, so padding cannot produce a box and
+source-coordinate mapping does not use the larger batch canvas. Polygons map
+back to the immutable source, and recognition crops that source rather than the
+detector raster. If the fast detector returns no boxes and the source spans at
+least 32 values in one color channel, OCR retries that slot once with a scalar
+4,000-pixel detector input. Both execution receipts are retained. The heuristic
+does not prove that a non-empty result found every small text line.
 
 Recognition flattens the resulting crop plans across that admitted image
 batch. Each plan retains its source slot and reading-order detection index.
 OCR computes the exact post-rotation recognition width without allocating all
-crops, stable-sorts the identities by that width, and chunks the order into
-dynamic `[B,3,48,W]` calls with `B <= 8`. Each call uses its actual widest crop,
-only its active crops are materialized, decoded blocks are restored by retained
+crops, stable-sorts identities by that width, and chunks each identical-width
+group into dynamic `[B,3,48,W]` calls with `B <= 8`. Different widths are not
+mixed: the recognition graph has global width context, and the wider peer's
+padding changed a checked mixed-shape CUDA result below the 0.95 token-F1 gate.
+Only active crops are materialized, decoded blocks are restored by retained
 identity, and a shared Power receipt is attached once to every participating
 slot. If a shared call fails without cancellation, OCR retries its affected
 crops through bounded scalar calls to preserve slot isolation. A cancelled
-permit is never converted into fallback work. Static width profiles and their
-measured fill threshold remain a separate optimization. Neither fused stage
-becomes a throughput claim until the real single-image, mixed-Office, and scale
-benchmarks pass.
+permit is never converted into fallback work. Static width profiles remain a
+separate optimization.
+
+The pinned official 30-block image and clear 8-point and 12-point PDF text at
+144 DPI pass exact consumer gates. Five-point synthetic text does not, so the
+fast detector is not evidence for arbitrary small text or scans. Broader
+single-image, mixed-Office, and scale corpora remain release requirements.
 
 Normalized-black letterboxing changes convolution boundary context compared
 with an independently sized scalar tensor. The official mixed-shape gate

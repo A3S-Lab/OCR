@@ -44,23 +44,28 @@ client and exact model bundle.
       failures, and completed/failed/skipped/unsupported outcomes.
 - [x] Exact Power model sessions, finite queues, current-memory microbatch
       plans, one shared permit, cancellation, and receipt-v4 evidence.
-- [x] Bounded batches of 1 through 256 source slots and microbatches of at most
-      eight model slots.
+- [x] Bounded batches of 1 through 256 source slots, detection microbatches of
+      at most 16 images, and recognition batches of at most eight crops.
 
 ### O2 — Cross-image PP-OCRv6 detection
 
 - [x] Preserve an independent aspect-ratio resize and source extent per image.
 - [x] Letterbox mixed shapes onto one top-left-aligned canvas whose padding is
       a black pixel transformed by the exact detection normalization.
-- [x] Partition contiguous slots into at-most-eight shape cohorts before Power
-      planning; every fused slot must retain at least 90% canvas fill and a
-      quality outlier receives its own fully admitted plan.
+- [x] Partition contiguous slots into at-most-16 shape cohorts before Power
+      planning; every fused slot must retain at least 90% canvas fill and the
+      reviewed peak intermediate must fit Power's tensor-element limit.
 - [x] Execute one reviewed dynamic `[B,3,H,W]` detection graph call and split
       `[B,1,H,W]` in exact caller order through Power's generic tensor contract.
 - [x] Restrict DB thresholding, contours, scoring, and coordinate projection to
       each slot's valid content extent; padding cannot create a box.
 - [x] Include the common F32 canvas in conservative host/device microbatch
       declarations and bind the shape-cohort scheduler into session evidence.
+- [x] Bound the fast detector at 896 pixels, retain original-source recognition
+      crops, and retry visually non-uniform empty results once at the reviewed
+      4,000-pixel quality bound while preserving both receipts.
+- [x] Build detection tensors and DB postprocessing with at most 16 bounded
+      workers while restoring deterministic slot order and isolating failures.
 - [x] Cover mixed canvas shapes, padding exclusion, coordinate projection,
       output slicing, bounds, and an official-model scalar/batch gate with the
       TurboOCR-derived ASCII-token F1 floor of 0.95.
@@ -72,9 +77,10 @@ client and exact model bundle.
 - [x] Flatten detected crops across admitted images while retaining exact
       `(slot, detection, reading-order)` identity and materializing no more
       than one eight-crop recognition batch at a time.
-- [x] Stable-sort into bounded dynamic-width batches, use the exact widest
-      crop canvas, and restore results and shared receipts to original image
-      and block order. Retain an isolated scalar retry for failed shared calls.
+- [x] Stable-sort and batch only identical dynamic canvas widths, preserving
+      scalar recognition geometry while restoring results and shared receipts
+      to original image and block order. Retain an isolated scalar retry for
+      failed shared calls.
 - [ ] Define measured static shape classes and a fill threshold with the exact
       dynamic-width path as fallback; never pad unboundedly merely to hit a
       static class.
