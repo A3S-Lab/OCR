@@ -35,11 +35,6 @@ pub(crate) struct NativeGraphOutput {
     pub(crate) receipt: ExecutionReceipt,
 }
 
-pub(crate) struct NativeGraphBatchOutput {
-    pub(crate) tensors: Vec<TensorOutput>,
-    pub(crate) receipt: ExecutionReceipt,
-}
-
 /// The model architecture, reviewed graph plans, and revision pins live here
 /// in a3s-ocr. Power supplies the shared execution and security substrate.
 pub(crate) struct NativePpOcrV6 {
@@ -100,17 +95,7 @@ impl NativePpOcrV6 {
         permit: &ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<NativeGraphOutput> {
-        let batch = self.detect_batch(data, shape, permit, cancellation)?;
-        let tensor = batch.tensors.into_iter().next().ok_or_else(|| {
-            UseError::new(
-                "use.ocr.provider_output_invalid",
-                "PP-OCRv6 detection returned no output tensor.",
-            )
-        })?;
-        Ok(NativeGraphOutput {
-            tensor,
-            receipt: batch.receipt,
-        })
+        self.detect_batch(data, shape, permit, cancellation)
     }
 
     pub(crate) fn detect_batch(
@@ -119,7 +104,7 @@ impl NativePpOcrV6 {
         shape: [usize; 4],
         permit: &ExecutionPermit,
         cancellation: &CancellationToken,
-    ) -> UseResult<NativeGraphBatchOutput> {
+    ) -> UseResult<NativeGraphOutput> {
         if shape[0] == 0 {
             return Err(UseError::new(
                 "use.ocr.provider_input_invalid",
@@ -142,14 +127,19 @@ impl NativePpOcrV6 {
             permit,
             cancellation,
         )?;
-        let tensors = output
-            .tensor
-            .split_leading(&vec![1; slot_count], self.runtime.limits())
-            .map_err(|error| power_error("slice the OCR detection batch", error))?;
-        Ok(NativeGraphBatchOutput {
-            tensors,
-            receipt: output.receipt,
-        })
+        if output.tensor.shape.len() != 4
+            || output.tensor.shape[0] != slot_count
+            || output.tensor.shape[1] != 1
+        {
+            return Err(UseError::new(
+                "use.ocr.provider_output_invalid",
+                format!(
+                    "PP-OCRv6 detection output shape must be [N, 1, H, W] for N={slot_count}, found {:?}.",
+                    output.tensor.shape
+                ),
+            ));
+        }
+        Ok(output)
     }
 
     pub(crate) fn recognize(
@@ -497,11 +487,12 @@ mod tests {
             .unwrap();
         assert_eq!(detection.tensor.shape, [1, 1, 64, 64]);
         assert_eq!(detection.tensor, repeated_detection.tensor);
-        assert_eq!(batched_detection.tensors.len(), 2);
+        assert_eq!(batched_detection.tensor.shape, [2, 1, 64, 64]);
         assert!(batched_detection
-            .tensors
-            .iter()
-            .all(|tensor| tensor == &detection.tensor));
+            .tensor
+            .values
+            .chunks_exact(detection.tensor.values.len())
+            .all(|values| values == detection.tensor.values));
         assert_eq!(
             batched_detection.receipt.input.item_count,
             detection.receipt.input.item_count * 2

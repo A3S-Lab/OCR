@@ -102,7 +102,9 @@ impl PpOcrV6Engine {
             .native
             .detect_batch(input.data, input.shape, permit, cancellation)?;
         let detected = batch_started.elapsed();
-        if detection.tensors.len() != images.len() || input.geometries.len() != images.len() {
+        if detection.tensor.shape.first() != Some(&images.len())
+            || input.geometries.len() != images.len()
+        {
             return Err(engine_error(
                 "use.ocr.provider_output_invalid",
                 "PP-OCRv6 detection changed exact batch cardinality.",
@@ -110,7 +112,7 @@ impl PpOcrV6Engine {
         }
         let mut detections = detection::postprocess_batch(
             input.geometries,
-            detection.tensors,
+            detection.tensor,
             &self.detection_config,
         )?;
         check_cancelled(cancellation)?;

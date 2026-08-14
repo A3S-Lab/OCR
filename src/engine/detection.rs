@@ -15,15 +15,39 @@ const QUALITY_RETRY_MIN_CHANNEL_RANGE: u8 = 32;
 
 pub(super) fn postprocess_batch(
     inputs: Vec<DetectionGeometry>,
-    tensors: Vec<TensorOutput>,
+    tensor: TensorOutput,
     config: &DetectionConfig,
 ) -> UseResult<Vec<UseResult<Vec<Detection>>>> {
-    if inputs.is_empty() || inputs.len() != tensors.len() {
+    if inputs.is_empty()
+        || tensor.shape.len() != 4
+        || tensor.shape[0] != inputs.len()
+        || tensor.shape[1] != 1
+    {
         return Err(engine_error(
             "use.ocr.provider_output_invalid",
             "PP-OCRv6 detection postprocessing received invalid batch cardinality.",
         ));
     }
+    let slot_elements = tensor.shape[1..]
+        .iter()
+        .try_fold(1_usize, |total, dimension| total.checked_mul(*dimension))
+        .ok_or_else(|| {
+            engine_error(
+                "use.ocr.provider_output_invalid",
+                "PP-OCRv6 detection output dimensions overflowed.",
+            )
+        })?;
+    if slot_elements == 0
+        || slot_elements
+            .checked_mul(inputs.len())
+            .is_none_or(|expected| expected != tensor.values.len())
+    {
+        return Err(engine_error(
+            "use.ocr.provider_output_invalid",
+            "PP-OCRv6 detection output length does not match its batch shape.",
+        ));
+    }
+    let slot_shape = [1, tensor.shape[1], tensor.shape[2], tensor.shape[3]];
     if inputs.len() == 1 {
         let input = inputs.into_iter().next().ok_or_else(|| {
             engine_error(
@@ -31,19 +55,20 @@ pub(super) fn postprocess_batch(
                 "PP-OCRv6 detection postprocessing lost its scalar input.",
             )
         })?;
-        let tensor = tensors.into_iter().next().ok_or_else(|| {
-            engine_error(
-                "use.ocr.provider_output_invalid",
-                "PP-OCRv6 detection postprocessing lost its scalar output.",
-            )
-        })?;
-        return Ok(vec![postprocess_one(input, tensor, config)]);
+        return Ok(vec![postprocess_one(
+            input,
+            &tensor.values,
+            &slot_shape,
+            config,
+        )]);
     }
     std::thread::scope(|scope| {
         let workers = inputs
             .into_iter()
-            .zip(tensors)
-            .map(|(input, tensor)| scope.spawn(move || postprocess_one(input, tensor, config)))
+            .zip(tensor.values.chunks_exact(slot_elements))
+            .map(|(input, values)| {
+                scope.spawn(move || postprocess_one(input, values, &slot_shape, config))
+            })
             .collect::<Vec<_>>();
         let completed = workers
             .into_iter()
@@ -64,12 +89,13 @@ pub(super) fn postprocess_batch(
 
 fn postprocess_one(
     input: DetectionGeometry,
-    tensor: TensorOutput,
+    values: &[f32],
+    shape: &[usize],
     config: &DetectionConfig,
 ) -> UseResult<Vec<Detection>> {
     detection_boxes_in_content(
-        &tensor.values,
-        &tensor.shape,
+        values,
+        shape,
         input.content_width,
         input.content_height,
         input.original_width,
@@ -123,21 +149,9 @@ impl PpOcrV6Engine {
         let output = self
             .native
             .detect_batch(input.data, input.shape, permit, cancellation)?;
-        if output.tensors.len() != 1 {
-            return Err(engine_error(
-                "use.ocr.provider_output_invalid",
-                "PP-OCRv6 quality retry changed scalar detection cardinality.",
-            ));
-        }
-        let tensor = output.tensors.into_iter().next().ok_or_else(|| {
-            engine_error(
-                "use.ocr.provider_output_invalid",
-                "PP-OCRv6 quality retry returned no detection tensor.",
-            )
-        })?;
         let detections = detection_boxes_in_content(
-            &tensor.values,
-            &tensor.shape,
+            &output.tensor.values,
+            &output.tensor.shape,
             input.geometry.content_width,
             input.geometry.content_height,
             input.geometry.original_width,
@@ -185,19 +199,13 @@ mod tests {
         }
     }
 
-    fn empty_detection_pair(side: usize) -> (DetectionGeometry, TensorOutput) {
-        (
-            DetectionGeometry {
-                original_width: side as u32,
-                original_height: side as u32,
-                content_width: side as u32,
-                content_height: side as u32,
-            },
-            TensorOutput {
-                shape: vec![1, 1, side, side],
-                values: vec![0.0; side * side],
-            },
-        )
+    fn detection_geometry(side: usize) -> DetectionGeometry {
+        DetectionGeometry {
+            original_width: side as u32,
+            original_height: side as u32,
+            content_width: side as u32,
+            content_height: side as u32,
+        }
     }
 
     #[test]
@@ -234,18 +242,29 @@ mod tests {
 
     #[test]
     fn batch_postprocessing_preserves_cardinality_and_isolates_slots() {
-        let (first_input, first_tensor) = empty_detection_pair(32);
-        let (second_input, second_tensor) = empty_detection_pair(64);
+        let tensor = TensorOutput {
+            shape: vec![2, 1, 32, 32],
+            values: vec![0.0; 2 * 32 * 32],
+        };
 
         let detections = postprocess_batch(
-            vec![first_input, second_input],
-            vec![first_tensor, second_tensor],
+            vec![detection_geometry(32), detection_geometry(64)],
+            tensor,
             &config(),
         )
         .unwrap();
 
         assert_eq!(detections.len(), 2);
-        assert!(detections.into_iter().all(|slot| slot.unwrap().is_empty()));
-        assert!(postprocess_batch(Vec::new(), Vec::new(), &config()).is_err());
+        assert!(detections[0].as_ref().unwrap().is_empty());
+        assert!(detections[1].is_err());
+        assert!(postprocess_batch(
+            Vec::new(),
+            TensorOutput {
+                shape: vec![0, 1, 32, 32],
+                values: Vec::new(),
+            },
+            &config()
+        )
+        .is_err());
     }
 }
