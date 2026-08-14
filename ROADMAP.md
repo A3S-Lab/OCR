@@ -70,6 +70,11 @@ client and exact model bundle.
       recognition multiplier-one depthwise layers. Detection bias remains one
       final round-to-nearest add in the fused kernel; CPU and unsupported
       layouts retain the existing fallback.
+- [x] Lock the 13 detection and five recognition adjacent single-consumer
+      `HardSigmoid`-to-`Mul` sites and pin Power's private byte-exact CUDA
+      lowering for equal rank-four and exact NCHW channel-gate tensors. Each
+      matched site removes four launches; every unreviewed form retains the
+      ordinary graph path.
 - [x] Cover mixed canvas shapes, padding exclusion, coordinate projection,
       output slicing, bounds, and an official-model scalar/batch gate with the
       TurboOCR-derived ASCII-token F1 floor of 0.95.

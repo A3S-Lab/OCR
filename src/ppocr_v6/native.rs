@@ -412,6 +412,43 @@ mod tests {
     }
 
     #[test]
+    fn reviewed_graphs_keep_the_fusible_gated_activation_inventory() {
+        assert_eq!(
+            adjacent_single_consumer_hard_sigmoid_mul(DETECTION_GRAPH),
+            13
+        );
+        assert_eq!(
+            adjacent_single_consumer_hard_sigmoid_mul(RECOGNITION_GRAPH),
+            5
+        );
+    }
+
+    fn adjacent_single_consumer_hard_sigmoid_mul(graph: &str) -> usize {
+        let graph: serde_json::Value = serde_json::from_str(graph).unwrap();
+        let nodes = graph["nodes"].as_array().unwrap();
+        nodes
+            .windows(2)
+            .filter(|pair| {
+                if pair[0]["op"] != "HardSigmoid" || pair[1]["op"] != "Mul" {
+                    return false;
+                }
+                let output = pair[0]["outputs"][0].as_str().unwrap();
+                let multiply_inputs = pair[1]["inputs"].as_array().unwrap();
+                let direct_uses = multiply_inputs
+                    .iter()
+                    .filter(|input| input.as_str() == Some(output))
+                    .count();
+                let graph_uses = nodes
+                    .iter()
+                    .flat_map(|node| node["inputs"].as_array().unwrap())
+                    .filter(|input| input.as_str() == Some(output))
+                    .count();
+                direct_uses == 1 && graph_uses == 1
+            })
+            .count()
+    }
+
+    #[test]
     fn pooled_session_and_batch_bindings_cover_exact_model_and_configuration() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path();

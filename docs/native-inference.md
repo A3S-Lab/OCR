@@ -160,6 +160,18 @@ crops through bounded scalar calls to preserve slot isolation. A cancelled
 permit is never converted into fallback work. Static width profiles remain a
 separate optimization.
 
+The reviewed plans also retain an explicit inventory of adjacent,
+single-consumer `HardSigmoid`-to-`Mul` channel gates: 13 in detection and five
+in recognition. The pinned Power revision recognizes only contiguous F32 CUDA
+tensors with equal rank-four shapes or an exact `[N, C, 1, 1]` gate over
+`[N, C, H, W]`. It evaluates the two affine stages, ordered clamp, and final
+multiplication in one byte-exact kernel instead of five launches. One combined
+detection-plus-recognition graph pass therefore avoids 72 launches; actual OCR
+work may invoke either graph a different number of times. The optimization is
+private to Power's executor, does not rewrite the OCR-owned graph declaration,
+and preserves ordinary execution for every unmatched device, dtype, shape,
+broadcast form, layout, or multi-consumer value.
+
 The pinned official 30-block image and clear 8-point and 12-point PDF text at
 144 DPI pass exact consumer gates. Five-point synthetic text does not, so the
 fast detector is not evidence for arbitrary small text or scans. Broader

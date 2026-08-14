@@ -309,6 +309,16 @@ Power's selected-device parity gate is byte-exact; CPU and unsupported tensor
 layouts retain their existing paths. OCR still owns the graph inventory and
 end-to-end output parity.
 
+The same pinned Power revision privately fuses adjacent, single-consumer F32
+`HardSigmoid`-to-`Mul` channel gates on CUDA. The reviewed OCR plans contain 13
+such detection sites and five recognition sites; a graph-inventory test locks
+those counts. Each matched `[N, C, 1, 1]` gate over `[N, C, H, W]` replaces the
+original four activation passes plus broadcast multiplication with one
+byte-exact kernel, removing four launches and four intermediate buffers per
+site. Graph topology, receipts, and OCR ownership do not change. CPU and every
+unreviewed dtype, shape, broadcast form, or layout retain node-by-node
+execution.
+
 The current quality evidence covers the pinned 30-block official image and
 clear 8-point and 12-point PDF text rendered at 144 DPI. Five-point synthetic
 text did not pass exact publication and is not a supported quality claim. The
@@ -565,7 +575,7 @@ pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
 
 The staged PP-OCRv6 integration pins the release-ready A3S Power 0.8.0 revision
-`6ebd922c7d882411f4a46ed48cd0078022d00cd4`. Source builds and CI execute that
+`51543d20a5da99187b3d05a382504605d2cfb685`. Source builds and CI execute that
 exact Git revision. Package verification additionally resolves the declared
 `=0.8.0` registry dependency, so the package gate remains closed until the same
 Power release is visible on crates.io. No path or `[patch.crates-io]` override
