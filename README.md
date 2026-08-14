@@ -228,8 +228,8 @@ Its pipeline is explicit:
 
 ~~~text
 bounded decode → cross-image letterbox → batched detection → per-slot DB
-               → reading order → perspective crop → crop-batch recognition
-               → CTC decode → source-pixel evidence
+               → identity-bound crop plans → stable width sort
+               → cross-image crop batches → CTC decode → ordered evidence
 ~~~
 
 The OCR-owned release packages pinned detection and recognition SafeTensors
@@ -270,9 +270,14 @@ creating a second admission scheduler. Each compatible cohort executes one
 dynamic `[B,3,H,W]` detection graph call. Power validates leading-axis assembly
 and output partitions; OCR retains each slot's content extent, excludes padding
 from DB postprocessing, and maps polygons through that extent into source
-pixels. Recognition still batches crops within each image; cross-image width
-bucketing remains a roadmap item. No throughput gain is claimed until the
-named-hardware release gates pass.
+pixels. OCR then flattens detected crops across the admitted images while
+retaining exact slot, detection, and reading-order identity. It stable-sorts
+crops by the exact dynamic recognition canvas width, chunks at most eight crops
+per graph call, materializes only the active chunk, and restores blocks and
+receipts to their source slots. A failed shared graph call retries its affected
+crops through the scalar path so a non-cancellation failure remains isolated;
+cancellation still terminates the admitted request. No throughput gain is
+claimed until the named-hardware release gates pass.
 
 Linux CI installs that exact pinned bundle and executes both reviewed graphs on
 the CPU. The gate checks the canonical Power weight digests, exact output
@@ -283,7 +288,10 @@ detection, DB postprocessing, reading-order sort, perspective crops, batched
 recognition, CTC decoding, source-coordinate polygons, and five Power execution
 receipts. The 30 output blocks are checked against a reference generated with
 Paddle 3.3.1 and PaddleOCR 3.7.0 using explicit text, score, and four-point
-coordinate tolerances. Paddle, Python, and ONNX Runtime are not test or runtime
+coordinate tolerances. The same gate compares one official crop at scalar and
+cross-image batch width two, requiring identical text and geometry, recognition
+confidence within `0.00001`, one shared recognition receipt, and an exact 2x
+input tensor size. Paddle, Python, and ONNX Runtime are not test or runtime
 dependencies of this crate.
 
 `a3s-use-ocr-execution-bench` adds a strict, path-free real-provider benchmark

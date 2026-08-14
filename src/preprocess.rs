@@ -140,7 +140,7 @@ fn canvas_dimensions(dimensions: &[(u32, u32)]) -> UseResult<(u32, u32)> {
 }
 
 pub(crate) fn recognition_input(
-    images: &[RgbImage],
+    images: &[&RgbImage],
     config: &RecognitionConfig,
 ) -> UseResult<RecognitionInput> {
     if images.is_empty() || images.len() > 8 {
@@ -154,20 +154,15 @@ pub(crate) fn recognition_input(
     {
         return Err(image_error("PP-OCRv6 text crop has zero width or height."));
     }
-    let model_height = u32::try_from(config.height)
-        .map_err(|_| image_error("Recognition model height is invalid."))?;
-    let default_width = u32::try_from(config.default_width)
-        .map_err(|_| image_error("Recognition model width is invalid."))?;
+    let model_height = recognition_model_height(config)?;
     let resized_widths = images
         .iter()
-        .map(|image| {
-            ((f64::from(model_height) * f64::from(image.width()) / f64::from(image.height())).ceil()
-                as u32)
-                .clamp(1, RECOGNITION_MAX_WIDTH)
-        })
-        .collect::<Vec<_>>();
+        .map(|image| recognition_resized_width(image.width(), image.height(), model_height))
+        .collect::<UseResult<Vec<_>>>()?;
     let widest = resized_widths.iter().copied().max().unwrap_or(1);
-    let canvas_width = default_width.max(widest).min(RECOGNITION_MAX_WIDTH);
+    let canvas_width = recognition_default_width(config)?
+        .max(widest)
+        .min(RECOGNITION_MAX_WIDTH);
     let target_plane = usize::try_from(u64::from(canvas_width) * u64::from(model_height))
         .map_err(|_| image_error("Recognition tensor dimensions overflowed."))?;
     let batch_stride = config
@@ -176,7 +171,7 @@ pub(crate) fn recognition_input(
         .ok_or_else(|| image_error("Recognition tensor dimensions overflowed."))?;
     let mut data = vec![0.0_f32; images.len() * batch_stride];
     for (batch, (image, resized_width)) in images.iter().zip(resized_widths).enumerate() {
-        let resized = DynamicImage::ImageRgb8(image.clone())
+        let resized = DynamicImage::ImageRgb8((*image).clone())
             .resize_exact(resized_width, model_height, FilterType::Triangle)
             .to_rgb8();
         for y in 0..model_height {
@@ -200,6 +195,42 @@ pub(crate) fn recognition_input(
             canvas_width as usize,
         ],
     })
+}
+
+pub(crate) fn recognition_canvas_width(
+    width: u32,
+    height: u32,
+    config: &RecognitionConfig,
+) -> UseResult<u32> {
+    let resized_width =
+        recognition_resized_width(width, height, recognition_model_height(config)?)?;
+    Ok(recognition_default_width(config)?
+        .max(resized_width)
+        .min(RECOGNITION_MAX_WIDTH))
+}
+
+fn recognition_resized_width(width: u32, height: u32, model_height: u32) -> UseResult<u32> {
+    if width == 0 || height == 0 {
+        return Err(image_error("PP-OCRv6 text crop has zero width or height."));
+    }
+    Ok(
+        ((f64::from(model_height) * f64::from(width) / f64::from(height)).ceil() as u32)
+            .clamp(1, RECOGNITION_MAX_WIDTH),
+    )
+}
+
+fn recognition_model_height(config: &RecognitionConfig) -> UseResult<u32> {
+    u32::try_from(config.height)
+        .ok()
+        .filter(|height| *height > 0)
+        .ok_or_else(|| image_error("Recognition model height is invalid."))
+}
+
+fn recognition_default_width(config: &RecognitionConfig) -> UseResult<u32> {
+    u32::try_from(config.default_width)
+        .ok()
+        .filter(|width| *width > 0)
+        .ok_or_else(|| image_error("Recognition model width is invalid."))
 }
 
 pub(crate) fn detection_dimensions(width: u32, height: u32) -> UseResult<(u32, u32)> {
@@ -242,6 +273,15 @@ mod tests {
             box_threshold: 0.6,
             max_candidates: 1_000,
             unclip_ratio: 1.5,
+        }
+    }
+
+    fn recognition_config() -> RecognitionConfig {
+        RecognitionConfig {
+            channels: 3,
+            height: 48,
+            default_width: 320,
+            characters: vec!["blank".to_string()],
         }
     }
 
@@ -293,5 +333,24 @@ mod tests {
         assert!(detection_batch_inputs(&[], &detection_config()).is_err());
         let images = std::iter::repeat_n(&image, 9).collect::<Vec<_>>();
         assert!(detection_batch_inputs(&images, &detection_config()).is_err());
+    }
+
+    #[test]
+    fn recognition_canvas_width_matches_the_materialized_tensor() {
+        let narrow = RgbImage::new(100, 20);
+        let wide = RgbImage::new(400, 20);
+        let config = recognition_config();
+
+        assert_eq!(recognition_canvas_width(100, 20, &config).unwrap(), 320);
+        assert_eq!(recognition_canvas_width(400, 20, &config).unwrap(), 960);
+        assert_eq!(
+            recognition_input(&[&narrow, &wide], &config).unwrap().shape,
+            [2, 3, 48, 960]
+        );
+        assert_eq!(
+            recognition_canvas_width(10_000, 1, &config).unwrap(),
+            RECOGNITION_MAX_WIDTH
+        );
+        assert!(recognition_canvas_width(0, 20, &config).is_err());
     }
 }

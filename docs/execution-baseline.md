@@ -129,6 +129,11 @@ mixed aspect ratios through the public staged API, compares every slot with its
 scalar result, records actual microbatch width and graph receipts, and measures
 peak host/device memory. Until that clean named-hardware report is persisted,
 the implementation is available without a release-wide throughput claim.
+The official low-level gate also executes one pinned real-image crop at scalar
+and cross-image batch width two. It requires exact text and source geometry,
+recognition confidence within `0.00001`, a shared recognition receipt on both
+slots, and an exact doubling of the receipt-bound input tensor size. This is a
+numerical and mapping gate, not a substitute for the public multi-image report.
 The checked-in official-model CI gate follows TurboOCR's accuracy contract: the
 ASCII-token F1 between each mixed-shape batch slot and its scalar result must be
 at least 0.95, while every polygon and box must remain inside its own source

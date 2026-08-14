@@ -69,12 +69,15 @@ client and exact model bundle.
 
 ### O3 — Cross-image recognition width buckets
 
-- [ ] Flatten detected crops across admitted images while retaining exact
-      `(slot, detection, reading-order)` identity.
-- [ ] Stable-sort into bounded width buckets, select the smallest reviewed
-      canvas/profile, and restore results to original image and block order.
-- [ ] Define a measured fill threshold with an explicit dynamic fallback;
-      never pad unboundedly merely to hit a static class.
+- [x] Flatten detected crops across admitted images while retaining exact
+      `(slot, detection, reading-order)` identity and materializing no more
+      than one eight-crop recognition batch at a time.
+- [x] Stable-sort into bounded dynamic-width batches, use the exact widest
+      crop canvas, and restore results and shared receipts to original image
+      and block order. Retain an isolated scalar retry for failed shared calls.
+- [ ] Define measured static shape classes and a fill threshold with the exact
+      dynamic-width path as fallback; never pad unboundedly merely to hit a
+      static class.
 - [ ] Prove CTC text/confidence parity, empty-image behavior, partial failures,
       cancellation, and scalar/batch receipt semantics on the official image
       matrix.

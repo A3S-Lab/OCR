@@ -1,19 +1,17 @@
 use a3s_power::inference::ExecutionReceipt;
 use a3s_use_core::{UseError, UseResult};
-use image::{imageops, ImageBuffer, Rgb, RgbImage};
-use imageproc::geometric_transformations::{warp_into, Interpolation, Projection};
+use image::RgbImage;
 use imageproc::point::Point;
 use tokio_util::sync::CancellationToken;
 
 use crate::assets::ModelAssets;
 use crate::cancellation::check_cancelled;
 use crate::config::{load_detection, load_recognition, DetectionConfig, RecognitionConfig};
-use crate::postprocess::{decode_ctc, detection_boxes_in_content, Detection};
+use crate::postprocess::detection_boxes_in_content;
 use crate::ppocr_v6::native::NativePpOcrV6;
-use crate::preprocess::{detection_batch_inputs, recognition_input};
+use crate::preprocess::detection_batch_inputs;
 
-const RECOGNITION_BATCH_SIZE: usize = 8;
-const MAX_CROP_PIXELS: u64 = 64 * 1024 * 1024;
+mod recognition;
 
 #[derive(Debug, Clone)]
 pub(crate) struct EngineBlock {
@@ -110,10 +108,10 @@ impl PpOcrV6Engine {
                 "PP-OCRv6 detection changed exact batch cardinality.",
             ));
         }
-        let mut outputs = Vec::with_capacity(images.len());
-        for ((image, input), tensor) in images.iter().zip(inputs).zip(detection.tensors) {
+        let mut detections = Vec::with_capacity(images.len());
+        for (input, tensor) in inputs.into_iter().zip(detection.tensors) {
             check_cancelled(cancellation)?;
-            let detections = detection_boxes_in_content(
+            detections.push(detection_boxes_in_content(
                 &tensor.values,
                 &tensor.shape,
                 input.content_width,
@@ -121,141 +119,10 @@ impl PpOcrV6Engine {
                 input.original_width,
                 input.original_height,
                 &self.detection_config,
-            );
-            outputs.push(detections.and_then(|detections| {
-                self.recognize_detections(
-                    image,
-                    detections,
-                    detection.receipt.clone(),
-                    permit,
-                    cancellation,
-                )
-            }));
+            ));
         }
-        Ok(outputs)
+        self.recognize_detected_batch(images, detections, detection.receipt, permit, cancellation)
     }
-
-    fn recognize_detections(
-        &mut self,
-        image: &RgbImage,
-        detections: Vec<Detection>,
-        detection_receipt: ExecutionReceipt,
-        permit: &a3s_power::inference::ExecutionPermit,
-        cancellation: &CancellationToken,
-    ) -> UseResult<EngineExtraction> {
-        if detections.is_empty() {
-            return Ok(EngineExtraction {
-                blocks: Vec::new(),
-                receipts: vec![detection_receipt],
-            });
-        }
-
-        let crops = detections
-            .iter()
-            .map(|detection| perspective_crop(image, detection))
-            .collect::<UseResult<Vec<_>>>()?;
-        let mut blocks = Vec::with_capacity(detections.len());
-        let mut receipts = vec![detection_receipt];
-        for (detection_batch, crop_batch) in detections
-            .chunks(RECOGNITION_BATCH_SIZE)
-            .zip(crops.chunks(RECOGNITION_BATCH_SIZE))
-        {
-            check_cancelled(cancellation)?;
-            let input = recognition_input(crop_batch, &self.recognition_config)?;
-            let recognition =
-                self.native
-                    .recognize(input.data, input.shape, permit, cancellation)?;
-            let shape = recognition.tensor.shape;
-            let output = recognition.tensor.values;
-            receipts.push(recognition.receipt);
-            if shape.len() != 3 || shape[0] != detection_batch.len() {
-                return Err(engine_error(
-                    "use.ocr.provider_output_invalid",
-                    format!(
-                        "PP-OCRv6 recognition output shape must be [N, T, C] for N={}, found {shape:?}.",
-                        detection_batch.len()
-                    ),
-                ));
-            }
-            let item_len = shape[1].checked_mul(shape[2]).ok_or_else(|| {
-                engine_error(
-                    "use.ocr.provider_output_invalid",
-                    "PP-OCRv6 recognition output dimensions overflowed.",
-                )
-            })?;
-            if output.len() != detection_batch.len().saturating_mul(item_len) {
-                return Err(engine_error(
-                    "use.ocr.provider_output_invalid",
-                    "PP-OCRv6 recognition output length does not match its batch shape.",
-                ));
-            }
-            for (index, detection) in detection_batch.iter().enumerate() {
-                let start = index * item_len;
-                let recognition = decode_ctc(
-                    &output[start..start + item_len],
-                    &[1, shape[1], shape[2]],
-                    &self.recognition_config,
-                )?;
-                blocks.push(EngineBlock {
-                    polygon: detection.polygon,
-                    detection_confidence: detection.confidence,
-                    text: recognition.text,
-                    confidence: recognition.confidence,
-                });
-            }
-        }
-        Ok(EngineExtraction { blocks, receipts })
-    }
-}
-
-fn perspective_crop(image: &RgbImage, detection: &Detection) -> UseResult<RgbImage> {
-    let polygon = detection.polygon;
-    let width = distance(polygon[0], polygon[1])
-        .max(distance(polygon[2], polygon[3]))
-        .max(1.0) as u32;
-    let height = distance(polygon[0], polygon[3])
-        .max(distance(polygon[1], polygon[2]))
-        .max(1.0) as u32;
-    let pixels = u64::from(width)
-        .checked_mul(u64::from(height))
-        .ok_or_else(|| crop_error("PP-OCRv6 text crop dimensions overflowed."))?;
-    if pixels > MAX_CROP_PIXELS {
-        return Err(crop_error(
-            "PP-OCRv6 text crop exceeds the 64 megapixel safety limit.",
-        ));
-    }
-
-    let source = polygon.map(|point| (point.x, point.y));
-    let destination = [
-        (0.0, 0.0),
-        (width as f32, 0.0),
-        (width as f32, height as f32),
-        (0.0, height as f32),
-    ];
-    let projection = Projection::from_control_points(source, destination).ok_or_else(|| {
-        crop_error("PP-OCRv6 detected a degenerate text polygon that cannot be rectified.")
-    })?;
-    let mut crop = ImageBuffer::new(width, height);
-    warp_into(
-        image,
-        &projection,
-        Interpolation::Bicubic,
-        Rgb([255, 255, 255]),
-        &mut crop,
-    );
-    if f64::from(height) / f64::from(width) >= 1.5 {
-        Ok(imageops::rotate270(&crop))
-    } else {
-        Ok(crop)
-    }
-}
-
-fn distance(left: Point<f32>, right: Point<f32>) -> f32 {
-    (left.x - right.x).hypot(left.y - right.y)
-}
-
-fn crop_error(message: impl Into<String>) -> UseError {
-    engine_error("use.ocr.crop_invalid", message)
 }
 
 fn engine_error(code: &str, message: impl Into<String>) -> UseError {
@@ -270,10 +137,12 @@ mod tests {
 
     use super::*;
     use crate::assets::OcrInstallSource;
+    use crate::postprocess::Detection;
 
     const REAL_IMAGE_SHA256: &str =
         "4425af33dd163cf73bdff502bd35ee527e9bdd5725501db1da78bfdae9f538f4";
     const MAX_RECOGNITION_SCORE_DELTA: f64 = 0.065;
+    const MAX_BATCH_RECOGNITION_SCORE_DELTA: f32 = 0.000_01;
     const MAX_POLYGON_COORDINATE_DELTA: f32 = 4.0;
 
     struct ExpectedBlock {
@@ -440,22 +309,6 @@ mod tests {
     ];
 
     #[test]
-    fn perspective_crop_uses_the_upstream_exclusive_extent() {
-        let image = RgbImage::new(20, 20);
-        let detection = Detection {
-            polygon: [
-                Point::new(1.0, 2.0),
-                Point::new(11.0, 2.0),
-                Point::new(11.0, 7.0),
-                Point::new(1.0, 7.0),
-            ],
-            confidence: 1.0,
-        };
-        let crop = perspective_crop(&image, &detection).unwrap();
-        assert_eq!(crop.dimensions(), (10, 5));
-    }
-
-    #[test]
     #[ignore = "requires the pinned official PP-OCRv6 bundle and real-image fixture"]
     fn official_real_image_matches_upstream() {
         let root = PathBuf::from(
@@ -513,6 +366,58 @@ mod tests {
                 );
             }
         }
+
+        let first_block = &extraction.blocks[0];
+        let detection = Detection {
+            polygon: first_block.polygon,
+            confidence: first_block.detection_confidence,
+        };
+        let scalar_permit = engine.native.begin(&cancellation).unwrap();
+        let scalar = engine
+            .recognize_detected_batch(
+                &[&image],
+                vec![Ok(vec![detection.clone()])],
+                extraction.receipts[0].clone(),
+                &scalar_permit,
+                &cancellation,
+            )
+            .unwrap();
+        let scalar = scalar[0].as_ref().unwrap();
+        drop(scalar_permit);
+        let batch_permit = engine.native.begin(&cancellation).unwrap();
+        let batch = engine
+            .recognize_detected_batch(
+                &[&image, &image],
+                vec![Ok(vec![detection.clone()]), Ok(vec![detection])],
+                extraction.receipts[0].clone(),
+                &batch_permit,
+                &cancellation,
+            )
+            .unwrap();
+        let first = batch[0].as_ref().unwrap();
+        let second = batch[1].as_ref().unwrap();
+        for batched in [first, second] {
+            assert_eq!(batched.blocks.len(), 1);
+            assert_eq!(batched.blocks[0].text, scalar.blocks[0].text);
+            assert!(
+                (batched.blocks[0].confidence - scalar.blocks[0].confidence).abs()
+                    <= MAX_BATCH_RECOGNITION_SCORE_DELTA
+            );
+            assert_eq!(batched.blocks[0].polygon, scalar.blocks[0].polygon);
+            assert_eq!(batched.receipts.len(), 2);
+        }
+        let scalar_recognition = &scalar.receipts[1];
+        let shared_recognition = &first.receipts[1];
+        assert_eq!(shared_recognition, &second.receipts[1]);
+        assert!(shared_recognition.model.family.ends_with("-recognition"));
+        assert_eq!(
+            shared_recognition.input.byte_length,
+            scalar_recognition.input.byte_length * 2
+        );
+        assert_eq!(
+            shared_recognition.input.item_count,
+            scalar_recognition.input.item_count * 2
+        );
     }
 
     fn parity_text(value: &str) -> String {

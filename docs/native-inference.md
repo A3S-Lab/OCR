@@ -33,9 +33,9 @@ digest. Power validates the complete plan and inventory before execution.
 bounded image
   -> OCR batch letterbox with per-slot content extents
   -> one Power detection graph call for the admitted image batch
-  -> OCR per-slot output slicing, DB postprocessing, and perspective crops
-  -> Power recognition graph
-  -> OCR CTC decoding and source-coordinate blocks
+  -> OCR per-slot output slicing, DB postprocessing, and crop identities
+  -> stable cross-image width sort and bounded Power recognition calls
+  -> OCR CTC decoding, source-coordinate blocks, and ordered restoration
   -> Power execution receipts carried by OcrResult
 ```
 
@@ -112,6 +112,7 @@ validated slots and exact caller IDs
   -> deterministic contiguous plan from live host/device memory
   -> one admitted Power microbatch permit across each planned slot group
   -> one dynamic leading-axis detection call and exact ordered output slices
+  -> bounded cross-slot recognition batches and exact identity restoration
   -> per-slot OCR results plus digest-only Power receipt v4 evidence
 ```
 
@@ -134,10 +135,20 @@ and returns `[B,1,H,W]`. Power's model-neutral leading-axis contract validates
 assembly, exact order, limits, and one positive output partition per input.
 OCR masks every partition to its own content width and height before DB
 postprocessing, so padding cannot produce a box and source-coordinate mapping
-does not use the larger batch canvas. Recognition remains per-image with up to
-eight crops per graph call. Cross-image crop flattening and width buckets are a
-separate numerical-parity milestone. The fused detection path does not become
-a throughput claim until the real TO5 single-image, mixed-Office, and scale
+does not use the larger batch canvas.
+
+Recognition flattens the resulting crop plans across that admitted image
+batch. Each plan retains its source slot and reading-order detection index.
+OCR computes the exact post-rotation recognition width without allocating all
+crops, stable-sorts the identities by that width, and chunks the order into
+dynamic `[B,3,48,W]` calls with `B <= 8`. Each call uses its actual widest crop,
+only its active crops are materialized, decoded blocks are restored by retained
+identity, and a shared Power receipt is attached once to every participating
+slot. If a shared call fails without cancellation, OCR retries its affected
+crops through bounded scalar calls to preserve slot isolation. A cancelled
+permit is never converted into fallback work. Static width profiles and their
+measured fill threshold remain a separate optimization. Neither fused stage
+becomes a throughput claim until the real single-image, mixed-Office, and scale
 benchmarks pass.
 
 Normalized-black letterboxing changes convolution boundary context compared
