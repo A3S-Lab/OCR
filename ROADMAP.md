@@ -81,6 +81,12 @@ client and exact model bundle.
       scalar recognition geometry while restoring results and shared receipts
       to original image and block order. Retain an isolated scalar retry for
       failed shared calls.
+- [x] Project reviewed recognition probabilities on the execution device from
+      `[N,T,18710]` to exact `[N,T,index/score/finite]` CTC evidence before host
+      materialization. Reverse-axis argmax preserves scalar last-class tie
+      behavior, and the finite marker still rejects any non-finite source
+      probability. The projection revision is bound into session and model
+      execution identity.
 - [ ] Define measured static shape classes and a fill threshold with the exact
       dynamic-width path as fallback; never pad unboundedly merely to hit a
       static class.
@@ -92,10 +98,13 @@ client and exact model bundle.
 
 - [ ] Move resize/normalize and perspective ROI warp to reviewed OCR-owned
       device kernels when Power's bounded device-resident handles are ready.
-- [ ] Evaluate DB threshold/connected-components and CTC argmax kernels behind
-      exact CPU parity gates. Keep canonical CPU fallbacks explicit.
-- [ ] Avoid full device-to-host tensor copies when only bounded maps, boxes, or
-      token indices are needed.
+- [ ] Evaluate DB threshold/connected-components kernels behind exact CPU
+      parity gates. Keep canonical CPU fallbacks explicit.
+- [x] Execute the CTC top-1 projection on CPU/CUDA through Power's model-owned
+      graph-output boundary, with scalar parity, official-weight, exact-shape,
+      tie, non-finite, and CUDA reviewed-shape gates.
+- [ ] Avoid the remaining full detection-map device-to-host copies when only
+      bounded maps or boxes are needed.
 - [ ] Retain Power admission, TEE/confidential-device policy, cancellation, and
       receipt binding for every fast path.
 

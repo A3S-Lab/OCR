@@ -289,6 +289,17 @@ can change decoded text. A failed shared graph call retries its affected crops
 through the scalar path so a non-cancellation failure remains isolated;
 cancellation still terminates the admitted request.
 
+Recognition no longer materializes the complete 18,710-class probability row
+on the host. OCR applies a deterministic model-owned projection on the Power
+execution device and transfers `[class index, score, source-finite marker]` for
+each CTC time step. The reverse-axis reduction preserves the scalar decoder's
+last-class tie rule, while the marker covers every source probability rather
+than only the selected score. For the reviewed `[1,40,18710]` output this
+reduces host materialization and receipt hashing from 2,993,600 bytes to 480
+bytes (**6,236.7x**). The projection revision is part of the model/session
+execution identity, and the execution receipt commits to the exact projected
+tensor consumed by CTC decoding.
+
 The current quality evidence covers the pinned 30-block official image and
 clear 8-point and 12-point PDF text rendered at 144 DPI. Five-point synthetic
 text did not pass exact publication and is not a supported quality claim. The
@@ -545,7 +556,7 @@ pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
 
 The staged PP-OCRv6 integration pins the release-ready A3S Power 0.8.0 revision
-`9455bd43d9a0b77c3ad868ead46a799c7347618f`. Source builds and CI execute that
+`9a6aaccb787c43d6ae7d5e1eb3194c22917a37f7`. Source builds and CI execute that
 exact Git revision. Package verification additionally resolves the declared
 `=0.8.0` registry dependency, so the package gate remains closed until the same
 Power release is visible on crates.io. No path or `[patch.crates-io]` override

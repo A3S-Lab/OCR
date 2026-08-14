@@ -141,6 +141,7 @@ pub(crate) fn detection_boxes_in_content(
     Ok(detections)
 }
 
+#[cfg(test)]
 pub(crate) fn decode_ctc(
     output: &[f32],
     shape: &[usize],
@@ -177,6 +178,62 @@ pub(crate) fn decode_ctc(
             .enumerate()
             .max_by(|left, right| left.1.total_cmp(&right.1))
             .ok_or_else(|| output_error("PP-OCRv6 recognition output row is empty."))?;
+        if index != 0 && index != previous {
+            if index == config.characters.len() + 1 {
+                text.push(' ');
+            } else if let Some(character) = config.characters.get(index - 1) {
+                text.push_str(character);
+            }
+            confidence += score;
+            selected += 1;
+        }
+        previous = index;
+    }
+    Ok(Recognition {
+        text,
+        confidence: if selected == 0 {
+            0.0
+        } else {
+            (confidence / selected as f32).clamp(0.0, 1.0)
+        },
+    })
+}
+
+pub(crate) fn decode_ctc_top1(
+    output: &[f32],
+    shape: &[usize],
+    config: &RecognitionConfig,
+) -> UseResult<Recognition> {
+    const FIELDS: usize = 3;
+    if shape.len() != 3 || shape[0] != 1 || shape[1] == 0 || shape[2] != FIELDS {
+        return Err(output_error(format!(
+            "PP-OCRv6 projected recognition output shape must be [1, T, {FIELDS}], found {shape:?}."
+        )));
+    }
+    let timesteps = shape[1];
+    if output.len() != timesteps.saturating_mul(FIELDS) {
+        return Err(output_error(
+            "PP-OCRv6 projected recognition output length does not match its shape.",
+        ));
+    }
+    let classes = config.characters.len() + 2;
+    let mut text = String::new();
+    let mut confidence = 0.0_f32;
+    let mut selected = 0_usize;
+    let mut previous = usize::MAX;
+    for row in output.chunks_exact(FIELDS) {
+        let [index, score, finite] = [row[0], row[1], row[2]];
+        if finite != 1.0 || !index.is_finite() || index < 0.0 || index.fract() != 0.0 {
+            return Err(output_error(
+                "PP-OCRv6 projected recognition output failed source-value validation.",
+            ));
+        }
+        let index = index as usize;
+        if index >= classes || !score.is_finite() {
+            return Err(output_error(
+                "PP-OCRv6 projected recognition output contains an invalid class or score.",
+            ));
+        }
         if index != 0 && index != previous {
             if index == config.characters.len() + 1 {
                 text.push(' ');
@@ -366,6 +423,30 @@ mod tests {
         let result = decode_ctc(&output, &[1, 5, 4], &config).unwrap();
         assert_eq!(result.text, "AAB");
         assert!((result.confidence - 0.8).abs() < f32::EPSILON);
+
+        let projected = [
+            0.0, 0.9, 1.0, // blank
+            1.0, 0.8, 1.0, // A
+            0.0, 0.9, 1.0, // blank
+            1.0, 0.8, 1.0, // A
+            2.0, 0.8, 1.0, // B
+        ];
+        let projected_result = decode_ctc_top1(&projected, &[1, 5, 3], &config).unwrap();
+        assert_eq!(projected_result, result);
+    }
+
+    #[test]
+    fn projected_ctc_decoder_rejects_nonfinite_source_markers_and_class_indices() {
+        let config = RecognitionConfig {
+            channels: 3,
+            height: 48,
+            default_width: 320,
+            characters: vec!["A".to_string(), "B".to_string()],
+        };
+
+        assert!(decode_ctc_top1(&[1.0, 0.8, 0.0], &[1, 1, 3], &config).is_err());
+        assert!(decode_ctc_top1(&[4.0, 0.8, 1.0], &[1, 1, 3], &config).is_err());
+        assert!(decode_ctc_top1(&[1.5, 0.8, 1.0], &[1, 1, 3], &config).is_err());
     }
 
     #[test]

@@ -62,6 +62,7 @@ unlimited-ocr-metal = [
 ]
 ppocr-v6 = [
     "power-runtime",
+    "dep:candle-core",
     "dep:clipper2",
     "dep:fs2",
     "dep:image",
@@ -75,7 +76,7 @@ mcp = ["dep:rmcp", "dep:serde_json", "tokio/io-std"]
 cli = ["ppocr-v6", "mcp", "dep:clap"]
 
 [dependencies]
-a3s-power = { version = "=0.8.0", git = "https://github.com/A3S-Lab/Power.git", rev = "9455bd43d9a0b77c3ad868ead46a799c7347618f", default-features = false, features = ["embedded-inference"], optional = true }
+a3s-power = { version = "=0.8.0", git = "https://github.com/A3S-Lab/Power.git", rev = "9a6aaccb787c43d6ae7d5e1eb3194c22917a37f7", default-features = false, features = ["embedded-inference"], optional = true }
 a3s-use-core = "0.2.0"
 anyhow = { version = "1", optional = true }
 async-trait = "0.1"

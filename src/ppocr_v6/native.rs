@@ -17,6 +17,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::assets::ModelAssets;
 
+mod projection;
+
 const FAMILY: &str = "pp-ocr-v6-small";
 const REVISION: &str = "paddlex-paddle3.0.0";
 const DETECTION_GRAPH: &str = include_str!("graphs/detection.json");
@@ -155,34 +157,9 @@ impl NativePpOcrV6 {
                 "PP-OCRv6 recognition input must be NCHW with three channels and height 48.",
             ));
         }
-        self.execute(
-            &self.recognition,
-            &self.recognition_identity,
-            data,
-            shape,
-            permit,
-            cancellation,
-        )
-    }
-
-    fn execute(
-        &self,
-        graph: &GraphExecutor,
-        identity: &ModelIdentity,
-        data: Vec<f32>,
-        shape: [usize; 4],
-        permit: &ExecutionPermit,
-        cancellation: &CancellationToken,
-    ) -> UseResult<NativeGraphOutput> {
-        if shape[1] != 3 {
-            return Err(UseError::new(
-                "use.ocr.provider_input_invalid",
-                "PP-OCRv6 graph input must use NCHW layout with three channels.",
-            ));
-        }
         let input = TensorInput::new(shape.to_vec(), data, self.runtime.limits())
             .map_err(|error| power_error("validate the OCR input tensor", error))?;
-        self.execute_input(graph, identity, input, permit, cancellation)
+        self.execute_recognition_input(input, permit, cancellation)
     }
 
     fn execute_input(
@@ -201,6 +178,26 @@ impl NativePpOcrV6 {
         let receipt = self
             .runtime
             .receipt(identity.clone(), input_digest, output_digest);
+        Ok(NativeGraphOutput { tensor, receipt })
+    }
+
+    fn execute_recognition_input(
+        &self,
+        input: TensorInput,
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<NativeGraphOutput> {
+        let input_digest = ExecutionDigest::f32_tensor(&input.shape, &input.values);
+        let tensor = self
+            .recognition
+            .run_with_output_projection(input, permit, cancellation, projection::ctc_top1)
+            .map_err(|error| power_error("execute the projected OCR recognition graph", error))?;
+        let output_digest = ExecutionDigest::f32_tensor(&tensor.shape, &tensor.values);
+        let receipt = self.runtime.receipt(
+            self.recognition_identity.clone(),
+            input_digest,
+            output_digest,
+        );
         Ok(NativeGraphOutput { tensor, receipt })
     }
 }
@@ -229,7 +226,7 @@ pub(crate) fn batch_binding() -> UseResult<ExecutionBatchBinding> {
     ExecutionBatchBinding::new(
         bundle_weights_sha256(),
         named_sha256(b"a3s-ocr-ppocr-v6-staged-slot-layout-v2\0"),
-        named_sha256(b"a3s-ocr-ppocr-v6-shape-cohort-scheduler-v3\0"),
+        named_sha256(b"a3s-ocr-ppocr-v6-shape-cohort-scheduler-v4\0"),
     )
     .map_err(|error| power_error("bind the PP-OCRv6 staged batch", error))
 }
@@ -262,9 +259,10 @@ fn session_execution_sha256(assets: &ModelAssets) -> UseResult<String> {
         ))
     })?;
     let mut digest = Sha256::new();
-    digest.update(b"a3s-ocr-ppocr-v6-session-execution-v2\0");
+    digest.update(b"a3s-ocr-ppocr-v6-session-execution-v3\0");
     update_bytes(&mut digest, DETECTION_GRAPH.as_bytes())?;
     update_bytes(&mut digest, RECOGNITION_GRAPH.as_bytes())?;
+    update_bytes(&mut digest, projection::IDENTITY)?;
     update_bytes(&mut digest, &detection_config)?;
     update_bytes(&mut digest, &recognition_config)?;
     Ok(format!("{:x}", digest.finalize()))
@@ -300,6 +298,7 @@ struct GraphSpec {
     source_sha256: &'static str,
     source_opset: u32,
     weights_sha256: &'static str,
+    projection_revision: Option<&'static str>,
 }
 
 impl GraphSpec {
@@ -310,6 +309,7 @@ impl GraphSpec {
             source_sha256: DETECTION_SOURCE_SHA256,
             source_opset: 14,
             weights_sha256: DETECTION_WEIGHTS_SHA256,
+            projection_revision: None,
         }
     }
 
@@ -320,6 +320,7 @@ impl GraphSpec {
             source_sha256: RECOGNITION_SOURCE_SHA256,
             source_opset: 11,
             weights_sha256: RECOGNITION_WEIGHTS_SHA256,
+            projection_revision: Some(projection::REVISION),
         }
     }
 
@@ -334,9 +335,13 @@ impl GraphSpec {
     }
 
     fn model_identity(self) -> ModelIdentity {
+        let revision = self.projection_revision.map_or_else(
+            || REVISION.to_string(),
+            |projection| format!("{REVISION}+{projection}"),
+        );
         ModelIdentity::new(
             format!("{FAMILY}-{}", self.role),
-            REVISION,
+            revision,
             self.weights_sha256,
         )
     }
@@ -446,17 +451,7 @@ mod tests {
     #[test]
     #[ignore = "requires the pinned official PP-OCRv6 native bundle"]
     fn official_weights_execute_with_pinned_cpu_fixtures() {
-        let root = std::env::var_os("A3S_PPOCR_V6_MODEL")
-            .expect("A3S_PPOCR_V6_MODEL must name the pinned official model bundle");
-        let root = std::path::PathBuf::from(root);
-        let assets = ModelAssets {
-            root: root.clone(),
-            detection_weights: root.join("det/model.safetensors"),
-            detection_config: root.join("det/inference.yml"),
-            recognition_weights: root.join("rec/model.safetensors"),
-            recognition_config: root.join("rec/inference.yml"),
-            source: OcrInstallSource::Environment,
-        };
+        let assets = official_assets();
         let native = NativePpOcrV6::load(&assets).unwrap();
         let cancellation = CancellationToken::new();
         let permit = native.begin(&cancellation).unwrap();
@@ -509,30 +504,66 @@ mod tests {
             DETECTION_WEIGHTS_SHA256
         );
 
+        assert_official_recognition_projection(&native, &permit, &cancellation);
+    }
+
+    #[test]
+    #[ignore = "requires the pinned official PP-OCRv6 native bundle"]
+    fn official_recognition_projection_executes_on_selected_device() {
+        let native = NativePpOcrV6::load(&official_assets()).unwrap();
+        let cancellation = CancellationToken::new();
+        let permit = native.begin(&cancellation).unwrap();
+
+        assert_official_recognition_projection(&native, &permit, &cancellation);
+    }
+
+    fn official_assets() -> ModelAssets {
+        let root = std::env::var_os("A3S_PPOCR_V6_MODEL")
+            .expect("A3S_PPOCR_V6_MODEL must name the pinned official model bundle");
+        let root = std::path::PathBuf::from(root);
+        ModelAssets {
+            root: root.clone(),
+            detection_weights: root.join("det/model.safetensors"),
+            detection_config: root.join("det/inference.yml"),
+            recognition_weights: root.join("rec/model.safetensors"),
+            recognition_config: root.join("rec/inference.yml"),
+            source: OcrInstallSource::Environment,
+        }
+    }
+
+    fn assert_official_recognition_projection(
+        native: &NativePpOcrV6,
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) {
         let recognition = native
             .recognize(
                 vec![0.0; 3 * 48 * 320],
                 [1, 3, 48, 320],
-                &permit,
-                &cancellation,
+                permit,
+                cancellation,
             )
             .unwrap();
         let repeated_recognition = native
             .recognize(
                 vec![0.0; 3 * 48 * 320],
                 [1, 3, 48, 320],
-                &permit,
-                &cancellation,
+                permit,
+                cancellation,
             )
             .unwrap();
-        assert_eq!(recognition.tensor.shape, [1, 40, 18_710]);
+        assert_eq!(recognition.tensor.shape, [1, 40, 3]);
         assert_eq!(recognition.tensor, repeated_recognition.tensor);
         assert_eq!(
             recognition.receipt.output,
             repeated_recognition.receipt.output
         );
-        assert_eq!(recognition.receipt.output.byte_length, 2_993_600);
-        assert_eq!(recognition.receipt.output.item_count, 748_400);
+        assert_eq!(recognition.receipt.output.byte_length, 480);
+        assert_eq!(recognition.receipt.output.item_count, 120);
+        assert_eq!(
+            recognition.receipt.model.revision,
+            "paddlex-paddle3.0.0+ctc-top1-last-tie-finite-v1"
+        );
         assert_eq!(
             recognition.receipt.model.weights_sha256,
             RECOGNITION_WEIGHTS_SHA256

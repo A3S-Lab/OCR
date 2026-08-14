@@ -5,7 +5,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::{engine_error, EngineBlock, EngineExtraction, PpOcrV6Engine};
 use crate::cancellation::check_cancelled;
-use crate::postprocess::{decode_ctc, Detection, Recognition};
+use crate::postprocess::{decode_ctc_top1, Detection, Recognition};
 use crate::preprocess::{recognition_canvas_width, recognition_input};
 
 mod crop;
@@ -190,7 +190,7 @@ impl PpOcrV6Engine {
         let items = (0..crops.len())
             .map(|index| {
                 let start = index * item_len;
-                decode_ctc(
+                decode_ctc_top1(
                     &output[start..start + item_len],
                     &[1, shape[1], shape[2]],
                     &self.recognition_config,
