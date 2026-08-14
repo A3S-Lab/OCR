@@ -66,6 +66,10 @@ client and exact model bundle.
       4,000-pixel quality bound while preserving both receipts.
 - [x] Build detection tensors and DB postprocessing with at most 16 bounded
       workers while restoring deterministic slot order and isolating failures.
+- [x] Pin Power's one-kernel CUDA lowering for all 17 reviewed detection and 14
+      recognition multiplier-one depthwise layers. Detection bias remains one
+      final round-to-nearest add in the fused kernel; CPU and unsupported
+      layouts retain the existing fallback.
 - [x] Cover mixed canvas shapes, padding exclusion, coordinate projection,
       output slicing, bounds, and an official-model scalar/batch gate with the
       TurboOCR-derived ASCII-token F1 floor of 0.95.

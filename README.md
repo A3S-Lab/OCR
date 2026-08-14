@@ -300,6 +300,15 @@ bytes (**6,236.7x**). The projection revision is part of the model/session
 execution identity, and the execution receipt commits to the exact projected
 tensor consumed by CTC decoding.
 
+The pinned Power runtime also fuses the reviewed CUDA multiplier-one depthwise
+convolutions: 17 detection layers and 14 recognition layers now execute one
+F32 kernel per node instead of one device-wide multiply/add sequence per kernel
+position. Detection bias is applied in the same kernel after the final term.
+Explicit round-to-nearest arithmetic retains the prior accumulation order, and
+Power's selected-device parity gate is byte-exact; CPU and unsupported tensor
+layouts retain their existing paths. OCR still owns the graph inventory and
+end-to-end output parity.
+
 The current quality evidence covers the pinned 30-block official image and
 clear 8-point and 12-point PDF text rendered at 144 DPI. Five-point synthetic
 text did not pass exact publication and is not a supported quality claim. The
@@ -556,7 +565,7 @@ pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
 
 The staged PP-OCRv6 integration pins the release-ready A3S Power 0.8.0 revision
-`9a6aaccb787c43d6ae7d5e1eb3194c22917a37f7`. Source builds and CI execute that
+`6ebd922c7d882411f4a46ed48cd0078022d00cd4`. Source builds and CI execute that
 exact Git revision. Package verification additionally resolves the declared
 `=0.8.0` registry dependency, so the package gate remains closed until the same
 Power release is visible on crates.io. No path or `[patch.crates-io]` override
