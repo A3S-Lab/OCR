@@ -385,11 +385,17 @@ equal-canvas coalescing plus parallel recognition preprocessing first reduced
 the 29-page CUDA median from 8.400 to 6.834 seconds. The current byte-exact GELU
 fusion then reduced five-run, alternating-order medians from 1.489 to 1.463
 seconds for the six-page table document (4.101 pages/s) and from 6.255 to 5.838
-seconds for the 29-page rider-seal document (4.968 pages/s). Current single-run
-CPU captures took 46.334 seconds (0.129 pages/s) and 334.596 seconds (0.087
-pages/s), respectively. The CUDA result is still below the 10-pages/s complete
-fine-parse target. These are fixture-specific correctness and latency
-diagnostics, not corpus-wide OCR accuracy or throughput claims.
+seconds for the 29-page rider-seal document (4.968 pages/s). A subsequent
+channel-bias-fusion A/B under the current machine load used nine alternating
+runs for the table gate and five for the seal gate: medians fell from 1.387 to
+1.340 seconds (4.326 to 4.478 pages/s, 3.4% lower latency) and from 6.067 to
+5.960 seconds (4.780 to 4.866 pages/s, 1.8% lower latency), respectively. Every
+run retained the same text, table continuation, cell, seal-position, and
+boundary-fragment assertions. Current single-run CPU captures took 46.334
+seconds (0.129 pages/s) and 334.596 seconds (0.087 pages/s), respectively. The
+CUDA result is still below the 10-pages/s complete fine-parse target. These are
+fixture-specific correctness and latency diagnostics, not corpus-wide OCR
+accuracy or throughput claims.
 
 Recognition no longer materializes the complete 18,710-class probability row
 on the host. OCR applies a deterministic model-owned projection on the Power
@@ -430,6 +436,18 @@ remove four launches per chain without rewriting the OCR-owned graph; the 138
 recognition calls in the retained 29-page seal gate therefore avoid 7,176
 launches. CPU and every unmatched graph, dtype, layout, device, output, or
 shared intermediate retain ordinary node-by-node execution.
+
+The recognition graph additionally contains 10 `Conv`-bias-ReLU prefixes, 13
+`Conv`-bias prefixes feeding those GELU chains, and five `Conv`-bias prefixes
+feeding gated HardSigmoid multiplies. An OCR-owned topology test locks the 28
+counts, exact F32 `[1,C,1,1]` bias shapes against convolution output channels,
+identity depth, and private-consumer relationships. The pinned Power executor
+keeps each convolution on its existing backend and folds the channel addition
+into the following byte-exact CUDA activation. Each recognition call avoids 28
+more full-tensor launches and buffers; the retained 138-call seal gate avoids
+3,864. Launch-bounded 32-bit channel indexing is required for the measured fast
+path. CPU and every unreviewed bias, shape, topology, device, dtype, or layout
+retain the ordinary graph.
 
 The current quality evidence covers the pinned 30-block official image and
 clear 8-point and 12-point PDF text rendered at 144 DPI. Five-point synthetic

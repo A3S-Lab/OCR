@@ -188,14 +188,17 @@ continuations. The full 29-page rider-seal gate reduces 2,583 detected crops to
 138 physical recognition calls while retaining the CUDA text fingerprint,
 structured-geometry fingerprint, 12 confirmed seals, and two reconciled
 right-boundary fragments. On the named RTX 4090, the current five-run,
-alternating-order medians are 1.463 seconds (4.101 pages/s) for the table
+alternating-order GELU medians were 1.463 seconds (4.101 pages/s) for the table
 document and 5.838 seconds (4.968 pages/s) for the rider-seal document, versus
-same-run pre-fusion medians of 1.489 and 6.255 seconds. Current single-run CPU
-captures are 46.334 seconds (0.129 pages/s) and 334.596 seconds (0.087 pages/s),
-respectively. Whitespace-only CTC results are filtered after inference because
-Parser cannot publish empty text blocks; detector-score overlap rules out a
-safe confidence prefilter. Broader official-image and corpus certification
-remains open.
+same-run pre-fusion medians of 1.489 and 6.255 seconds. The later channel-bias
+A/B used nine alternating table runs and five seal runs under the current load:
+1.387 to 1.340 seconds (4.326 to 4.478 pages/s) and 6.067 to 5.960 seconds
+(4.780 to 4.866 pages/s). Every run retained the same text and structured
+geometry. Current single-run CPU captures are 46.334 seconds (0.129 pages/s)
+and 334.596 seconds (0.087 pages/s), respectively. Whitespace-only CTC results
+are filtered after inference because Parser cannot publish empty text blocks;
+detector-score overlap rules out a safe confidence prefilter. Broader
+official-image and corpus certification remains open.
 
 The reviewed plans also retain an explicit inventory of adjacent,
 single-consumer `HardSigmoid`-to-`Mul` channel gates: 13 in detection and five
@@ -217,6 +220,16 @@ chain avoids four intermediate buffers, and each recognition graph call avoids
 52 launches; the 29-page gate's 138 physical calls avoid 7,176 launches. The
 graph declaration, session identity, receipts, CTC projection, and CPU path
 remain unchanged.
+
+Recognition also locks 28 convolution/channel-bias activation prefixes: 10
+ReLU, 13 error-function GELU, and five gated HardSigmoid multiply windows. The
+inventory gate verifies exact F32 `[1,C,1,1]` bias shapes against convolution
+output channels, bounded identity chains, and private consumer counts. Power
+retains the ordinary convolution backend and folds only the channel addition
+into the reviewed activation kernel, using 32-bit indexing after the existing
+`u32` launch bound. This removes 28 further launches per recognition call, or
+3,864 across the retained 138-call seal gate, without changing OCR topology,
+receipts, CPU behavior, or any unsupported fallback.
 
 The pinned official 30-block image and clear 8-point and 12-point PDF text at
 144 DPI pass exact consumer gates. Five-point synthetic text does not, so the

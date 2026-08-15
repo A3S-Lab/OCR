@@ -18,6 +18,8 @@ use tokio_util::sync::CancellationToken;
 use crate::assets::ModelAssets;
 
 mod projection;
+#[cfg(test)]
+mod topology_tests;
 
 const FAMILY: &str = "pp-ocr-v6-small";
 const REVISION: &str = "paddlex-paddle3.0.0";

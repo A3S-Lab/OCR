@@ -112,6 +112,12 @@ client and exact model bundle.
       five-run alternating-order medians fall from 1.489 to 1.463 seconds for
       the six-page table document and from 6.255 to 5.838 seconds for the
       29-page rider-seal document without changing text or structured geometry.
+- [x] Lock 10 biased ReLU, 13 biased GELU, and five biased gated-HardSigmoid
+      recognition prefixes and pin Power's byte-exact channel-bias CUDA
+      lowering. Nine-run table medians fall from 1.387 to 1.340 seconds and
+      five-run seal medians from 6.067 to 5.960 seconds while exact table
+      continuations, cells, seal positions, and boundary fragments remain
+      unchanged.
 - [ ] Define measured static shape classes and a fill threshold with the exact
       dynamic-width path as fallback; never pad unboundedly merely to hit a
       static class.
@@ -170,7 +176,8 @@ client and exact model bundle.
       baseline and does not meet the fine-parse target.
 - [ ] Reduce the remaining PP-OCRv6 recognition graph cost. On the retained
       29-page CUDA gate, 138 width-cohort calls dominate the optimized path;
-      complete text-plus-seal throughput is 4.968 pages/s, not 10 pages/s.
+      the latest channel-bias A/B median is 5.960 seconds (4.866 pages/s), not
+      10 pages/s.
 
 ## Cross-repository sequence
 
