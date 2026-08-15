@@ -59,6 +59,20 @@ SLANET_PLUS_ENCODER_SHA256 = (
     "dbd5431b4051b0f3037e3f8650dba4297cdf38a6a132ac9ccf57886184f4b66e"
 )
 SLANET_PLUS_SHAPE_CONSUMERS = {"Concat", "Slice"}
+SLANET_PLUS_CONTROL_RESHAPE_OUTPUTS = {
+    "helper.reshape.0",
+    "helper.reshape.1",
+    "helper.reshape.2",
+    "helper.reshape.3",
+    "helper.reshape.4",
+    "helper.reshape.5",
+    "helper.reshape.6",
+}
+SLANET_PLUS_RESIZE_SCALES = {
+    "nearest_interp_v2_0.tmp_0": 31.0 / 16.0,
+    "nearest_interp_v2_1.tmp_0": 61.0 / 31.0,
+    "nearest_interp_v2_2.tmp_0": 2.0,
+}
 
 
 def sha256(path: Path) -> str:
@@ -203,6 +217,63 @@ def convert(
                     "inputs": inputs,
                     "outputs": outputs,
                     "attributes": {},
+                }
+            )
+            continue
+        if (
+            slanet_plus_encoder
+            and node.op_type == "Reshape"
+            and len(outputs) == 1
+            and outputs[0] in SLANET_PLUS_CONTROL_RESHAPE_OUTPUTS
+        ):
+            if (
+                len(inputs) != 2
+                or attributes not in ({}, {"allowzero": 0})
+                or consumers.get(outputs[0]) != ["Cast"]
+            ):
+                raise ValueError(
+                    f"unreviewed SLANet-Plus control Reshape node {name!r}"
+                )
+            nodes.append(
+                {
+                    "name": f"{name}.__control_identity",
+                    "op": "Identity",
+                    "inputs": [inputs[0]],
+                    "outputs": outputs,
+                    "attributes": {},
+                }
+            )
+            continue
+        if (
+            slanet_plus_encoder
+            and node.op_type == "Resize"
+            and len(outputs) == 1
+            and outputs[0] in SLANET_PLUS_RESIZE_SCALES
+        ):
+            expected_attributes = {
+                "coordinate_transformation_mode": "asymmetric",
+                "mode": "nearest",
+                "nearest_mode": "floor",
+            }
+            if len(inputs) != 4 or attributes != expected_attributes:
+                raise ValueError(f"unreviewed SLANet-Plus Resize node {name!r}")
+            scale_name = f"a3s.slanet_plus.resize_scales.{name}"
+            scale = SLANET_PLUS_RESIZE_SCALES[outputs[0]]
+            tensors[scale_name] = np.asarray([1.0, 1.0, scale, scale], dtype=np.float32)
+            initializers.append(
+                {
+                    "name": scale_name,
+                    "dtype": "float32",
+                    "shape": [4],
+                }
+            )
+            nodes.append(
+                {
+                    "name": name,
+                    "op": "Resize",
+                    "inputs": [inputs[0], inputs[1], scale_name],
+                    "outputs": outputs,
+                    "attributes": attributes,
                 }
             )
             continue

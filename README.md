@@ -133,7 +133,11 @@ can complete; unimplemented stages are returned as `unsupported`, never
 inferred from text. The compatibility adapter for existing providers supports
 only the text stage. PP-OCRv6 currently declares preprocessing and text, where
 preprocessing means bounded image decode and canonicalization. It does not yet
-claim table or seal detection.
+claim table or seal detection. The separately constructed
+`DocumentFastOcrProvider` composes that text provider with the pinned
+SLANet-Plus wired-table model and declares preprocessing, text, and table. It
+is explicit rather than the default because its additional model bundle and
+table-only limitations must remain visible to the host.
 
 Staged-batch schema v2 requires every completed table or seal stage to carry a
 bounded typed payload on the exact source-image pixel canvas. Table evidence
@@ -145,6 +149,35 @@ envelopes, out-of-canvas regions, overlapping or out-of-grid cells, fabricated
 clipping, duplicate identities, and unbounded text before publishing a result.
 Cross-page table reconciliation remains a Parser responsibility; OCR produces
 page-local evidence and never joins pages itself.
+
+### Opt-in wired-table provider
+
+Set `A3S_OCR_SLANET_PLUS_MODEL_DIR` to a reviewed local bundle with this exact
+inventory:
+
+~~~text
+encoder/model.safetensors
+slanext_wired_decoder.bin
+slanext_dict_infer.txt
+~~~
+
+Then inject the provider explicitly:
+
+~~~rust
+use a3s_use_ocr::{DocumentFastOcrProvider, OcrClient, UseResult};
+
+fn document_fast_client() -> UseResult<OcrClient> {
+    OcrClient::with_provider(DocumentFastOcrProvider::from_env()?)
+}
+~~~
+
+The provider admits conservative wired-table crops from intersecting page
+rules, runs the fixed 488-pixel SLANet-Plus encoder through A3S Power, decodes
+the autoregressive structure and cell quadrilaterals locally, and assigns
+PP-OCRv6 text blocks to model cells by source-pixel geometry. A line candidate
+alone is never published as table evidence. Borderless tables and seals remain
+unsupported, and page-local fragments are not labeled as cross-page
+continuations by OCR.
 
 A request contains 1 through 256 unique slots and at most 256 MiB of validated
 input bytes in addition to the existing 32 MiB per-image limit. Malformed
@@ -224,6 +257,7 @@ Provider choice is a typed object, never a raw backend-name switch.
 | Provider | OCR-owned implementation | Execution substrate | Source boundary |
 | --- | --- | --- | --- |
 | `PpOcrV6Provider` | Detection/recognition graphs, image pipeline, DB/CTC postprocessing | Embedded A3S Power | Always on device |
+| `DocumentFastOcrProvider` | PP-OCRv6 text plus SLANet-Plus wired-table admission, structure decode, cell geometry, and text matching | Embedded A3S Power | Always on device |
 | `UnlimitedOcrProvider` | Vision towers, projector, decoder, tokenizer, generation, and grounding | Embedded A3S Power | Always on device |
 | Custom `OcrProvider` | Defined by the implementation | Defined by the implementation | Required in its descriptor |
 
@@ -531,6 +565,7 @@ visible to the MCP host instead of looking like a local-only read.
 | --- | --- |
 | `power-runtime` | Model-neutral embedded A3S Power runtime; never enables its server feature |
 | `ppocr-v6` | Local PP-OCRv6 provider, native graph plans, installer, image pipeline |
+| `ppocr-v6-cuda` | PP-OCRv6 and document-fast table inference through Power's NVIDIA CUDA path |
 | `benchmark` | PP-OCRv6 real-image cold/warm execution-baseline binary |
 | `unlimited-ocr` | Native CPU Unlimited-OCR model, tokenizer, image pipeline, generation, and grounding |
 | `unlimited-ocr-accelerate` | Unlimited-OCR plus Apple Accelerate CPU kernels with reviewed BF16 operation boundaries |

@@ -1,0 +1,9942 @@
+{
+  "family": "slanet-plus",
+  "initializers": [
+    {
+      "dtype": "int64",
+      "name": "Cast.20",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "Cast.22",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "a3s.slanet_plus.resize_scales.Resize.0",
+      "shape": [
+        4
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "a3s.slanet_plus.resize_scales.Resize.1",
+      "shape": [
+        4
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "a3s.slanet_plus.resize_scales.Resize.2",
+      "shape": [
+        4
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_0.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_0.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_0.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_0.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_1.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_1.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_1.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_1.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_10.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_10.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_10.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_10.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_11.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_11.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_11.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_11.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_12.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_12.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_12.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_12.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_13.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_13.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_13.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_13.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_14.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_14.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_14.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_14.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_15.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_15.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_15.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_15.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_16.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_16.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_16.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_16.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_17.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_17.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_17.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_17.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_18.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_18.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_18.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_18.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_19.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_19.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_19.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_19.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_2.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_2.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_2.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_2.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_20.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_20.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_20.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_20.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_21.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_21.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_21.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_21.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_22.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_22.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_22.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_22.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_23.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_23.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_23.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_23.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_24.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_24.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_24.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_24.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_25.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_25.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_25.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_25.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_26.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_26.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_26.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_26.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_27.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_27.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_27.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_27.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_28.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_28.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_28.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_28.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_29.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_29.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_29.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_29.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_3.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_3.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_3.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_3.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_30.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_30.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_30.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_30.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_31.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_31.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_31.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_31.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_32.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_32.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_32.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_32.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_33.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_33.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_33.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_33.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_34.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_34.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_34.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_34.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_35.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_35.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_35.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_35.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_36.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_36.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_36.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_36.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_37.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_37.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_37.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_37.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_38.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_38.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_38.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_38.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_39.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_39.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_39.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_39.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_4.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_4.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_4.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_4.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_40.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_40.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_40.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_40.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_41.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_41.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_41.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_41.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_42.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_42.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_42.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_42.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_43.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_43.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_43.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_43.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_44.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_44.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_44.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_44.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_45.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_45.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_45.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_45.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_5.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_5.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_5.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_5.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_6.b_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_6.w_0",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_6.w_1",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_6.w_2",
+      "shape": [
+        96
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_7.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_7.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_7.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_7.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_8.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_8.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_8.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_8.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_9.b_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_9.w_0",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_9.w_1",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm2d_9.w_2",
+      "shape": [
+        48
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_0.b_0",
+      "shape": [
+        16
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_0.w_0",
+      "shape": [
+        16
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_0.w_1",
+      "shape": [
+        16
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_0.w_2",
+      "shape": [
+        16
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_1.b_0",
+      "shape": [
+        16
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_1.w_0",
+      "shape": [
+        16
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_1.w_1",
+      "shape": [
+        16
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_1.w_2",
+      "shape": [
+        16
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_10.b_0",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_10.w_0",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_10.w_1",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_10.w_2",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_11.b_0",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_11.w_0",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_11.w_1",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_11.w_2",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_12.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_12.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_12.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_12.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_13.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_13.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_13.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_13.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_14.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_14.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_14.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_14.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_15.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_15.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_15.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_15.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_16.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_16.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_16.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_16.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_17.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_17.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_17.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_17.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_18.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_18.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_18.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_18.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_19.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_19.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_19.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_19.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_2.b_0",
+      "shape": [
+        32
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_2.w_0",
+      "shape": [
+        32
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_2.w_1",
+      "shape": [
+        32
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_2.w_2",
+      "shape": [
+        32
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_20.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_20.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_20.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_20.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_21.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_21.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_21.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_21.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_22.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_22.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_22.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_22.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_23.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_23.w_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_23.w_1",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_23.w_2",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_24.b_0",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_24.w_0",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_24.w_1",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_24.w_2",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_25.b_0",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_25.w_0",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_25.w_1",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_25.w_2",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_26.b_0",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_26.w_0",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_26.w_1",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_26.w_2",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_3.b_0",
+      "shape": [
+        32
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_3.w_0",
+      "shape": [
+        32
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_3.w_1",
+      "shape": [
+        32
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_3.w_2",
+      "shape": [
+        32
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_4.b_0",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_4.w_0",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_4.w_1",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_4.w_2",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_5.b_0",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_5.w_0",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_5.w_1",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_5.w_2",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_6.b_0",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_6.w_0",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_6.w_1",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_6.w_2",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_7.b_0",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_7.w_0",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_7.w_1",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_7.w_2",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_8.b_0",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_8.w_0",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_8.w_1",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_8.w_2",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_9.b_0",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_9.w_0",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_9.w_1",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "batch_norm_9.w_2",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_0.w_0",
+      "shape": [
+        16,
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_1.w_0",
+      "shape": [
+        16,
+        1,
+        3,
+        3
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_10.w_0",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_11.w_0",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_12.w_0",
+      "shape": [
+        256,
+        128,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_13.w_0",
+      "shape": [
+        256,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_14.w_0",
+      "shape": [
+        256,
+        256,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_15.w_0",
+      "shape": [
+        256,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_16.w_0",
+      "shape": [
+        256,
+        256,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_17.w_0",
+      "shape": [
+        256,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_18.w_0",
+      "shape": [
+        256,
+        256,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_19.w_0",
+      "shape": [
+        256,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_2.w_0",
+      "shape": [
+        32,
+        16,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_20.w_0",
+      "shape": [
+        256,
+        256,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_21.w_0",
+      "shape": [
+        256,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_22.w_0",
+      "shape": [
+        256,
+        256,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_23.w_0",
+      "shape": [
+        256,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_24.b_0",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_24.w_0",
+      "shape": [
+        64,
+        256,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_25.b_0",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_25.w_0",
+      "shape": [
+        256,
+        64,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_26.w_0",
+      "shape": [
+        512,
+        256,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_27.w_0",
+      "shape": [
+        512,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_28.b_0",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_28.w_0",
+      "shape": [
+        128,
+        512,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_29.b_0",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_29.w_0",
+      "shape": [
+        512,
+        128,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_3.w_0",
+      "shape": [
+        32,
+        1,
+        3,
+        3
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_30.w_0",
+      "shape": [
+        512,
+        512,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_31.w_0",
+      "shape": [
+        96,
+        64,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_32.w_0",
+      "shape": [
+        96,
+        128,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_33.w_0",
+      "shape": [
+        96,
+        256,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_34.w_0",
+      "shape": [
+        96,
+        512,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_35.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_36.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_37.w_0",
+      "shape": [
+        96,
+        96,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_38.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_39.w_0",
+      "shape": [
+        48,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_4.w_0",
+      "shape": [
+        64,
+        32,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_40.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_41.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_42.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_43.w_0",
+      "shape": [
+        96,
+        96,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_44.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_45.w_0",
+      "shape": [
+        48,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_46.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_47.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_48.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_49.w_0",
+      "shape": [
+        96,
+        96,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_5.w_0",
+      "shape": [
+        64,
+        1,
+        3,
+        3
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_50.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_51.w_0",
+      "shape": [
+        48,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_52.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_53.w_0",
+      "shape": [
+        96,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_54.w_0",
+      "shape": [
+        96,
+        96,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_55.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_56.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_57.w_0",
+      "shape": [
+        96,
+        96,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_58.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_59.w_0",
+      "shape": [
+        48,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_6.w_0",
+      "shape": [
+        64,
+        64,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_60.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_61.w_0",
+      "shape": [
+        96,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_62.w_0",
+      "shape": [
+        96,
+        96,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_63.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_64.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_65.w_0",
+      "shape": [
+        96,
+        96,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_66.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_67.w_0",
+      "shape": [
+        48,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_68.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_69.w_0",
+      "shape": [
+        96,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_7.w_0",
+      "shape": [
+        64,
+        1,
+        3,
+        3
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_70.w_0",
+      "shape": [
+        96,
+        96,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_71.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_72.w_0",
+      "shape": [
+        48,
+        192,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_73.w_0",
+      "shape": [
+        96,
+        96,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_74.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_75.w_0",
+      "shape": [
+        48,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_76.w_0",
+      "shape": [
+        48,
+        48,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_8.w_0",
+      "shape": [
+        128,
+        64,
+        1,
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "conv2d_9.w_0",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.10",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.11",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.12",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.13",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.14",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.15",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "helper.constant.16",
+      "shape": [
+        0
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "helper.constant.17",
+      "shape": [
+        0
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.18",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.19",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.20",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.21",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.22",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.23",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.24",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.25",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.26",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.27",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.28",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.29",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.30",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.31",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.32",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "helper.constant.33",
+      "shape": [
+        0
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "helper.constant.34",
+      "shape": [
+        0
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.35",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.36",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.37",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.38",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.39",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.4",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.40",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.41",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.42",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.43",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.44",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.45",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.46",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.47",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.48",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.49",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.5",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "helper.constant.50",
+      "shape": [
+        0
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "helper.constant.51",
+      "shape": [
+        0
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.52",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.53",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.54",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.6",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.60",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.61",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.62",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.63",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.64",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.65",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.7",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.8",
+      "shape": [
+        1
+      ]
+    },
+    {
+      "dtype": "int64",
+      "name": "helper.constant.9",
+      "shape": [
+        1
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "name": "x",
+      "shape": [
+        "DynamicDimension.0",
+        3,
+        "DynamicDimension.1",
+        "DynamicDimension.2"
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          3,
+          3
+        ],
+        "pads": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "strides": [
+          2,
+          2
+        ]
+      },
+      "inputs": [
+        "x",
+        "conv2d_0.w_0"
+      ],
+      "name": "Conv.0",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_0.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_0.tmp_0",
+        "batch_norm_0.w_0",
+        "batch_norm_0.b_0",
+        "batch_norm_0.w_1",
+        "batch_norm_0.w_2"
+      ],
+      "name": "BatchNormalization.0",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_0.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_0.tmp_3"
+      ],
+      "name": "HardSwish.0.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_0.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_0.tmp_3",
+        "hardswish_0.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.0.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_0.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 16,
+        "kernel_shape": [
+          3,
+          3
+        ],
+        "pads": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_0.tmp_0",
+        "conv2d_1.w_0"
+      ],
+      "name": "Conv.1",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_0.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_0.tmp_0",
+        "batch_norm_1.w_0",
+        "batch_norm_1.b_0",
+        "batch_norm_1.w_1",
+        "batch_norm_1.w_2"
+      ],
+      "name": "BatchNormalization.1",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_1.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_1.tmp_3"
+      ],
+      "name": "HardSwish.1.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_1.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_1.tmp_3",
+        "hardswish_1.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.1.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_1.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_1.tmp_0",
+        "conv2d_2.w_0"
+      ],
+      "name": "Conv.2",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_1.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_1.tmp_0",
+        "batch_norm_2.w_0",
+        "batch_norm_2.b_0",
+        "batch_norm_2.w_1",
+        "batch_norm_2.w_2"
+      ],
+      "name": "BatchNormalization.2",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_2.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_2.tmp_3"
+      ],
+      "name": "HardSwish.2.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_2.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_2.tmp_3",
+        "hardswish_2.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.2.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_2.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 32,
+        "kernel_shape": [
+          3,
+          3
+        ],
+        "pads": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "strides": [
+          2,
+          2
+        ]
+      },
+      "inputs": [
+        "hardswish_2.tmp_0",
+        "conv2d_3.w_0"
+      ],
+      "name": "Conv.3",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_1.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_1.tmp_0",
+        "batch_norm_3.w_0",
+        "batch_norm_3.b_0",
+        "batch_norm_3.w_1",
+        "batch_norm_3.w_2"
+      ],
+      "name": "BatchNormalization.3",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_3.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_3.tmp_3"
+      ],
+      "name": "HardSwish.3.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_3.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_3.tmp_3",
+        "hardswish_3.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.3.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_3.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_3.tmp_0",
+        "conv2d_4.w_0"
+      ],
+      "name": "Conv.4",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_2.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_2.tmp_0",
+        "batch_norm_4.w_0",
+        "batch_norm_4.b_0",
+        "batch_norm_4.w_1",
+        "batch_norm_4.w_2"
+      ],
+      "name": "BatchNormalization.4",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_4.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_4.tmp_3"
+      ],
+      "name": "HardSwish.4.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_4.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_4.tmp_3",
+        "hardswish_4.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.4.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_4.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 64,
+        "kernel_shape": [
+          3,
+          3
+        ],
+        "pads": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_4.tmp_0",
+        "conv2d_5.w_0"
+      ],
+      "name": "Conv.5",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_2.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_2.tmp_0",
+        "batch_norm_5.w_0",
+        "batch_norm_5.b_0",
+        "batch_norm_5.w_1",
+        "batch_norm_5.w_2"
+      ],
+      "name": "BatchNormalization.5",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_5.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_5.tmp_3"
+      ],
+      "name": "HardSwish.5.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_5.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_5.tmp_3",
+        "hardswish_5.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.5.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_5.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_5.tmp_0",
+        "conv2d_6.w_0"
+      ],
+      "name": "Conv.6",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_3.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_3.tmp_0",
+        "batch_norm_6.w_0",
+        "batch_norm_6.b_0",
+        "batch_norm_6.w_1",
+        "batch_norm_6.w_2"
+      ],
+      "name": "BatchNormalization.6",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_6.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_6.tmp_3"
+      ],
+      "name": "HardSwish.6.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_6.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_6.tmp_3",
+        "hardswish_6.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.6.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_6.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 64,
+        "kernel_shape": [
+          3,
+          3
+        ],
+        "pads": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "strides": [
+          2,
+          2
+        ]
+      },
+      "inputs": [
+        "hardswish_6.tmp_0",
+        "conv2d_7.w_0"
+      ],
+      "name": "Conv.7",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_3.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_6.tmp_0",
+        "conv2d_31.w_0"
+      ],
+      "name": "Conv.31",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_18.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_3.tmp_0",
+        "batch_norm_7.w_0",
+        "batch_norm_7.b_0",
+        "batch_norm_7.w_1",
+        "batch_norm_7.w_2"
+      ],
+      "name": "BatchNormalization.7",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_7.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_18.tmp_0",
+        "batch_norm2d_0.w_0",
+        "batch_norm2d_0.b_0",
+        "batch_norm2d_0.w_1",
+        "batch_norm2d_0.w_2"
+      ],
+      "name": "BatchNormalization.27",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_0.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_7.tmp_3"
+      ],
+      "name": "HardSwish.7.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_7.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_7.tmp_3",
+        "hardswish_7.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.7.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_7.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_0.tmp_6"
+      ],
+      "name": "HardSwish.27.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_27.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_0.tmp_6",
+        "hardswish_27.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.27.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_27.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_7.tmp_0",
+        "conv2d_8.w_0"
+      ],
+      "name": "Conv.8",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_4.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_27.tmp_0"
+      ],
+      "name": "Shape.8",
+      "op": "Shape",
+      "outputs": [
+        "Shape.9"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_4.tmp_0",
+        "batch_norm_8.w_0",
+        "batch_norm_8.b_0",
+        "batch_norm_8.w_1",
+        "batch_norm_8.w_2"
+      ],
+      "name": "BatchNormalization.8",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_8.tmp_3"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Shape.9"
+      ],
+      "name": "Cast.10.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "shape_2.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_8.tmp_3"
+      ],
+      "name": "HardSwish.8.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_8.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_8.tmp_3",
+        "hardswish_8.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.8.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_8.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_2.tmp_0",
+        "helper.constant.38",
+        "helper.constant.39",
+        "helper.constant.41",
+        "helper.constant.40"
+      ],
+      "name": "Slice.10",
+      "op": "Slice",
+      "outputs": [
+        "Slice.11"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_2.tmp_0",
+        "helper.constant.43",
+        "helper.constant.44",
+        "helper.constant.46",
+        "helper.constant.45"
+      ],
+      "name": "Slice.12",
+      "op": "Slice",
+      "outputs": [
+        "Slice.13"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 128,
+        "kernel_shape": [
+          3,
+          3
+        ],
+        "pads": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_8.tmp_0",
+        "conv2d_9.w_0"
+      ],
+      "name": "Conv.9",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_4.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Slice.11",
+        "helper.constant.42"
+      ],
+      "name": "Squeeze.4",
+      "op": "Squeeze",
+      "outputs": [
+        "shape_2.tmp_0_slice_1"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Slice.13",
+        "helper.constant.47"
+      ],
+      "name": "Squeeze.5",
+      "op": "Squeeze",
+      "outputs": [
+        "shape_2.tmp_0_slice_2"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_4.tmp_0",
+        "batch_norm_9.w_0",
+        "batch_norm_9.b_0",
+        "batch_norm_9.w_1",
+        "batch_norm_9.w_2"
+      ],
+      "name": "BatchNormalization.9",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_9.tmp_3"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_2.tmp_0_slice_1"
+      ],
+      "name": "Reshape.8.__control_identity",
+      "op": "Identity",
+      "outputs": [
+        "helper.reshape.4"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_2.tmp_0_slice_2"
+      ],
+      "name": "Reshape.9.__control_identity",
+      "op": "Identity",
+      "outputs": [
+        "helper.reshape.5"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_9.tmp_3"
+      ],
+      "name": "HardSwish.9.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_9.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_9.tmp_3",
+        "hardswish_9.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.9.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_9.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "helper.reshape.4"
+      ],
+      "name": "Cast.11.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "Cast.12"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "helper.reshape.5"
+      ],
+      "name": "Cast.13.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "Cast.14"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_9.tmp_0",
+        "conv2d_10.w_0"
+      ],
+      "name": "Conv.10",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_5.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 0
+      },
+      "inputs": [
+        "Cast.12",
+        "Cast.14"
+      ],
+      "name": "Concat.12",
+      "op": "Concat",
+      "outputs": [
+        "helper.concat.4"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_5.tmp_0",
+        "batch_norm_10.w_0",
+        "batch_norm_10.b_0",
+        "batch_norm_10.w_1",
+        "batch_norm_10.w_2"
+      ],
+      "name": "BatchNormalization.10",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_10.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_10.tmp_3"
+      ],
+      "name": "HardSwish.10.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_10.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_10.tmp_3",
+        "hardswish_10.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.10.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_10.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 128,
+        "kernel_shape": [
+          3,
+          3
+        ],
+        "pads": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "strides": [
+          2,
+          2
+        ]
+      },
+      "inputs": [
+        "hardswish_10.tmp_0",
+        "conv2d_11.w_0"
+      ],
+      "name": "Conv.11",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_5.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_10.tmp_0",
+        "conv2d_32.w_0"
+      ],
+      "name": "Conv.32",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_19.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_5.tmp_0",
+        "batch_norm_11.w_0",
+        "batch_norm_11.b_0",
+        "batch_norm_11.w_1",
+        "batch_norm_11.w_2"
+      ],
+      "name": "BatchNormalization.11",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_11.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_19.tmp_0",
+        "batch_norm2d_1.w_0",
+        "batch_norm2d_1.b_0",
+        "batch_norm2d_1.w_1",
+        "batch_norm2d_1.w_2"
+      ],
+      "name": "BatchNormalization.28",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_1.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_11.tmp_3"
+      ],
+      "name": "HardSwish.11.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_11.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_11.tmp_3",
+        "hardswish_11.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.11.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_11.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_1.tmp_6"
+      ],
+      "name": "HardSwish.28.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_28.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_1.tmp_6",
+        "hardswish_28.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.28.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_28.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_11.tmp_0",
+        "conv2d_12.w_0"
+      ],
+      "name": "Conv.12",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_6.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_28.tmp_0"
+      ],
+      "name": "Shape.4",
+      "op": "Shape",
+      "outputs": [
+        "Shape.5"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_6.tmp_0",
+        "batch_norm_12.w_0",
+        "batch_norm_12.b_0",
+        "batch_norm_12.w_1",
+        "batch_norm_12.w_2"
+      ],
+      "name": "BatchNormalization.12",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_12.tmp_3"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Shape.5"
+      ],
+      "name": "Cast.5.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "shape_1.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_12.tmp_3"
+      ],
+      "name": "HardSwish.12.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_12.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_12.tmp_3",
+        "hardswish_12.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.12.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_12.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_1.tmp_0",
+        "helper.constant.21",
+        "helper.constant.22",
+        "helper.constant.24",
+        "helper.constant.23"
+      ],
+      "name": "Slice.5",
+      "op": "Slice",
+      "outputs": [
+        "Slice.6"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_1.tmp_0",
+        "helper.constant.26",
+        "helper.constant.27",
+        "helper.constant.29",
+        "helper.constant.28"
+      ],
+      "name": "Slice.7",
+      "op": "Slice",
+      "outputs": [
+        "Slice.8"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 256,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_12.tmp_0",
+        "conv2d_13.w_0"
+      ],
+      "name": "Conv.13",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_6.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Slice.6",
+        "helper.constant.25"
+      ],
+      "name": "Squeeze.2",
+      "op": "Squeeze",
+      "outputs": [
+        "shape_1.tmp_0_slice_1"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Slice.8",
+        "helper.constant.30"
+      ],
+      "name": "Squeeze.3",
+      "op": "Squeeze",
+      "outputs": [
+        "shape_1.tmp_0_slice_2"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_6.tmp_0",
+        "batch_norm_13.w_0",
+        "batch_norm_13.b_0",
+        "batch_norm_13.w_1",
+        "batch_norm_13.w_2"
+      ],
+      "name": "BatchNormalization.13",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_13.tmp_3"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_1.tmp_0_slice_1"
+      ],
+      "name": "Reshape.6.__control_identity",
+      "op": "Identity",
+      "outputs": [
+        "helper.reshape.2"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_1.tmp_0_slice_2"
+      ],
+      "name": "Reshape.7.__control_identity",
+      "op": "Identity",
+      "outputs": [
+        "helper.reshape.3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_13.tmp_3"
+      ],
+      "name": "HardSwish.13.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_13.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_13.tmp_3",
+        "hardswish_13.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.13.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_13.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "helper.reshape.2"
+      ],
+      "name": "Cast.6.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "Cast.7"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "helper.reshape.3"
+      ],
+      "name": "Cast.8.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "Cast.9"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_13.tmp_0",
+        "conv2d_14.w_0"
+      ],
+      "name": "Conv.14",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_7.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 0
+      },
+      "inputs": [
+        "Cast.7",
+        "Cast.9"
+      ],
+      "name": "Concat.6",
+      "op": "Concat",
+      "outputs": [
+        "helper.concat.2"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_7.tmp_0",
+        "batch_norm_14.w_0",
+        "batch_norm_14.b_0",
+        "batch_norm_14.w_1",
+        "batch_norm_14.w_2"
+      ],
+      "name": "BatchNormalization.14",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_14.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_14.tmp_3"
+      ],
+      "name": "HardSwish.14.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_14.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_14.tmp_3",
+        "hardswish_14.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.14.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_14.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 256,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_14.tmp_0",
+        "conv2d_15.w_0"
+      ],
+      "name": "Conv.15",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_7.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_7.tmp_0",
+        "batch_norm_15.w_0",
+        "batch_norm_15.b_0",
+        "batch_norm_15.w_1",
+        "batch_norm_15.w_2"
+      ],
+      "name": "BatchNormalization.15",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_15.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_15.tmp_3"
+      ],
+      "name": "HardSwish.15.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_15.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_15.tmp_3",
+        "hardswish_15.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.15.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_15.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_15.tmp_0",
+        "conv2d_16.w_0"
+      ],
+      "name": "Conv.16",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_8.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_8.tmp_0",
+        "batch_norm_16.w_0",
+        "batch_norm_16.b_0",
+        "batch_norm_16.w_1",
+        "batch_norm_16.w_2"
+      ],
+      "name": "BatchNormalization.16",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_16.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_16.tmp_3"
+      ],
+      "name": "HardSwish.16.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_16.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_16.tmp_3",
+        "hardswish_16.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.16.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_16.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 256,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_16.tmp_0",
+        "conv2d_17.w_0"
+      ],
+      "name": "Conv.17",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_8.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_8.tmp_0",
+        "batch_norm_17.w_0",
+        "batch_norm_17.b_0",
+        "batch_norm_17.w_1",
+        "batch_norm_17.w_2"
+      ],
+      "name": "BatchNormalization.17",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_17.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_17.tmp_3"
+      ],
+      "name": "HardSwish.17.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_17.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_17.tmp_3",
+        "hardswish_17.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.17.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_17.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_17.tmp_0",
+        "conv2d_18.w_0"
+      ],
+      "name": "Conv.18",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_9.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_9.tmp_0",
+        "batch_norm_18.w_0",
+        "batch_norm_18.b_0",
+        "batch_norm_18.w_1",
+        "batch_norm_18.w_2"
+      ],
+      "name": "BatchNormalization.18",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_18.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_18.tmp_3"
+      ],
+      "name": "HardSwish.18.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_18.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_18.tmp_3",
+        "hardswish_18.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.18.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_18.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 256,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_18.tmp_0",
+        "conv2d_19.w_0"
+      ],
+      "name": "Conv.19",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_9.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_9.tmp_0",
+        "batch_norm_19.w_0",
+        "batch_norm_19.b_0",
+        "batch_norm_19.w_1",
+        "batch_norm_19.w_2"
+      ],
+      "name": "BatchNormalization.19",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_19.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_19.tmp_3"
+      ],
+      "name": "HardSwish.19.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_19.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_19.tmp_3",
+        "hardswish_19.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.19.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_19.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_19.tmp_0",
+        "conv2d_20.w_0"
+      ],
+      "name": "Conv.20",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_10.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_10.tmp_0",
+        "batch_norm_20.w_0",
+        "batch_norm_20.b_0",
+        "batch_norm_20.w_1",
+        "batch_norm_20.w_2"
+      ],
+      "name": "BatchNormalization.20",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_20.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_20.tmp_3"
+      ],
+      "name": "HardSwish.20.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_20.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_20.tmp_3",
+        "hardswish_20.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.20.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_20.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 256,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_20.tmp_0",
+        "conv2d_21.w_0"
+      ],
+      "name": "Conv.21",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_10.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_10.tmp_0",
+        "batch_norm_21.w_0",
+        "batch_norm_21.b_0",
+        "batch_norm_21.w_1",
+        "batch_norm_21.w_2"
+      ],
+      "name": "BatchNormalization.21",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_21.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_21.tmp_3"
+      ],
+      "name": "HardSwish.21.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_21.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_21.tmp_3",
+        "hardswish_21.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.21.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_21.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_21.tmp_0",
+        "conv2d_22.w_0"
+      ],
+      "name": "Conv.22",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_11.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_11.tmp_0",
+        "batch_norm_22.w_0",
+        "batch_norm_22.b_0",
+        "batch_norm_22.w_1",
+        "batch_norm_22.w_2"
+      ],
+      "name": "BatchNormalization.22",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_22.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_22.tmp_3"
+      ],
+      "name": "HardSwish.22.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_22.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_22.tmp_3",
+        "hardswish_22.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.22.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_22.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 256,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          2,
+          2
+        ]
+      },
+      "inputs": [
+        "hardswish_22.tmp_0",
+        "conv2d_23.w_0"
+      ],
+      "name": "Conv.23",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_11.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_22.tmp_0",
+        "conv2d_33.w_0"
+      ],
+      "name": "Conv.33",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_20.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_11.tmp_0",
+        "batch_norm_23.w_0",
+        "batch_norm_23.b_0",
+        "batch_norm_23.w_1",
+        "batch_norm_23.w_2"
+      ],
+      "name": "BatchNormalization.23",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_23.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_20.tmp_0",
+        "batch_norm2d_2.w_0",
+        "batch_norm2d_2.b_0",
+        "batch_norm2d_2.w_1",
+        "batch_norm2d_2.w_2"
+      ],
+      "name": "BatchNormalization.29",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_2.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_23.tmp_3"
+      ],
+      "name": "HardSwish.23.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_23.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_23.tmp_3",
+        "hardswish_23.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.23.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_23.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_2.tmp_6"
+      ],
+      "name": "HardSwish.29.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_29.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_2.tmp_6",
+        "hardswish_29.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.29.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_29.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_23.tmp_0"
+      ],
+      "name": "GlobalAveragePool.0",
+      "op": "GlobalAveragePool",
+      "outputs": [
+        "pool2d_0.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_29.tmp_0"
+      ],
+      "name": "Shape.0",
+      "op": "Shape",
+      "outputs": [
+        "Shape.1"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "pool2d_0.tmp_0",
+        "conv2d_24.w_0",
+        "conv2d_24.b_0"
+      ],
+      "name": "Conv.24",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_12.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Shape.1"
+      ],
+      "name": "Cast.0.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "shape_0.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "conv2d_12.tmp_0"
+      ],
+      "name": "Relu.0",
+      "op": "Relu",
+      "outputs": [
+        "relu_0.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_0.tmp_0",
+        "helper.constant.4",
+        "helper.constant.5",
+        "helper.constant.7",
+        "helper.constant.6"
+      ],
+      "name": "Slice.0",
+      "op": "Slice",
+      "outputs": [
+        "Slice.1"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_0.tmp_0",
+        "helper.constant.9",
+        "helper.constant.10",
+        "helper.constant.12",
+        "helper.constant.11"
+      ],
+      "name": "Slice.2",
+      "op": "Slice",
+      "outputs": [
+        "Slice.3"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "relu_0.tmp_0",
+        "conv2d_25.w_0",
+        "conv2d_25.b_0"
+      ],
+      "name": "Conv.25",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_13.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Slice.1",
+        "helper.constant.8"
+      ],
+      "name": "Squeeze.0",
+      "op": "Squeeze",
+      "outputs": [
+        "shape_0.tmp_0_slice_1"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Slice.3",
+        "helper.constant.13"
+      ],
+      "name": "Squeeze.1",
+      "op": "Squeeze",
+      "outputs": [
+        "shape_0.tmp_0_slice_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666670143604279,
+        "beta": 0.5
+      },
+      "inputs": [
+        "conv2d_13.tmp_0"
+      ],
+      "name": "HardSigmoid.0",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardsigmoid_0.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_0.tmp_0_slice_1"
+      ],
+      "name": "Reshape.4.__control_identity",
+      "op": "Identity",
+      "outputs": [
+        "helper.reshape.0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_0.tmp_0_slice_2"
+      ],
+      "name": "Reshape.5.__control_identity",
+      "op": "Identity",
+      "outputs": [
+        "helper.reshape.1"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_23.tmp_0",
+        "hardsigmoid_0.tmp_0"
+      ],
+      "name": "Mul.0",
+      "op": "Mul",
+      "outputs": [
+        "Mul.1"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "helper.reshape.0"
+      ],
+      "name": "Cast.1.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "Cast.2"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "helper.reshape.1"
+      ],
+      "name": "Cast.3.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "Cast.4"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Mul.1",
+        "conv2d_26.w_0"
+      ],
+      "name": "Conv.26",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_14.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 0
+      },
+      "inputs": [
+        "Cast.2",
+        "Cast.4"
+      ],
+      "name": "Concat.0",
+      "op": "Concat",
+      "outputs": [
+        "helper.concat.0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_14.tmp_0",
+        "batch_norm_24.w_0",
+        "batch_norm_24.b_0",
+        "batch_norm_24.w_1",
+        "batch_norm_24.w_2"
+      ],
+      "name": "BatchNormalization.24",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_24.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_24.tmp_3"
+      ],
+      "name": "HardSwish.24.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_24.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_24.tmp_3",
+        "hardswish_24.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.24.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_24.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 512,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_24.tmp_0",
+        "conv2d_27.w_0"
+      ],
+      "name": "Conv.27",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_12.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_12.tmp_0",
+        "batch_norm_25.w_0",
+        "batch_norm_25.b_0",
+        "batch_norm_25.w_1",
+        "batch_norm_25.w_2"
+      ],
+      "name": "BatchNormalization.25",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_25.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_25.tmp_3"
+      ],
+      "name": "HardSwish.25.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_25.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_25.tmp_3",
+        "hardswish_25.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.25.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_25.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_25.tmp_0"
+      ],
+      "name": "GlobalAveragePool.1",
+      "op": "GlobalAveragePool",
+      "outputs": [
+        "pool2d_1.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "pool2d_1.tmp_0",
+        "conv2d_28.w_0",
+        "conv2d_28.b_0"
+      ],
+      "name": "Conv.28",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_15.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "conv2d_15.tmp_0"
+      ],
+      "name": "Relu.1",
+      "op": "Relu",
+      "outputs": [
+        "relu_1.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "relu_1.tmp_0",
+        "conv2d_29.w_0",
+        "conv2d_29.b_0"
+      ],
+      "name": "Conv.29",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_16.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666670143604279,
+        "beta": 0.5
+      },
+      "inputs": [
+        "conv2d_16.tmp_0"
+      ],
+      "name": "HardSigmoid.1",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardsigmoid_1.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_25.tmp_0",
+        "hardsigmoid_1.tmp_0"
+      ],
+      "name": "Mul.2",
+      "op": "Mul",
+      "outputs": [
+        "Mul.3"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Mul.3",
+        "conv2d_30.w_0"
+      ],
+      "name": "Conv.30",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_17.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_17.tmp_0",
+        "batch_norm_26.w_0",
+        "batch_norm_26.b_0",
+        "batch_norm_26.w_1",
+        "batch_norm_26.w_2"
+      ],
+      "name": "BatchNormalization.26",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_26.tmp_3"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_26.tmp_3"
+      ],
+      "name": "HardSwish.26.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_26.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_26.tmp_3",
+        "hardswish_26.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.26.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_26.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_26.tmp_0",
+        "conv2d_34.w_0"
+      ],
+      "name": "Conv.34",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_21.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_21.tmp_0",
+        "batch_norm2d_3.w_0",
+        "batch_norm2d_3.b_0",
+        "batch_norm2d_3.w_1",
+        "batch_norm2d_3.w_2"
+      ],
+      "name": "BatchNormalization.30",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_3.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_3.tmp_6"
+      ],
+      "name": "HardSwish.30.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_30.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_3.tmp_6",
+        "hardswish_30.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.30.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_30.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_30.tmp_0"
+      ],
+      "name": "Shape.2",
+      "op": "Shape",
+      "outputs": [
+        "Shape.3"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Shape.3",
+        "helper.constant.19",
+        "helper.constant.20",
+        "helper.constant.18"
+      ],
+      "name": "Slice.4",
+      "op": "Slice",
+      "outputs": [
+        "helper.slice.0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 0
+      },
+      "inputs": [
+        "helper.slice.0",
+        "helper.concat.0"
+      ],
+      "name": "Concat.1",
+      "op": "Concat",
+      "outputs": [
+        "helper.concat.1"
+      ]
+    },
+    {
+      "attributes": {
+        "coordinate_transformation_mode": "asymmetric",
+        "mode": "nearest",
+        "nearest_mode": "floor"
+      },
+      "inputs": [
+        "hardswish_30.tmp_0",
+        "helper.constant.16",
+        "a3s.slanet_plus.resize_scales.Resize.0"
+      ],
+      "name": "Resize.0",
+      "op": "Resize",
+      "outputs": [
+        "nearest_interp_v2_0.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "nearest_interp_v2_0.tmp_0",
+        "hardswish_29.tmp_0"
+      ],
+      "name": "Concat.2",
+      "op": "Concat",
+      "outputs": [
+        "Concat.3"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.3",
+        "conv2d_36.w_0"
+      ],
+      "name": "Conv.35",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_22.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.3",
+        "conv2d_35.w_0"
+      ],
+      "name": "Conv.36",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_23.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_22.tmp_0",
+        "batch_norm2d_5.w_0",
+        "batch_norm2d_5.b_0",
+        "batch_norm2d_5.w_1",
+        "batch_norm2d_5.w_2"
+      ],
+      "name": "BatchNormalization.31",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_4.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_23.tmp_0",
+        "batch_norm2d_4.w_0",
+        "batch_norm2d_4.b_0",
+        "batch_norm2d_4.w_1",
+        "batch_norm2d_4.w_2"
+      ],
+      "name": "BatchNormalization.32",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_5.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_4.tmp_6"
+      ],
+      "name": "HardSwish.31.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_31.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_4.tmp_6",
+        "hardswish_31.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.31.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_31.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_5.tmp_6"
+      ],
+      "name": "HardSwish.32.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_32.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_5.tmp_6",
+        "hardswish_32.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.32.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_32.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_32.tmp_0",
+        "conv2d_38.w_0"
+      ],
+      "name": "Conv.37",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_24.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_24.tmp_0",
+        "batch_norm2d_7.w_0",
+        "batch_norm2d_7.b_0",
+        "batch_norm2d_7.w_1",
+        "batch_norm2d_7.w_2"
+      ],
+      "name": "BatchNormalization.33",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_6.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_6.tmp_6"
+      ],
+      "name": "HardSwish.33.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_33.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_6.tmp_6",
+        "hardswish_33.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.33.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_33.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 48,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_33.tmp_0",
+        "conv2d_39.w_0"
+      ],
+      "name": "Conv.38",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_13.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_13.tmp_0",
+        "batch_norm2d_8.w_0",
+        "batch_norm2d_8.b_0",
+        "batch_norm2d_8.w_1",
+        "batch_norm2d_8.w_2"
+      ],
+      "name": "BatchNormalization.34",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_7.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_7.tmp_6"
+      ],
+      "name": "HardSwish.34.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_34.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_7.tmp_6",
+        "hardswish_34.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.34.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_34.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_34.tmp_0",
+        "conv2d_40.w_0"
+      ],
+      "name": "Conv.39",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_25.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_25.tmp_0",
+        "batch_norm2d_9.w_0",
+        "batch_norm2d_9.b_0",
+        "batch_norm2d_9.w_1",
+        "batch_norm2d_9.w_2"
+      ],
+      "name": "BatchNormalization.35",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_8.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_8.tmp_6"
+      ],
+      "name": "HardSwish.35.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_35.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_8.tmp_6",
+        "hardswish_35.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.35.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_35.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "hardswish_35.tmp_0",
+        "hardswish_31.tmp_0"
+      ],
+      "name": "Concat.4",
+      "op": "Concat",
+      "outputs": [
+        "Concat.5"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.5",
+        "conv2d_37.w_0"
+      ],
+      "name": "Conv.40",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_26.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_26.tmp_0",
+        "batch_norm2d_6.w_0",
+        "batch_norm2d_6.b_0",
+        "batch_norm2d_6.w_1",
+        "batch_norm2d_6.w_2"
+      ],
+      "name": "BatchNormalization.36",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_9.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_9.tmp_6"
+      ],
+      "name": "HardSwish.36.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_36.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_9.tmp_6",
+        "hardswish_36.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.36.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_36.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_36.tmp_0"
+      ],
+      "name": "Shape.6",
+      "op": "Shape",
+      "outputs": [
+        "Shape.7"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Shape.7",
+        "helper.constant.36",
+        "helper.constant.37",
+        "helper.constant.35"
+      ],
+      "name": "Slice.9",
+      "op": "Slice",
+      "outputs": [
+        "helper.slice.1"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 0
+      },
+      "inputs": [
+        "helper.slice.1",
+        "helper.concat.2"
+      ],
+      "name": "Concat.7",
+      "op": "Concat",
+      "outputs": [
+        "helper.concat.3"
+      ]
+    },
+    {
+      "attributes": {
+        "coordinate_transformation_mode": "asymmetric",
+        "mode": "nearest",
+        "nearest_mode": "floor"
+      },
+      "inputs": [
+        "hardswish_36.tmp_0",
+        "helper.constant.33",
+        "a3s.slanet_plus.resize_scales.Resize.1"
+      ],
+      "name": "Resize.1",
+      "op": "Resize",
+      "outputs": [
+        "nearest_interp_v2_1.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "nearest_interp_v2_1.tmp_0",
+        "hardswish_28.tmp_0"
+      ],
+      "name": "Concat.8",
+      "op": "Concat",
+      "outputs": [
+        "Concat.9"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.9",
+        "conv2d_42.w_0"
+      ],
+      "name": "Conv.41",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_27.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.9",
+        "conv2d_41.w_0"
+      ],
+      "name": "Conv.42",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_28.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_27.tmp_0",
+        "batch_norm2d_11.w_0",
+        "batch_norm2d_11.b_0",
+        "batch_norm2d_11.w_1",
+        "batch_norm2d_11.w_2"
+      ],
+      "name": "BatchNormalization.37",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_10.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_28.tmp_0",
+        "batch_norm2d_10.w_0",
+        "batch_norm2d_10.b_0",
+        "batch_norm2d_10.w_1",
+        "batch_norm2d_10.w_2"
+      ],
+      "name": "BatchNormalization.38",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_11.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_10.tmp_6"
+      ],
+      "name": "HardSwish.37.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_37.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_10.tmp_6",
+        "hardswish_37.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.37.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_37.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_11.tmp_6"
+      ],
+      "name": "HardSwish.38.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_38.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_11.tmp_6",
+        "hardswish_38.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.38.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_38.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_38.tmp_0",
+        "conv2d_44.w_0"
+      ],
+      "name": "Conv.43",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_29.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_29.tmp_0",
+        "batch_norm2d_13.w_0",
+        "batch_norm2d_13.b_0",
+        "batch_norm2d_13.w_1",
+        "batch_norm2d_13.w_2"
+      ],
+      "name": "BatchNormalization.39",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_12.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_12.tmp_6"
+      ],
+      "name": "HardSwish.39.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_39.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_12.tmp_6",
+        "hardswish_39.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.39.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_39.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 48,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_39.tmp_0",
+        "conv2d_45.w_0"
+      ],
+      "name": "Conv.44",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_14.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_14.tmp_0",
+        "batch_norm2d_14.w_0",
+        "batch_norm2d_14.b_0",
+        "batch_norm2d_14.w_1",
+        "batch_norm2d_14.w_2"
+      ],
+      "name": "BatchNormalization.40",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_13.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_13.tmp_6"
+      ],
+      "name": "HardSwish.40.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_40.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_13.tmp_6",
+        "hardswish_40.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.40.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_40.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_40.tmp_0",
+        "conv2d_46.w_0"
+      ],
+      "name": "Conv.45",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_30.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_30.tmp_0",
+        "batch_norm2d_15.w_0",
+        "batch_norm2d_15.b_0",
+        "batch_norm2d_15.w_1",
+        "batch_norm2d_15.w_2"
+      ],
+      "name": "BatchNormalization.41",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_14.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_14.tmp_6"
+      ],
+      "name": "HardSwish.41.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_41.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_14.tmp_6",
+        "hardswish_41.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.41.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_41.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "hardswish_41.tmp_0",
+        "hardswish_37.tmp_0"
+      ],
+      "name": "Concat.10",
+      "op": "Concat",
+      "outputs": [
+        "Concat.11"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.11",
+        "conv2d_43.w_0"
+      ],
+      "name": "Conv.46",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_31.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_31.tmp_0",
+        "batch_norm2d_12.w_0",
+        "batch_norm2d_12.b_0",
+        "batch_norm2d_12.w_1",
+        "batch_norm2d_12.w_2"
+      ],
+      "name": "BatchNormalization.42",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_15.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_15.tmp_6"
+      ],
+      "name": "HardSwish.42.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_42.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_15.tmp_6",
+        "hardswish_42.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.42.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_42.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_42.tmp_0"
+      ],
+      "name": "Shape.10",
+      "op": "Shape",
+      "outputs": [
+        "Shape.11"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Shape.11",
+        "helper.constant.53",
+        "helper.constant.54",
+        "helper.constant.52"
+      ],
+      "name": "Slice.14",
+      "op": "Slice",
+      "outputs": [
+        "helper.slice.2"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 0
+      },
+      "inputs": [
+        "helper.slice.2",
+        "helper.concat.4"
+      ],
+      "name": "Concat.13",
+      "op": "Concat",
+      "outputs": [
+        "helper.concat.5"
+      ]
+    },
+    {
+      "attributes": {
+        "coordinate_transformation_mode": "asymmetric",
+        "mode": "nearest",
+        "nearest_mode": "floor"
+      },
+      "inputs": [
+        "hardswish_42.tmp_0",
+        "helper.constant.50",
+        "a3s.slanet_plus.resize_scales.Resize.2"
+      ],
+      "name": "Resize.2",
+      "op": "Resize",
+      "outputs": [
+        "nearest_interp_v2_2.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "nearest_interp_v2_2.tmp_0",
+        "hardswish_27.tmp_0"
+      ],
+      "name": "Concat.14",
+      "op": "Concat",
+      "outputs": [
+        "Concat.15"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.15",
+        "conv2d_48.w_0"
+      ],
+      "name": "Conv.47",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_32.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.15",
+        "conv2d_47.w_0"
+      ],
+      "name": "Conv.48",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_33.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_32.tmp_0",
+        "batch_norm2d_17.w_0",
+        "batch_norm2d_17.b_0",
+        "batch_norm2d_17.w_1",
+        "batch_norm2d_17.w_2"
+      ],
+      "name": "BatchNormalization.43",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_16.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_33.tmp_0",
+        "batch_norm2d_16.w_0",
+        "batch_norm2d_16.b_0",
+        "batch_norm2d_16.w_1",
+        "batch_norm2d_16.w_2"
+      ],
+      "name": "BatchNormalization.44",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_17.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_16.tmp_6"
+      ],
+      "name": "HardSwish.43.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_43.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_16.tmp_6",
+        "hardswish_43.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.43.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_43.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_17.tmp_6"
+      ],
+      "name": "HardSwish.44.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_44.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_17.tmp_6",
+        "hardswish_44.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.44.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_44.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_44.tmp_0",
+        "conv2d_50.w_0"
+      ],
+      "name": "Conv.49",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_34.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_34.tmp_0",
+        "batch_norm2d_19.w_0",
+        "batch_norm2d_19.b_0",
+        "batch_norm2d_19.w_1",
+        "batch_norm2d_19.w_2"
+      ],
+      "name": "BatchNormalization.45",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_18.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_18.tmp_6"
+      ],
+      "name": "HardSwish.45.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_45.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_18.tmp_6",
+        "hardswish_45.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.45.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_45.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 48,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_45.tmp_0",
+        "conv2d_51.w_0"
+      ],
+      "name": "Conv.50",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_15.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_15.tmp_0",
+        "batch_norm2d_20.w_0",
+        "batch_norm2d_20.b_0",
+        "batch_norm2d_20.w_1",
+        "batch_norm2d_20.w_2"
+      ],
+      "name": "BatchNormalization.46",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_19.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_19.tmp_6"
+      ],
+      "name": "HardSwish.46.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_46.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_19.tmp_6",
+        "hardswish_46.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.46.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_46.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_46.tmp_0",
+        "conv2d_52.w_0"
+      ],
+      "name": "Conv.51",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_35.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_35.tmp_0",
+        "batch_norm2d_21.w_0",
+        "batch_norm2d_21.b_0",
+        "batch_norm2d_21.w_1",
+        "batch_norm2d_21.w_2"
+      ],
+      "name": "BatchNormalization.47",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_20.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_20.tmp_6"
+      ],
+      "name": "HardSwish.47.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_47.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_20.tmp_6",
+        "hardswish_47.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.47.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_47.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "hardswish_47.tmp_0",
+        "hardswish_43.tmp_0"
+      ],
+      "name": "Concat.16",
+      "op": "Concat",
+      "outputs": [
+        "Concat.17"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.17",
+        "conv2d_49.w_0"
+      ],
+      "name": "Conv.52",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_36.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_36.tmp_0",
+        "batch_norm2d_18.w_0",
+        "batch_norm2d_18.b_0",
+        "batch_norm2d_18.w_1",
+        "batch_norm2d_18.w_2"
+      ],
+      "name": "BatchNormalization.48",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_21.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_21.tmp_6"
+      ],
+      "name": "HardSwish.48.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_48.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_21.tmp_6",
+        "hardswish_48.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.48.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_48.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 96,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          2,
+          2
+        ]
+      },
+      "inputs": [
+        "hardswish_48.tmp_0",
+        "conv2d_53.w_0"
+      ],
+      "name": "Conv.53",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_16.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_16.tmp_0",
+        "batch_norm2d_22.w_0",
+        "batch_norm2d_22.b_0",
+        "batch_norm2d_22.w_1",
+        "batch_norm2d_22.w_2"
+      ],
+      "name": "BatchNormalization.49",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_22.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_22.tmp_6"
+      ],
+      "name": "HardSwish.49.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_49.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_22.tmp_6",
+        "hardswish_49.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.49.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_49.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_49.tmp_0",
+        "conv2d_54.w_0"
+      ],
+      "name": "Conv.54",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_37.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_37.tmp_0",
+        "batch_norm2d_23.w_0",
+        "batch_norm2d_23.b_0",
+        "batch_norm2d_23.w_1",
+        "batch_norm2d_23.w_2"
+      ],
+      "name": "BatchNormalization.50",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_23.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_23.tmp_6"
+      ],
+      "name": "HardSwish.50.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_50.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_23.tmp_6",
+        "hardswish_50.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.50.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_50.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "hardswish_50.tmp_0",
+        "hardswish_42.tmp_0"
+      ],
+      "name": "Concat.18",
+      "op": "Concat",
+      "outputs": [
+        "Concat.19"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.19",
+        "conv2d_56.w_0"
+      ],
+      "name": "Conv.55",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_38.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.19",
+        "conv2d_55.w_0"
+      ],
+      "name": "Conv.56",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_39.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_38.tmp_0",
+        "batch_norm2d_25.w_0",
+        "batch_norm2d_25.b_0",
+        "batch_norm2d_25.w_1",
+        "batch_norm2d_25.w_2"
+      ],
+      "name": "BatchNormalization.51",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_24.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_39.tmp_0",
+        "batch_norm2d_24.w_0",
+        "batch_norm2d_24.b_0",
+        "batch_norm2d_24.w_1",
+        "batch_norm2d_24.w_2"
+      ],
+      "name": "BatchNormalization.52",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_25.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_24.tmp_6"
+      ],
+      "name": "HardSwish.51.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_51.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_24.tmp_6",
+        "hardswish_51.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.51.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_51.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_25.tmp_6"
+      ],
+      "name": "HardSwish.52.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_52.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_25.tmp_6",
+        "hardswish_52.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.52.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_52.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_52.tmp_0",
+        "conv2d_58.w_0"
+      ],
+      "name": "Conv.57",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_40.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_40.tmp_0",
+        "batch_norm2d_27.w_0",
+        "batch_norm2d_27.b_0",
+        "batch_norm2d_27.w_1",
+        "batch_norm2d_27.w_2"
+      ],
+      "name": "BatchNormalization.53",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_26.tmp_6"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_26.tmp_6"
+      ],
+      "name": "HardSwish.53.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_53.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_26.tmp_6",
+        "hardswish_53.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.53.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_53.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 48,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_53.tmp_0",
+        "conv2d_59.w_0"
+      ],
+      "name": "Conv.58",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_17.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_17.tmp_0",
+        "batch_norm2d_28.w_0",
+        "batch_norm2d_28.b_0",
+        "batch_norm2d_28.w_1",
+        "batch_norm2d_28.w_2"
+      ],
+      "name": "BatchNormalization.54",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_27.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_27.tmp_2"
+      ],
+      "name": "HardSwish.54.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_54.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_27.tmp_2",
+        "hardswish_54.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.54.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_54.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_54.tmp_0",
+        "conv2d_60.w_0"
+      ],
+      "name": "Conv.59",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_41.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_41.tmp_0",
+        "batch_norm2d_29.w_0",
+        "batch_norm2d_29.b_0",
+        "batch_norm2d_29.w_1",
+        "batch_norm2d_29.w_2"
+      ],
+      "name": "BatchNormalization.55",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_28.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_28.tmp_2"
+      ],
+      "name": "HardSwish.55.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_55.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_28.tmp_2",
+        "hardswish_55.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.55.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_55.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "hardswish_55.tmp_0",
+        "hardswish_51.tmp_0"
+      ],
+      "name": "Concat.20",
+      "op": "Concat",
+      "outputs": [
+        "Concat.21"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.21",
+        "conv2d_57.w_0"
+      ],
+      "name": "Conv.60",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_42.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_42.tmp_0",
+        "batch_norm2d_26.w_0",
+        "batch_norm2d_26.b_0",
+        "batch_norm2d_26.w_1",
+        "batch_norm2d_26.w_2"
+      ],
+      "name": "BatchNormalization.56",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_29.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_29.tmp_2"
+      ],
+      "name": "HardSwish.56.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_56.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_29.tmp_2",
+        "hardswish_56.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.56.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_56.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 96,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          2,
+          2
+        ]
+      },
+      "inputs": [
+        "hardswish_56.tmp_0",
+        "conv2d_61.w_0"
+      ],
+      "name": "Conv.61",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_18.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_18.tmp_0",
+        "batch_norm2d_30.w_0",
+        "batch_norm2d_30.b_0",
+        "batch_norm2d_30.w_1",
+        "batch_norm2d_30.w_2"
+      ],
+      "name": "BatchNormalization.57",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_30.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_30.tmp_2"
+      ],
+      "name": "HardSwish.57.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_57.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_30.tmp_2",
+        "hardswish_57.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.57.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_57.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_57.tmp_0",
+        "conv2d_62.w_0"
+      ],
+      "name": "Conv.62",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_43.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_43.tmp_0",
+        "batch_norm2d_31.w_0",
+        "batch_norm2d_31.b_0",
+        "batch_norm2d_31.w_1",
+        "batch_norm2d_31.w_2"
+      ],
+      "name": "BatchNormalization.58",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_31.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_31.tmp_2"
+      ],
+      "name": "HardSwish.58.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_58.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_31.tmp_2",
+        "hardswish_58.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.58.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_58.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "hardswish_58.tmp_0",
+        "hardswish_36.tmp_0"
+      ],
+      "name": "Concat.22",
+      "op": "Concat",
+      "outputs": [
+        "Concat.23"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.23",
+        "conv2d_64.w_0"
+      ],
+      "name": "Conv.63",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_44.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.23",
+        "conv2d_63.w_0"
+      ],
+      "name": "Conv.64",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_45.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_44.tmp_0",
+        "batch_norm2d_33.w_0",
+        "batch_norm2d_33.b_0",
+        "batch_norm2d_33.w_1",
+        "batch_norm2d_33.w_2"
+      ],
+      "name": "BatchNormalization.59",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_32.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_45.tmp_0",
+        "batch_norm2d_32.w_0",
+        "batch_norm2d_32.b_0",
+        "batch_norm2d_32.w_1",
+        "batch_norm2d_32.w_2"
+      ],
+      "name": "BatchNormalization.60",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_33.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_32.tmp_2"
+      ],
+      "name": "HardSwish.59.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_59.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_32.tmp_2",
+        "hardswish_59.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.59.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_59.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_33.tmp_2"
+      ],
+      "name": "HardSwish.60.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_60.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_33.tmp_2",
+        "hardswish_60.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.60.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_60.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_60.tmp_0",
+        "conv2d_66.w_0"
+      ],
+      "name": "Conv.65",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_46.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_46.tmp_0",
+        "batch_norm2d_35.w_0",
+        "batch_norm2d_35.b_0",
+        "batch_norm2d_35.w_1",
+        "batch_norm2d_35.w_2"
+      ],
+      "name": "BatchNormalization.61",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_34.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_34.tmp_2"
+      ],
+      "name": "HardSwish.61.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_61.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_34.tmp_2",
+        "hardswish_61.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.61.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_61.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 48,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_61.tmp_0",
+        "conv2d_67.w_0"
+      ],
+      "name": "Conv.66",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_19.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_19.tmp_0",
+        "batch_norm2d_36.w_0",
+        "batch_norm2d_36.b_0",
+        "batch_norm2d_36.w_1",
+        "batch_norm2d_36.w_2"
+      ],
+      "name": "BatchNormalization.62",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_35.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_35.tmp_2"
+      ],
+      "name": "HardSwish.62.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_62.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_35.tmp_2",
+        "hardswish_62.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.62.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_62.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_62.tmp_0",
+        "conv2d_68.w_0"
+      ],
+      "name": "Conv.67",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_47.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_47.tmp_0",
+        "batch_norm2d_37.w_0",
+        "batch_norm2d_37.b_0",
+        "batch_norm2d_37.w_1",
+        "batch_norm2d_37.w_2"
+      ],
+      "name": "BatchNormalization.63",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_36.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_36.tmp_2"
+      ],
+      "name": "HardSwish.63.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_63.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_36.tmp_2",
+        "hardswish_63.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.63.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_63.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "hardswish_63.tmp_0",
+        "hardswish_59.tmp_0"
+      ],
+      "name": "Concat.24",
+      "op": "Concat",
+      "outputs": [
+        "Concat.25"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.25",
+        "conv2d_65.w_0"
+      ],
+      "name": "Conv.68",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_48.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_48.tmp_0",
+        "batch_norm2d_34.w_0",
+        "batch_norm2d_34.b_0",
+        "batch_norm2d_34.w_1",
+        "batch_norm2d_34.w_2"
+      ],
+      "name": "BatchNormalization.64",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_37.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_37.tmp_2"
+      ],
+      "name": "HardSwish.64.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_64.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_37.tmp_2",
+        "hardswish_64.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.64.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_64.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 96,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          2,
+          2
+        ]
+      },
+      "inputs": [
+        "hardswish_64.tmp_0",
+        "conv2d_69.w_0"
+      ],
+      "name": "Conv.69",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_20.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_20.tmp_0",
+        "batch_norm2d_38.w_0",
+        "batch_norm2d_38.b_0",
+        "batch_norm2d_38.w_1",
+        "batch_norm2d_38.w_2"
+      ],
+      "name": "BatchNormalization.65",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_38.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_38.tmp_2"
+      ],
+      "name": "HardSwish.65.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_65.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_38.tmp_2",
+        "hardswish_65.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.65.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_65.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_65.tmp_0",
+        "conv2d_70.w_0"
+      ],
+      "name": "Conv.70",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_49.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_49.tmp_0",
+        "batch_norm2d_39.w_0",
+        "batch_norm2d_39.b_0",
+        "batch_norm2d_39.w_1",
+        "batch_norm2d_39.w_2"
+      ],
+      "name": "BatchNormalization.66",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_39.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_39.tmp_2"
+      ],
+      "name": "HardSwish.66.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_66.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_39.tmp_2",
+        "hardswish_66.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.66.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_66.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "hardswish_66.tmp_0",
+        "hardswish_30.tmp_0"
+      ],
+      "name": "Concat.26",
+      "op": "Concat",
+      "outputs": [
+        "Concat.27"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.27",
+        "conv2d_72.w_0"
+      ],
+      "name": "Conv.71",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_50.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.27",
+        "conv2d_71.w_0"
+      ],
+      "name": "Conv.72",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_51.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_50.tmp_0",
+        "batch_norm2d_41.w_0",
+        "batch_norm2d_41.b_0",
+        "batch_norm2d_41.w_1",
+        "batch_norm2d_41.w_2"
+      ],
+      "name": "BatchNormalization.67",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_40.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_51.tmp_0",
+        "batch_norm2d_40.w_0",
+        "batch_norm2d_40.b_0",
+        "batch_norm2d_40.w_1",
+        "batch_norm2d_40.w_2"
+      ],
+      "name": "BatchNormalization.68",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_41.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_40.tmp_2"
+      ],
+      "name": "HardSwish.67.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_67.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_40.tmp_2",
+        "hardswish_67.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.67.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_67.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_41.tmp_2"
+      ],
+      "name": "HardSwish.68.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_68.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_41.tmp_2",
+        "hardswish_68.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.68.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_68.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_68.tmp_0",
+        "conv2d_74.w_0"
+      ],
+      "name": "Conv.73",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_52.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_52.tmp_0",
+        "batch_norm2d_43.w_0",
+        "batch_norm2d_43.b_0",
+        "batch_norm2d_43.w_1",
+        "batch_norm2d_43.w_2"
+      ],
+      "name": "BatchNormalization.69",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_42.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_42.tmp_2"
+      ],
+      "name": "HardSwish.69.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_69.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_42.tmp_2",
+        "hardswish_69.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.69.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_69.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 48,
+        "kernel_shape": [
+          5,
+          5
+        ],
+        "pads": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_69.tmp_0",
+        "conv2d_75.w_0"
+      ],
+      "name": "Conv.74",
+      "op": "Conv",
+      "outputs": [
+        "depthwise_conv2d_21.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "depthwise_conv2d_21.tmp_0",
+        "batch_norm2d_44.w_0",
+        "batch_norm2d_44.b_0",
+        "batch_norm2d_44.w_1",
+        "batch_norm2d_44.w_2"
+      ],
+      "name": "BatchNormalization.70",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_43.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_43.tmp_2"
+      ],
+      "name": "HardSwish.70.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_70.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_43.tmp_2",
+        "hardswish_70.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.70.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_70.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "hardswish_70.tmp_0",
+        "conv2d_76.w_0"
+      ],
+      "name": "Conv.75",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_53.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_53.tmp_0",
+        "batch_norm2d_45.w_0",
+        "batch_norm2d_45.b_0",
+        "batch_norm2d_45.w_1",
+        "batch_norm2d_45.w_2"
+      ],
+      "name": "BatchNormalization.71",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_44.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_44.tmp_2"
+      ],
+      "name": "HardSwish.71.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_71.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_44.tmp_2",
+        "hardswish_71.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.71.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_71.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 1
+      },
+      "inputs": [
+        "hardswish_71.tmp_0",
+        "hardswish_67.tmp_0"
+      ],
+      "name": "Concat.28",
+      "op": "Concat",
+      "outputs": [
+        "Concat.29"
+      ]
+    },
+    {
+      "attributes": {
+        "dilations": [
+          1,
+          1
+        ],
+        "group": 1,
+        "kernel_shape": [
+          1,
+          1
+        ],
+        "pads": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "strides": [
+          1,
+          1
+        ]
+      },
+      "inputs": [
+        "Concat.29",
+        "conv2d_73.w_0"
+      ],
+      "name": "Conv.76",
+      "op": "Conv",
+      "outputs": [
+        "conv2d_54.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "epsilon": 9.999999747378752e-06,
+        "momentum": 0.8999999761581421
+      },
+      "inputs": [
+        "conv2d_54.tmp_0",
+        "batch_norm2d_42.w_0",
+        "batch_norm2d_42.b_0",
+        "batch_norm2d_42.w_1",
+        "batch_norm2d_42.w_2"
+      ],
+      "name": "BatchNormalization.72",
+      "op": "BatchNormalization",
+      "outputs": [
+        "batch_norm_45.tmp_2"
+      ]
+    },
+    {
+      "attributes": {
+        "alpha": 0.16666666666666666,
+        "beta": 0.5
+      },
+      "inputs": [
+        "batch_norm_45.tmp_2"
+      ],
+      "name": "HardSwish.72.__hard_sigmoid",
+      "op": "HardSigmoid",
+      "outputs": [
+        "hardswish_72.tmp_0.__hard_sigmoid"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "batch_norm_45.tmp_2",
+        "hardswish_72.tmp_0.__hard_sigmoid"
+      ],
+      "name": "HardSwish.72.__multiply",
+      "op": "Mul",
+      "outputs": [
+        "hardswish_72.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "hardswish_72.tmp_0"
+      ],
+      "name": "Shape.14",
+      "op": "Shape",
+      "outputs": [
+        "Shape.15"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Shape.15"
+      ],
+      "name": "Cast.16.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "shape_4.tmp_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_4.tmp_0",
+        "helper.constant.60",
+        "helper.constant.61",
+        "helper.constant.63",
+        "helper.constant.62"
+      ],
+      "name": "Slice.17",
+      "op": "Slice",
+      "outputs": [
+        "Slice.18"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "Slice.18",
+        "helper.constant.64"
+      ],
+      "name": "Squeeze.7",
+      "op": "Squeeze",
+      "outputs": [
+        "shape_4.tmp_0_slice_0"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "shape_4.tmp_0_slice_0"
+      ],
+      "name": "Reshape.10.__control_identity",
+      "op": "Identity",
+      "outputs": [
+        "helper.reshape.6"
+      ]
+    },
+    {
+      "attributes": {},
+      "inputs": [
+        "helper.reshape.6"
+      ],
+      "name": "Cast.17.__shape_identity",
+      "op": "Identity",
+      "outputs": [
+        "Cast.18"
+      ]
+    },
+    {
+      "attributes": {
+        "axis": 0
+      },
+      "inputs": [
+        "Cast.18",
+        "Cast.20",
+        "Cast.22"
+      ],
+      "name": "Concat.30",
+      "op": "Concat",
+      "outputs": [
+        "helper.concat.6"
+      ]
+    },
+    {
+      "attributes": {
+        "allowzero": 0
+      },
+      "inputs": [
+        "hardswish_72.tmp_0",
+        "helper.concat.6"
+      ],
+      "name": "Reshape.11",
+      "op": "Reshape",
+      "outputs": [
+        "reshape2_4.tmp_0"
+      ]
+    },
+    {
+      "attributes": {
+        "perm": [
+          0,
+          2,
+          1
+        ]
+      },
+      "inputs": [
+        "reshape2_4.tmp_0"
+      ],
+      "name": "Transpose.0",
+      "op": "Transpose",
+      "outputs": [
+        "transpose_0.tmp_0.0"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "transpose_0.tmp_0.0",
+      "shape": [
+        "batch",
+        256,
+        96
+      ]
+    }
+  ],
+  "role": "table-encoder",
+  "schemaVersion": 1,
+  "source": {
+    "format": "onnx",
+    "opset": 14,
+    "sha256": "dbd5431b4051b0f3037e3f8650dba4297cdf38a6a132ac9ccf57886184f4b66e"
+  }
+}

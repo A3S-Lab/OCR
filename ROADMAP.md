@@ -122,8 +122,14 @@ client and exact model bundle.
 - [x] Define staged-batch v2 page-local table and seal evidence with exact
       source canvases, bounded regions, optional cell geometry, merged spans,
       canonical clipped edges, and strict provider-output validation.
-- [ ] Add explicit orientation, layout, table, formula, and seal providers only
-      with pinned assets, typed outputs, source-pixel geometry, and evidence.
+- [x] Add an explicit `document-fast-v1` wired-table provider with pinned
+      encoder/decoder/dictionary assets, a Power-native batched encoder,
+      model-backed cell quadrilaterals, PP-OCRv6 cell text, and exact page-local
+      evidence. The retained cross-page fixture checks 6x6/29, 8x7/25, and
+      3x6/17 grids on pages 2 through 4.
+- [ ] Add explicit orientation, layout, borderless-table, formula, and seal
+      providers only with pinned assets, typed outputs, source-pixel geometry,
+      and evidence.
 - [ ] Preserve provider-native fine geometry; never fabricate line, span, cell,
       or equation boxes from plain text.
 - [ ] Keep PP-OCRv6 and Unlimited-OCR behind the same provider/client contract

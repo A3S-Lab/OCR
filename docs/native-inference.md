@@ -112,7 +112,10 @@ contract supplies evidence to Parser without moving cross-page reconciliation
 or normalized document geometry into OCR.
 
 PP-OCRv6 implements preprocessing and text and returns table and seal as
-unsupported. Its staged execution is:
+unsupported. `DocumentFastOcrProvider` is a separate explicit composition that
+adds only the table stage. It requires an operator-supplied, SHA-256-pinned
+SLANet-Plus wired-table bundle; it does not broaden the default provider or
+claim seal support. PP-OCRv6 staged execution is:
 
 ```text
 validated slots and exact caller IDs
@@ -200,6 +203,45 @@ OCR does not own document order or cross-page semantics. A parser may use slot
 IDs to bind OCR evidence to exact rendered surfaces, but retry/cache authority,
 native/visual reconciliation, cross-page continuation, and document graph
 construction remain in A3S Parser.
+
+### Document-fast wired tables
+
+The document-fast table path keeps deterministic admission separate from model
+authority:
+
+```text
+bounded source image
+  -> one row-major dark-pixel pass for horizontal and vertical line runs
+  -> intersected wired-region candidates, at most eight per page
+  -> exact source crop resized and normalized to [N,3,488,488]
+  -> one at-most-16-crop Power encoder batch -> [N,256,96]
+  -> OCR-owned additive-attention GRU structure/location decoder
+  -> validated row/column spans and model cell quadrilaterals
+  -> source-pixel assignment of PP-OCRv6 blocks to one cell at most
+```
+
+The embedded graph declaration is an offline conversion of the reviewed split
+encoder. Conversion is allowed only for its exact source SHA-256 and I/O names.
+Seven control-only reshape values are reduced to identities, and three dynamic
+nearest-neighbor size calculations are replaced by the reviewed fixed-488
+scales. A zero-input probe gate compares the Power output with the source ONNX
+output at ten fixed indices with a `5e-5` absolute tolerance. ONNX Runtime and
+Python remain offline audit tools and are not runtime dependencies.
+
+The model bundle is accepted only when every canonical file remains under the
+configured root and matches its exact length and SHA-256. The Power session
+identity additionally binds the encoder graph, canonical encoder weight-store
+digest, decoder blob, and structure dictionary. The table stage chunks crops
+without materializing an unbounded tensor set, retains cancellation checks,
+and attaches encoder receipts to both the page-local result and batch evidence.
+
+On the retained real `merged-row-table` fixture, pages 2 through 4 each produce
+one model-backed fragment. The checked grids are respectively 6 by 6
+with 29 cells, 8 by 7 with 25 cells, and 3 by 6 with 17 cells; all published
+cells have model geometry. These are fixture-specific correctness gates, not a
+general table-accuracy score. OCR does not decide that the three fragments are
+one logical table. Borderless-table detection and seal detection remain
+unsupported.
 
 ## Unlimited-OCR
 

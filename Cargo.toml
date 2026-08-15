@@ -72,6 +72,7 @@ ppocr-v6 = [
     "dep:serde_yaml",
     "dep:tar",
 ]
+ppocr-v6-cuda = ["ppocr-v6", "a3s-power/embedded-cuda"]
 mcp = ["dep:rmcp", "dep:serde_json", "tokio/io-std"]
 cli = ["ppocr-v6", "mcp", "dep:clap"]
 

@@ -46,6 +46,28 @@ Upstream repository: <https://github.com/PaddlePaddle/PaddleOCR>
 
 Model collection: <https://huggingface.co/collections/PaddlePaddle/pp-ocrv6>
 
+## TurboOCR and SLANet-Plus Table Assets
+
+The optional document-fast provider was reviewed against TurboOCR commit
+`ed01c3ea2a3c7011bc361c2985215444918409b8` and its `v3.0.0` model bundle.
+TurboOCR's split-encoder/host-decoder design is an algorithm and asset-format
+reference. A3S OCR does not include the TurboOCR server, TensorRT, ONNX Runtime,
+Python runtime, scheduler, or protocol implementation.
+
+The crate embeds an independently converted A3S Power graph declaration for
+the exact reviewed SLANet-Plus encoder and a small dictionary fixture used by
+tests. It does not redistribute the ONNX encoder, SafeTensors weights, decoder
+weight blob, or production dictionary; operators supply those assets and A3S
+OCR verifies their exact byte lengths and SHA-256 digests before loading them.
+
+TurboOCR is licensed under the MIT License. PaddleOCR model artifacts and
+model definitions are licensed under the Apache License, Version 2.0.
+
+Upstream repositories:
+
+- <https://github.com/aiptimizer/TurboOCR>
+- <https://github.com/PaddlePaddle/PaddleOCR>
+
 ## A3S Power and Candle
 
 Native OCR providers execute through the model-neutral `a3s-power` embedded
