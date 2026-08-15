@@ -1,6 +1,7 @@
 use a3s_power::inference::{ExecutionPermit, ExecutionReceipt};
 use a3s_use_core::{UseError, UseResult};
 use image::RgbImage;
+use rayon::prelude::*;
 use tokio_util::sync::CancellationToken;
 
 use super::{engine_error, EngineBlock, EngineExtraction, PpOcrV6Engine};
@@ -263,10 +264,17 @@ fn prepare_batch_crops(
     active: Vec<usize>,
     states: &mut [ImageRecognition],
 ) -> Vec<(usize, RgbImage)> {
-    let mut crops = Vec::with_capacity(active.len());
-    for work_index in active {
+    let prepared = active
+        .into_par_iter()
+        .map(|work_index| {
+            let item = &work[work_index];
+            (work_index, item.crop.execute(images[item.image_index]))
+        })
+        .collect::<Vec<_>>();
+    let mut crops = Vec::with_capacity(prepared.len());
+    for (work_index, crop) in prepared {
         let item = &work[work_index];
-        match item.crop.execute(images[item.image_index]) {
+        match crop {
             Ok(crop) => crops.push((work_index, crop)),
             Err(error) => states[item.image_index].fail(error),
         }
@@ -425,6 +433,24 @@ mod tests {
         let healthy = outputs.next().unwrap().unwrap();
         assert_eq!(healthy.blocks[0].text, "healthy");
         assert_eq!(healthy.receipts, vec![receipt()]);
+    }
+
+    #[test]
+    fn parallel_crop_preparation_preserves_planned_order() {
+        let red = RgbImage::from_pixel(200, 50, image::Rgb([255, 0, 0]));
+        let green = RgbImage::from_pixel(200, 50, image::Rgb([0, 255, 0]));
+        let images = vec![&red, &green];
+        let work = vec![work_item(0, 0, 100.0), work_item(1, 0, 100.0)];
+        let mut states = vec![pending_image(1), pending_image(1)];
+
+        let crops = prepare_batch_crops(&images, &work, vec![1, 0], &mut states);
+
+        assert_eq!(
+            crops.iter().map(|(index, _)| *index).collect::<Vec<_>>(),
+            vec![1, 0]
+        );
+        assert_eq!(crops[0].1.get_pixel(50, 10), &image::Rgb([0, 255, 0]));
+        assert_eq!(crops[1].1.get_pixel(50, 10), &image::Rgb([255, 0, 0]));
     }
 
     fn pending_image(blocks: usize) -> ImageRecognition {

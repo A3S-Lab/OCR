@@ -45,7 +45,8 @@ client and exact model bundle.
 - [x] Exact Power model sessions, finite queues, current-memory microbatch
       plans, one shared permit, cancellation, and receipt-v4 evidence.
 - [x] Bounded batches of 1 through 256 source slots, detection microbatches of
-      at most 16 images, and recognition batches of at most eight crops.
+      at most 16 images, canonical recognition cohorts of at most eight crops,
+      and input-equivalent physical recognition calls of at most 32 crops.
 
 ### O2 — Cross-image PP-OCRv6 detection
 
@@ -85,13 +86,21 @@ client and exact model bundle.
 
 - [x] Flatten detected crops across admitted images while retaining exact
       `(slot, detection, reading-order)` identity and materializing no more
-      than one eight-crop recognition batch at a time.
+      than one 32-crop physical recognition batch at a time.
 - [x] Stable-sort and batch dynamic canvas widths within a reviewed 16-pixel
       bound (at most 5% padding at the 320-pixel minimum), restoring results
       and shared receipts to original image and block order. SHA-pinned table
       and seal fixtures retain exact text fingerprints while reducing calls
       from 53 to 28 and 33 to 23. Retain an isolated scalar retry for failed
       shared calls and separate every wider cohort.
+- [x] Coalesce adjacent canonical eight-crop cohorts only when their final
+      canvas width is identical, up to 32 crops, and parallelize independent
+      perspective crops and tensor slots without changing any input value or
+      output order. The 29-page CUDA rider-seal gate retains its exact text and
+      geometry fingerprints while its median falls from 8.400 to 6.834 seconds.
+- [x] Omit whitespace-only decoded blocks from public OCR evidence. Confidence
+      traces prove blank and nonblank detector scores overlap, so no unsafe
+      pre-recognition confidence cutoff is introduced.
 - [x] Project reviewed recognition probabilities on the execution device from
       `[N,T,18710]` to exact `[N,T,index/score/finite]` CTC evidence before host
       materialization. Reverse-axis argmax preserves scalar last-class tie
@@ -154,6 +163,9 @@ client and exact model bundle.
 - [ ] Optimize the PicoDet static graph CPU path before making a document-fast
       seal throughput claim; the first retained release build is a correctness
       baseline and does not meet the fine-parse target.
+- [ ] Reduce the remaining PP-OCRv6 recognition graph cost. On the retained
+      29-page CUDA gate, 138 width-cohort calls dominate the optimized path;
+      complete text-plus-seal throughput is 4.244 pages/s, not 10 pages/s.
 
 ## Cross-repository sequence
 

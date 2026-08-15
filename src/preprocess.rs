@@ -4,6 +4,7 @@ use std::io::Cursor;
 use a3s_use_core::{UseError, UseResult};
 use image::imageops::FilterType;
 use image::{ImageReader, Limits, RgbImage};
+use rayon::prelude::*;
 
 use crate::config::{DetectionConfig, RecognitionConfig};
 
@@ -19,7 +20,7 @@ const DETECTION_MIN_SIDE: u32 = 64;
 const DETECTION_FAST_MAX_SIDE: u32 = 896;
 pub(crate) const DETECTION_QUALITY_MAX_SIDE: u32 = 4_000;
 const DETECTION_MAX_BATCH_SIZE: usize = 16;
-const RECOGNITION_MAX_BATCH_SIZE: usize = 8;
+const RECOGNITION_MAX_BATCH_SIZE: usize = 32;
 const RECOGNITION_MAX_WIDTH: u32 = 3_200;
 
 pub(crate) struct DetectionInput {
@@ -284,21 +285,28 @@ pub(crate) fn recognition_input(
         .checked_mul(target_plane)
         .ok_or_else(|| image_error("Recognition tensor dimensions overflowed."))?;
     let mut data = vec![0.0_f32; images.len() * batch_stride];
-    for (batch, (image, resized_width)) in images.iter().zip(resized_widths).enumerate() {
-        let resized =
-            image::imageops::resize(*image, resized_width, model_height, FilterType::Triangle);
-        for y in 0..model_height {
-            for x in 0..resized_width {
-                let pixel = resized.get_pixel(x, y);
-                let target = y as usize * canvas_width as usize + x as usize;
-                let channels = [pixel[2], pixel[1], pixel[0]];
-                for channel in 0..config.channels {
-                    data[batch * batch_stride + channel * target_plane + target] =
-                        f32::from(channels[channel]) / 127.5 - 1.0;
+    data.par_chunks_exact_mut(batch_stride)
+        .zip(
+            images
+                .par_iter()
+                .copied()
+                .zip(resized_widths.par_iter().copied()),
+        )
+        .for_each(|(slot, (image, resized_width))| {
+            let resized =
+                image::imageops::resize(image, resized_width, model_height, FilterType::Triangle);
+            for y in 0..model_height {
+                for x in 0..resized_width {
+                    let pixel = resized.get_pixel(x, y);
+                    let target = y as usize * canvas_width as usize + x as usize;
+                    let channels = [pixel[2], pixel[1], pixel[0]];
+                    for channel in 0..config.channels {
+                        slot[channel * target_plane + target] =
+                            f32::from(channels[channel]) / 127.5 - 1.0;
+                    }
                 }
             }
-        }
-    }
+        });
     Ok(RecognitionInput {
         data,
         shape: [
@@ -512,5 +520,24 @@ mod tests {
         let oversized =
             std::iter::repeat_n(&narrow, RECOGNITION_MAX_BATCH_SIZE + 1).collect::<Vec<_>>();
         assert!(recognition_input(&oversized, &config).is_err());
+    }
+
+    #[test]
+    fn recognition_batch_preserves_input_order_and_scalar_values() {
+        let red = RgbImage::from_pixel(80, 20, image::Rgb([255, 0, 0]));
+        let green = RgbImage::from_pixel(80, 20, image::Rgb([0, 255, 0]));
+        let blue = RgbImage::from_pixel(80, 20, image::Rgb([0, 0, 255]));
+        let config = recognition_config();
+
+        let batch = recognition_input(&[&red, &green, &blue], &config).unwrap();
+        let slot_stride = batch.data.len() / 3;
+        for (index, image) in [&red, &green, &blue].into_iter().enumerate() {
+            let single = recognition_input(&[image], &config).unwrap();
+            assert_eq!(&batch.shape[1..], &single.shape[1..]);
+            assert_eq!(
+                &batch.data[index * slot_stride..(index + 1) * slot_stride],
+                single.data
+            );
+        }
     }
 }

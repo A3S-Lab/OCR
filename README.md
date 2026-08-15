@@ -354,24 +354,38 @@ output partitions; OCR retains each slot's content extent, excludes padding
 from DB postprocessing, and maps polygons through that extent into source
 pixels. OCR then flattens detected crops across the admitted images while
 retaining exact slot, detection, and reading-order identity. It stable-sorts
-dynamic recognition widths and groups at most eight crops whose widest canvas
-is no more than 16 pixels wider than the narrowest. Because every recognition
-canvas is at least 320 pixels wide, the reviewed bound adds at most 5% right
-padding while collapsing pixel-level crop jitter; larger width differences
-remain in separate calls. The planner materializes only the active chunk and
-restores blocks and receipts to their source slots. Unbounded width mixing is
-still forbidden because PP-OCRv6 recognition has global width context and can
-change decoded text. A failed shared graph call retries its affected crops
-through the scalar path so a non-cancellation failure remains isolated;
-cancellation still terminates the admitted request.
+dynamic recognition widths into canonical groups of at most eight crops whose
+widest canvas is no more than 16 pixels wider than the narrowest. Because every
+recognition canvas is at least 320 pixels wide, the reviewed bound adds at most
+5% right padding while collapsing pixel-level crop jitter; larger width
+differences remain separate. Adjacent canonical groups are coalesced only when
+their final canvas width is already identical, with a hard physical limit of
+32 crops. This changes neither padding nor model input values. Perspective
+crops and recognition tensors use the shared Rayon worker pool and restore the
+same deterministic order; scalar-versus-batch tensor tests are byte-exact. The
+planner materializes only the active group and restores blocks and receipts to
+their source slots. Unbounded width mixing remains forbidden because
+PP-OCRv6 recognition has global width context and can change decoded text. A
+failed shared graph call retries its affected crops through the scalar path so
+a non-cancellation failure remains isolated; cancellation still terminates the
+admitted request. Recognition results containing only whitespace are omitted
+from public blocks rather than publishing invalid empty evidence; this filter
+runs after inference and is not a detector-confidence shortcut.
 
 The bounded-width release gate uses SHA-pinned Parser rasters. The three-page
-cross-page-table fixture retained its exact text fingerprint while recognition
-calls fell from 53 to 28; the two-page rider-seal fixture retained its exact
-text fingerprint while calls fell from 33 to 23. Both fixtures also retain
-their table grids, cell geometry, seal IoU, and cross-page relations. These are
-fixture-specific correctness and latency diagnostics, not corpus-wide OCR
-accuracy or throughput claims.
+cross-page-table fixture retains its exact text fingerprint, `6x6/29`,
+`8x7/25`, and `3x6/17` grids/cells, and two continuation edges. The two-page
+rider-seal fixture retains its exact text fingerprint, three complete seals,
+two IoU-checked right-edge fragments, and one continuation identity. The
+full-document gates extend this to all six table pages and all 29 rider-seal
+pages: CUDA retains exact text and structured-geometry fingerprints, 71 table
+cells, two table continuations, 12 complete seals, and two reconciled boundary
+fragments with no unresolved candidate. On the named development RTX 4090,
+equal-canvas coalescing plus parallel recognition preprocessing reduced the
+29-page CUDA median from 8.400 to 6.834 seconds (4.244 pages/s); the same CPU
+path took 459.988 seconds (0.063 pages/s). The CUDA result is still below the
+10-pages/s complete fine-parse target. These are fixture-specific correctness
+and latency diagnostics, not corpus-wide OCR accuracy or throughput claims.
 
 Recognition no longer materializes the complete 18,710-class probability row
 on the host. OCR applies a deterministic model-owned projection on the Power

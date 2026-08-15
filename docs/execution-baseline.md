@@ -147,12 +147,16 @@ Recognition batching has a stricter geometry rule. A CUDA diagnostic that
 mixed different dynamic widths produced 0.933 ASCII-token F1 for the wide slot;
 the same result occurred with the prior pinned Power revision. The checked path
 therefore never performs unbounded width mixing. It admits only crops whose
-recognition canvases differ by at most 16 pixels into one at-most-eight-crop
-call. Since the minimum canvas is 320 pixels, the maximum added right padding
-is 5%; larger differences retain separate dynamic calls. SHA-pinned Parser
-table and rider-seal fixtures keep exact text fingerprints under this bound,
-along with their structured geometry and cross-page assertions. Detector
-inputs use a 896-pixel fast bound and preserve original-source crops. Visually
+recognition canvases differ by at most 16 pixels into one canonical
+at-most-eight-crop cohort. Adjacent canonical cohorts share one at-most-32-crop
+physical call only when their final canvas width is already identical. Since
+the minimum canvas is 320 pixels, the maximum added right padding remains 5%;
+larger differences retain separate dynamic calls. The gate must compare every
+parallelized perspective crop and tensor slot with scalar materialization and
+preserve exact input order and values. SHA-pinned Parser table and rider-seal
+fixtures keep exact text and structured-geometry fingerprints under this
+policy, along with their cell, IoU, and cross-page assertions. Detector inputs
+use a 896-pixel fast bound and preserve original-source crops. Visually
 non-uniform empty results receive one scalar retry at the 4,000-pixel quality
 bound; this does not certify partially detected small text or replace the open
 official-image matrix gate.

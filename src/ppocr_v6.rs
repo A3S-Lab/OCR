@@ -98,8 +98,32 @@ impl OcrProvider for PpOcrV6Provider {
 
 pub(super) fn build_output(extraction: EngineExtraction) -> UseResult<OcrProviderOutput> {
     let EngineExtraction { blocks, receipts } = extraction;
+    if std::env::var_os("A3S_OCR_TRACE_STAGE_TIMINGS").is_some() {
+        let blank = blocks
+            .iter()
+            .filter(|block| block.text.trim().is_empty())
+            .collect::<Vec<_>>();
+        if !blank.is_empty() {
+            let blank_detection_max = blank
+                .iter()
+                .map(|block| block.detection_confidence)
+                .max_by(f32::total_cmp)
+                .unwrap_or_default();
+            let nonblank_detection_min = blocks
+                .iter()
+                .filter(|block| !block.text.trim().is_empty())
+                .map(|block| block.detection_confidence)
+                .min_by(f32::total_cmp);
+            eprintln!(
+                "A3S_OCR_BLANK_RECOGNITION blocks={} blank={} blank_detection_max={blank_detection_max:.6} nonblank_detection_min={nonblank_detection_min:?}",
+                blocks.len(),
+                blank.len(),
+            );
+        }
+    }
     let blocks = blocks
         .into_iter()
+        .filter(|block| !block.text.trim().is_empty())
         .map(|block| {
             let [first, second, third, fourth] = block.polygon;
             let polygon = [
@@ -171,6 +195,31 @@ fn finite_coordinate(value: f32) -> UseResult<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_output_omits_blank_recognition_blocks() {
+        let polygon = [
+            imageproc::point::Point::new(10.0, 20.0),
+            imageproc::point::Point::new(40.0, 20.0),
+            imageproc::point::Point::new(40.0, 50.0),
+            imageproc::point::Point::new(10.0, 50.0),
+        ];
+        let block = |text: &str| crate::engine::EngineBlock {
+            polygon,
+            detection_confidence: 0.9,
+            text: text.to_string(),
+            confidence: 0.8,
+        };
+        let output = build_output(EngineExtraction {
+            blocks: vec![block(""), block(" \t\r\n"), block("preserved text")],
+            receipts: Vec::new(),
+        })
+        .unwrap();
+
+        assert_eq!(output.text, "preserved text");
+        assert_eq!(output.blocks.len(), 1);
+        assert_eq!(output.blocks[0].text, "preserved text");
+    }
 
     #[test]
     fn default_provider_is_local_and_explicit() {

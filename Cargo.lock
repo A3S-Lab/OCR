@@ -63,6 +63,7 @@ dependencies = [
  "image",
  "imageproc",
  "libc",
+ "rayon",
  "reqwest",
  "rmcp",
  "schemars",

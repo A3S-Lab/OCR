@@ -2,7 +2,8 @@ use a3s_use_core::UseResult;
 
 use super::super::engine_error;
 
-const RECOGNITION_BATCH_SIZE: usize = 8;
+const RECOGNITION_CANONICAL_BATCH_SIZE: usize = 8;
+const RECOGNITION_MAX_BATCH_SIZE: usize = 32;
 // Recognition canvases are never narrower than 320 pixels, so this admits at
 // most 5% right padding while collapsing pixel-level crop-width jitter. The
 // bound is covered by exact-text Parser fixtures and remains far below the
@@ -35,22 +36,48 @@ pub(super) fn plan_width_batches_with_padding(
     // path.
     let mut sorted_indices = (0..canvas_widths.len()).collect::<Vec<_>>();
     sorted_indices.sort_by_key(|index| canvas_widths[*index]);
-    let mut batches = Vec::new();
+    let mut canonical = Vec::new();
     let mut start = 0;
     while start < sorted_indices.len() {
         let minimum_width = canvas_widths[sorted_indices[start]];
         let maximum_width = minimum_width.saturating_add(maximum_padding);
         let mut end = start + 1;
         while end < sorted_indices.len()
-            && end - start < RECOGNITION_BATCH_SIZE
+            && end - start < RECOGNITION_CANONICAL_BATCH_SIZE
             && canvas_widths[sorted_indices[end]] <= maximum_width
         {
             end += 1;
         }
-        batches.push(sorted_indices[start..end].to_vec());
+        canonical.push(sorted_indices[start..end].to_vec());
         start = end;
     }
-    Ok(batches)
+    Ok(coalesce_equal_canvas_batches(canonical, canvas_widths))
+}
+
+fn coalesce_equal_canvas_batches(
+    canonical: Vec<Vec<usize>>,
+    canvas_widths: &[u32],
+) -> Vec<Vec<usize>> {
+    let mut batches: Vec<Vec<usize>> = Vec::with_capacity(canonical.len());
+    for batch in canonical {
+        let canvas_width = batch
+            .iter()
+            .map(|index| canvas_widths[*index])
+            .max()
+            .unwrap_or_default();
+        let can_coalesce = batches.last().is_some_and(|previous| {
+            previous.len() + batch.len() <= RECOGNITION_MAX_BATCH_SIZE
+                && previous.iter().map(|index| canvas_widths[*index]).max() == Some(canvas_width)
+        });
+        if can_coalesce {
+            if let Some(previous) = batches.last_mut() {
+                previous.extend(batch);
+                continue;
+            }
+        }
+        batches.push(batch);
+    }
+    batches
 }
 
 #[cfg(test)]
@@ -100,15 +127,26 @@ mod tests {
 
     #[test]
     fn width_batches_never_exceed_the_reviewed_graph_limit() {
-        let batches = plan_width_batches(&[320; 17]).unwrap();
+        let batches = plan_width_batches(&[320; 33]).unwrap();
+
+        assert_eq!(batches, vec![(0..32).collect::<Vec<_>>(), vec![32]]);
+    }
+
+    #[test]
+    fn coalescing_preserves_each_canonical_input_canvas() {
+        let widths = [320; 33].into_iter().chain([321; 8]).collect::<Vec<_>>();
+        let batches = plan_width_batches(&widths).unwrap();
 
         assert_eq!(
             batches,
-            vec![
-                (0..8).collect::<Vec<_>>(),
-                (8..16).collect::<Vec<_>>(),
-                vec![16]
-            ]
+            vec![(0..32).collect::<Vec<_>>(), (32..41).collect::<Vec<_>>()]
+        );
+        assert_eq!(
+            batches
+                .iter()
+                .map(|batch| batch.iter().map(|index| widths[*index]).max().unwrap())
+                .collect::<Vec<_>>(),
+            vec![320, 321]
         );
     }
 

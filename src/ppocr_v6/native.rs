@@ -226,7 +226,7 @@ pub(crate) fn batch_binding() -> UseResult<ExecutionBatchBinding> {
     ExecutionBatchBinding::new(
         bundle_weights_sha256(),
         named_sha256(b"a3s-ocr-ppocr-v6-staged-slot-layout-v2\0"),
-        named_sha256(b"a3s-ocr-ppocr-v6-shape-cohort-scheduler-v5\0"),
+        named_sha256(b"a3s-ocr-ppocr-v6-shape-cohort-scheduler-v7\0"),
     )
     .map_err(|error| power_error("bind the PP-OCRv6 staged batch", error))
 }
