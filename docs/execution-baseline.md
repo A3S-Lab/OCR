@@ -146,9 +146,13 @@ a distinct Power plan with its own receipt.
 Recognition batching has a stricter geometry rule. A CUDA diagnostic that
 mixed different dynamic widths produced 0.933 ASCII-token F1 for the wide slot;
 the same result occurred with the prior pinned Power revision. The checked path
-therefore batches only crops with identical recognition canvas widths. The
-mixed-shape gate then passes without weakening its 0.95 threshold, while equal
-width crops still share calls of at most eight items. Detector inputs use a
-896-pixel fast bound and preserve original-source crops. Visually non-uniform
-empty results receive one scalar retry at the 4,000-pixel quality bound; this
-does not certify partially detected small text.
+therefore never performs unbounded width mixing. It admits only crops whose
+recognition canvases differ by at most 16 pixels into one at-most-eight-crop
+call. Since the minimum canvas is 320 pixels, the maximum added right padding
+is 5%; larger differences retain separate dynamic calls. SHA-pinned Parser
+table and rider-seal fixtures keep exact text fingerprints under this bound,
+along with their structured geometry and cross-page assertions. Detector
+inputs use a 896-pixel fast bound and preserve original-source crops. Visually
+non-uniform empty results receive one scalar retry at the 4,000-pixel quality
+bound; this does not certify partially detected small text or replace the open
+official-image matrix gate.

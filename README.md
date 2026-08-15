@@ -353,14 +353,25 @@ compatible cohort contains at most 16 images and executes one dynamic
 output partitions; OCR retains each slot's content extent, excludes padding
 from DB postprocessing, and maps polygons through that extent into source
 pixels. OCR then flattens detected crops across the admitted images while
-retaining exact slot, detection, and reading-order identity. It groups only
-identical dynamic recognition canvas widths, chunks each width group into at
-most eight crops per graph call, materializes only the active chunk, and
-restores blocks and receipts to their source slots. Different widths are never
-mixed because PP-OCRv6 recognition has global width context and wider padding
-can change decoded text. A failed shared graph call retries its affected crops
+retaining exact slot, detection, and reading-order identity. It stable-sorts
+dynamic recognition widths and groups at most eight crops whose widest canvas
+is no more than 16 pixels wider than the narrowest. Because every recognition
+canvas is at least 320 pixels wide, the reviewed bound adds at most 5% right
+padding while collapsing pixel-level crop jitter; larger width differences
+remain in separate calls. The planner materializes only the active chunk and
+restores blocks and receipts to their source slots. Unbounded width mixing is
+still forbidden because PP-OCRv6 recognition has global width context and can
+change decoded text. A failed shared graph call retries its affected crops
 through the scalar path so a non-cancellation failure remains isolated;
 cancellation still terminates the admitted request.
+
+The bounded-width release gate uses SHA-pinned Parser rasters. The three-page
+cross-page-table fixture retained its exact text fingerprint while recognition
+calls fell from 53 to 28; the two-page rider-seal fixture retained its exact
+text fingerprint while calls fell from 33 to 23. Both fixtures also retain
+their table grids, cell geometry, seal IoU, and cross-page relations. These are
+fixture-specific correctness and latency diagnostics, not corpus-wide OCR
+accuracy or throughput claims.
 
 Recognition no longer materializes the complete 18,710-class probability row
 on the host. OCR applies a deterministic model-owned projection on the Power

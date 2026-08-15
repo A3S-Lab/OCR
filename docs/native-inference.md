@@ -164,16 +164,25 @@ does not prove that a non-empty result found every small text line.
 Recognition flattens the resulting crop plans across that admitted image
 batch. Each plan retains its source slot and reading-order detection index.
 OCR computes the exact post-rotation recognition width without allocating all
-crops, stable-sorts identities by that width, and chunks each identical-width
-group into dynamic `[B,3,48,W]` calls with `B <= 8`. Different widths are not
-mixed: the recognition graph has global width context, and the wider peer's
-padding changed a checked mixed-shape CUDA result below the 0.95 token-F1 gate.
-Only active crops are materialized, decoded blocks are restored by retained
-identity, and a shared Power receipt is attached once to every participating
-slot. If a shared call fails without cancellation, OCR retries its affected
-crops through bounded scalar calls to preserve slot isolation. A cancelled
-permit is never converted into fallback work. Static width profiles remain a
-separate optimization.
+crops, stable-sorts identities by that width, and chunks them into dynamic
+`[B,3,48,W]` calls with `B <= 8`. One batch may span no more than 16 pixels
+between its narrowest and widest canvas. The 320-pixel minimum canvas makes
+that at most 5% right padding, while any larger difference starts another
+batch. This replaces only pixel-level width fragmentation: an earlier
+unbounded mixed-width CUDA diagnostic changed a result below the 0.95 token-F1
+gate and remains forbidden. Only active crops are materialized, decoded blocks
+are restored by retained identity, and a shared Power receipt is attached once
+to every participating slot. If a shared call fails without cancellation, OCR
+retries its affected crops through bounded scalar calls to preserve slot
+isolation. A cancelled permit is never converted into fallback work. Static
+width profiles remain a separate optimization.
+
+The scheduler identity is revisioned with this bound. On SHA-pinned Parser
+rasters, the table fixture kept the exact text fingerprint while reducing 107
+crops from 53 calls (40 scalar calls) to 28 calls (five scalar calls). The seal
+fixture kept its exact text fingerprint while reducing 58 crops from 33 calls
+to 23. Parser additionally checks table topology/cells and seal geometry/links;
+broader official-image and corpus certification remains open.
 
 The reviewed plans also retain an explicit inventory of adjacent,
 single-consumer `HardSigmoid`-to-`Mul` channel gates: 13 in detection and five

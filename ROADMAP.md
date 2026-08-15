@@ -86,10 +86,12 @@ client and exact model bundle.
 - [x] Flatten detected crops across admitted images while retaining exact
       `(slot, detection, reading-order)` identity and materializing no more
       than one eight-crop recognition batch at a time.
-- [x] Stable-sort and batch only identical dynamic canvas widths, preserving
-      scalar recognition geometry while restoring results and shared receipts
-      to original image and block order. Retain an isolated scalar retry for
-      failed shared calls.
+- [x] Stable-sort and batch dynamic canvas widths within a reviewed 16-pixel
+      bound (at most 5% padding at the 320-pixel minimum), restoring results
+      and shared receipts to original image and block order. SHA-pinned table
+      and seal fixtures retain exact text fingerprints while reducing calls
+      from 53 to 28 and 33 to 23. Retain an isolated scalar retry for failed
+      shared calls and separate every wider cohort.
 - [x] Project reviewed recognition probabilities on the execution device from
       `[N,T,18710]` to exact `[N,T,index/score/finite]` CTC evidence before host
       materialization. Reverse-axis argmax preserves scalar last-class tie

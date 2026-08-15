@@ -12,7 +12,7 @@ mod crop;
 mod planning;
 
 use crop::PerspectiveCropPlan;
-use planning::plan_width_batches;
+use planning::{plan_width_batches, plan_width_batches_with_padding};
 
 struct RecognitionWorkItem {
     image_index: usize,
@@ -57,7 +57,35 @@ impl PpOcrV6Engine {
             .iter()
             .map(|item| item.canvas_width)
             .collect::<Vec<_>>();
-        for batch in plan_width_batches(&canvas_widths)? {
+        let batches = plan_width_batches(&canvas_widths)?;
+        if std::env::var_os("A3S_OCR_TRACE_STAGE_TIMINGS").is_some() {
+            let width_cohorts = canvas_widths
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len();
+            let scalar_batches = batches.iter().filter(|batch| batch.len() == 1).count();
+            let maximum_batch = batches.iter().map(Vec::len).max().unwrap_or(0);
+            let maximum_width = canvas_widths.iter().copied().max().unwrap_or(0);
+            let padding_batch_counts = [8_u32, 16, 32, 64]
+                .map(|padding| {
+                    plan_width_batches_with_padding(&canvas_widths, padding)
+                        .map(|batches| batches.len())
+                })
+                .into_iter()
+                .collect::<UseResult<Vec<_>>>()?;
+            eprintln!(
+                "A3S_OCR_RECOGNITION_PLAN crops={} width_cohorts={} batches={} scalar_batches={} maximum_batch={} maximum_width={} padding_batches_8_16_32_64={:?}",
+                work.len(),
+                width_cohorts,
+                batches.len(),
+                scalar_batches,
+                maximum_batch,
+                maximum_width,
+                padding_batch_counts,
+            );
+        }
+        for batch in batches {
             check_cancelled(cancellation)?;
             let active = batch
                 .into_iter()
