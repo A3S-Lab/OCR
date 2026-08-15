@@ -127,9 +127,13 @@ client and exact model bundle.
       model-backed cell quadrilaterals, PP-OCRv6 cell text, and exact page-local
       evidence. The retained cross-page fixture checks 6x6/29, 8x7/25, and
       3x6/17 grids on pages 2 through 4.
-- [ ] Add explicit orientation, layout, borderless-table, formula, and seal
-      providers only with pinned assets, typed outputs, source-pixel geometry,
-      and evidence.
+- [x] Add optional PicoDet-L model-backed seal positions with pinned assets,
+      exact source-pixel geometry, confirmed versus boundary-candidate status,
+      bounded immediate-predecessor edge views, and retained real rider-seal
+      evidence for three interior marks plus two adjacent-page edge fragments.
+- [ ] Add explicit orientation, general layout, borderless-table, formula, and
+      seal-text providers only with pinned assets, typed outputs, source-pixel
+      geometry, and evidence.
 - [ ] Preserve provider-native fine geometry; never fabricate line, span, cell,
       or equation boxes from plain text.
 - [ ] Keep PP-OCRv6 and Unlimited-OCR behind the same provider/client contract
@@ -145,6 +149,9 @@ client and exact model bundle.
       10,000-surface Parser workloads with byte-stable completed resume.
 - [ ] Reject a release claim on numerical/output drift, unbounded growth,
       privacy-policy change, stale receipts, or implicit remote execution.
+- [ ] Optimize the PicoDet static graph CPU path before making a document-fast
+      seal throughput claim; the first retained release build is a correctness
+      baseline and does not meet the fine-parse target.
 
 ## Cross-repository sequence
 

@@ -135,20 +135,23 @@ only the text stage. PP-OCRv6 currently declares preprocessing and text, where
 preprocessing means bounded image decode and canonicalization. It does not yet
 claim table or seal detection. The separately constructed
 `DocumentFastOcrProvider` composes that text provider with the pinned
-SLANet-Plus wired-table model and declares preprocessing, text, and table. It
-is explicit rather than the default because its additional model bundle and
-table-only limitations must remain visible to the host.
+SLANet-Plus wired-table model and declares preprocessing, text, and table. When
+the separately pinned PicoDet layout bundle is configured, the same explicit
+provider also declares seal detection. It remains opt-in because every added
+model and its limitations must stay visible to the host.
 
 Staged-batch schema v2 requires every completed table or seal stage to carry a
 bounded typed payload on the exact source-image pixel canvas. Table evidence
 preserves the detected table region, optional grid dimensions, merged-cell
 spans, text, and only the cell geometry actually supplied by the provider. Seal
-evidence preserves its exact region, optional recognition, and canonical canvas
-edges when the visible mark is clipped. The client rejects invalid polygon
-envelopes, out-of-canvas regions, overlapping or out-of-grid cells, fabricated
-clipping, duplicate identities, and unbounded text before publishing a result.
-Cross-page table reconciliation remains a Parser responsibility; OCR produces
-page-local evidence and never joins pages itself.
+evidence preserves its exact region, optional recognition, canonical canvas
+edges when the visible mark is clipped, and whether the model confirmed the
+object on that page or retained only a `boundary-candidate`. The client rejects
+invalid polygon envelopes, out-of-canvas regions, overlapping or out-of-grid
+cells, fabricated clipping, duplicate identities, and unbounded text before
+publishing a result.
+Cross-page table and rider-seal reconciliation remain Parser responsibilities;
+OCR produces page-local evidence and never joins pages itself.
 
 ### Opt-in wired-table provider
 
@@ -175,9 +178,33 @@ The provider admits conservative wired-table crops from intersecting page
 rules, runs the fixed 488-pixel SLANet-Plus encoder through A3S Power, decodes
 the autoregressive structure and cell quadrilaterals locally, and assigns
 PP-OCRv6 text blocks to model cells by source-pixel geometry. A line candidate
-alone is never published as table evidence. Borderless tables and seals remain
+alone is never published as table evidence. Borderless tables remain
 unsupported, and page-local fragments are not labeled as cross-page
 continuations by OCR.
+
+### Opt-in model-backed seal positions
+
+Set `A3S_OCR_PICODET_LAYOUT_MODEL_DIR` to the reviewed local directory that
+contains the converted `model.safetensors`. The checked-in graph is a
+deterministic lowering of the pinned PaddleOCR `PicoDet-L_layout_3cls` raw head;
+production loads neither Paddle nor Python. The model owns the `seal` class and
+the host performs bounded score filtering and NMS in source-pixel coordinates.
+
+The normal page path uses one 640-pixel full-page view plus fixed left and right
+edge strips. Full-page detections at the reviewed threshold are `confirmed`.
+Low-confidence edge evidence is never promoted: it is returned as
+`boundary-candidate`, must touch the declared source-canvas edge, and remains
+unpublishable as a confirmed object without downstream reconciliation.
+
+For an admitted sequence, a caller may explicitly bind a slot to its immediate
+predecessor with `with_adjacent_predecessor`. When the predecessor contains a
+bounded edge candidate, OCR runs at most one additional local view for that
+edge on the current page. This recovered the narrow right-edge fragment in the
+retained two-page rider-seal fixture while the second page independently
+retained its three interior seals. The adjacency declaration authorizes only
+extra page-local evidence collection; Parser still owns cross-page matching,
+promotion, and canonical geometry. Seal text recognition and a general seal
+accuracy score are not implemented.
 
 A request contains 1 through 256 unique slots and at most 256 MiB of validated
 input bytes in addition to the existing 32 MiB per-image limit. Malformed
@@ -257,7 +284,7 @@ Provider choice is a typed object, never a raw backend-name switch.
 | Provider | OCR-owned implementation | Execution substrate | Source boundary |
 | --- | --- | --- | --- |
 | `PpOcrV6Provider` | Detection/recognition graphs, image pipeline, DB/CTC postprocessing | Embedded A3S Power | Always on device |
-| `DocumentFastOcrProvider` | PP-OCRv6 text plus SLANet-Plus wired-table admission, structure decode, cell geometry, and text matching | Embedded A3S Power | Always on device |
+| `DocumentFastOcrProvider` | PP-OCRv6 text, SLANet-Plus wired-table structure, and optional PicoDet-L seal positions with typed boundary candidates | Embedded A3S Power | Always on device |
 | `UnlimitedOcrProvider` | Vision towers, projector, decoder, tokenizer, generation, and grounding | Embedded A3S Power | Always on device |
 | Custom `OcrProvider` | Defined by the implementation | Defined by the implementation | Required in its descriptor |
 
@@ -565,7 +592,7 @@ visible to the MCP host instead of looking like a local-only read.
 | --- | --- |
 | `power-runtime` | Model-neutral embedded A3S Power runtime; never enables its server feature |
 | `ppocr-v6` | Local PP-OCRv6 provider, native graph plans, installer, image pipeline |
-| `ppocr-v6-cuda` | PP-OCRv6 and document-fast table inference through Power's NVIDIA CUDA path |
+| `ppocr-v6-cuda` | PP-OCRv6 and document-fast table/seal inference through Power's NVIDIA CUDA path |
 | `benchmark` | PP-OCRv6 real-image cold/warm execution-baseline binary |
 | `unlimited-ocr` | Native CPU Unlimited-OCR model, tokenizer, image pipeline, generation, and grounding |
 | `unlimited-ocr-accelerate` | Unlimited-OCR plus Apple Accelerate CPU kernels with reviewed BF16 operation boundaries |

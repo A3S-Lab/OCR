@@ -71,9 +71,9 @@ pub use provider::{
     OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
 };
 pub use structured::{
-    OcrCanvasEdge, OcrEvidenceId, OcrImageCanvas, OcrSealEvidence, OcrSealKind,
-    OcrSealStageEvidence, OcrStageEvidence, OcrTableCellEvidence, OcrTableEvidence, OcrTableKind,
-    OcrTableStageEvidence, OcrVisualRegion,
+    OcrCanvasEdge, OcrEvidenceId, OcrImageCanvas, OcrSealDetectionStatus, OcrSealEvidence,
+    OcrSealKind, OcrSealStageEvidence, OcrStageEvidence, OcrTableCellEvidence, OcrTableEvidence,
+    OcrTableKind, OcrTableStageEvidence, OcrVisualRegion,
 };
 #[cfg(feature = "unlimited-ocr")]
 pub use unlimited_ocr::{

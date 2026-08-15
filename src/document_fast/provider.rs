@@ -3,6 +3,7 @@ use async_trait::async_trait;
 
 use super::assets::SlanetPlusAssets;
 use super::projection::table_evidence;
+use super::seal::{seal_evidence, DetectedSealPage, SealStageBatch, SealStageRunner};
 use super::stage::{DetectedPage, TableStageBatch, TableStageRunner};
 use crate::cancellation::CancellationScope;
 use crate::{
@@ -14,6 +15,7 @@ use crate::{
 pub const DOCUMENT_FAST_PROVIDER_ID: &str = "document-fast-v1";
 const ENGINE_NAME: &str = "a3s-power-native";
 const DOCUMENT_FAST_MODEL: &str = "pp-ocr-v6-small+slanet-plus-wired";
+const DOCUMENT_FAST_SEAL_MODEL: &str = "pp-ocr-v6-small+slanet-plus-wired+picodet-l-layout-3cls";
 
 /// Local fast-document composition with PP-OCRv6 text and model-backed wired
 /// table structure. Cross-page reconciliation remains a Parser concern.
@@ -22,21 +24,32 @@ pub struct DocumentFastOcrProvider {
     descriptor: OcrProviderDescriptor,
     text: PpOcrV6Provider,
     table: TableStageRunner,
+    seal: Option<SealStageRunner>,
 }
 
 impl DocumentFastOcrProvider {
     pub fn from_env() -> UseResult<Self> {
         let table_assets = SlanetPlusAssets::from_env()?;
+        let seal = SealStageRunner::from_env_optional()?;
+        let mut stages = vec![OcrStage::Preprocessing, OcrStage::Text, OcrStage::Table];
+        if seal.is_some() {
+            stages.push(OcrStage::Seal);
+        }
         Ok(Self {
             descriptor: OcrProviderDescriptor::new(DOCUMENT_FAST_PROVIDER_ID, ENGINE_NAME, false)?
-                .with_stages(vec![
-                    OcrStage::Preprocessing,
-                    OcrStage::Text,
-                    OcrStage::Table,
-                ])?,
+                .with_stages(stages)?,
             text: PpOcrV6Provider::from_env()?,
             table: TableStageRunner::new(table_assets)?,
+            seal,
         })
+    }
+
+    fn model_name(&self) -> &'static str {
+        if self.seal.is_some() {
+            DOCUMENT_FAST_SEAL_MODEL
+        } else {
+            DOCUMENT_FAST_MODEL
+        }
     }
 }
 
@@ -48,19 +61,30 @@ impl OcrProvider for DocumentFastOcrProvider {
 
     fn diagnostic(&self) -> OcrProviderStatus {
         let text = self.text.diagnostic();
+        let model = self.model_name();
         if text.readiness == Readiness::Ready {
             OcrProviderStatus {
                 readiness: Readiness::Ready,
-                model: Some(DOCUMENT_FAST_MODEL.to_string()),
-                model_dir: Some(self.table.model_root().to_path_buf()),
-                message: "Local PP-OCRv6 text and SLANet-Plus wired-table models are ready."
-                    .to_string(),
+                model: Some(model.to_string()),
+                model_dir: Some(
+                    self.seal
+                        .as_ref()
+                        .map_or_else(|| self.table.model_root(), SealStageRunner::model_root)
+                        .to_path_buf(),
+                ),
+                message: if self.seal.is_some() {
+                    "Local PP-OCRv6 text, SLANet-Plus wired-table, and PicoDet seal models are ready."
+                        .to_string()
+                } else {
+                    "Local PP-OCRv6 text and SLANet-Plus wired-table models are ready; the optional PicoDet seal model is not configured."
+                        .to_string()
+                },
                 suggestions: Vec::new(),
             }
         } else {
             OcrProviderStatus {
                 readiness: text.readiness,
-                model: Some(DOCUMENT_FAST_MODEL.to_string()),
+                model: Some(model.to_string()),
                 model_dir: text.model_dir,
                 message: format!(
                     "The wired-table model is ready, but the PP-OCRv6 text model is not: {}",
@@ -94,9 +118,14 @@ impl OcrProvider for DocumentFastOcrProvider {
             stages: text_stages,
             slots: request.slots.clone(),
         });
-        let table_slots = stages.contains(&OcrStage::Table).then_some(request.slots);
+        let table_slots = stages
+            .contains(&OcrStage::Table)
+            .then(|| request.slots.clone());
+        let seal_slots = stages.contains(&OcrStage::Seal).then_some(request.slots);
         let cancellation = CancellationScope::new();
         let token = cancellation.token();
+        let table_token = token.clone();
+        let seal_token = token;
         let text_future = async {
             match text_request {
                 Some(request) => Some(self.text.recognize_batch(request).await),
@@ -105,16 +134,26 @@ impl OcrProvider for DocumentFastOcrProvider {
         };
         let table_future = async {
             match table_slots {
-                Some(slots) => Some(self.table.run(slots, token).await),
+                Some(slots) => Some(self.table.run(slots, table_token).await),
                 None => None,
             }
         };
-        let (text_result, table_result) = tokio::join!(text_future, table_future);
+        let seal_future = async {
+            match (seal_slots, self.seal.as_ref()) {
+                (Some(slots), Some(seal)) => Some(seal.run(slots, seal_token).await),
+                _ => None,
+            }
+        };
+        let (text_result, table_result, seal_result) =
+            tokio::join!(text_future, table_future, seal_future);
         cancellation.disarm();
 
         let (text_slots, mut execution_receipts) = normalize_text_slots(text_result, &slot_ids)?;
         let (table_slots, table_receipts) = normalize_table_slots(table_result, &slot_ids)?;
+        let (seal_slots, seal_receipts) = normalize_seal_slots(seal_result, &slot_ids)?;
         execution_receipts.extend(table_receipts);
+        execution_receipts.extend(seal_receipts);
+        let model_name = self.model_name();
         let mut outputs = Vec::with_capacity(slot_ids.len());
         for (index, slot_id) in slot_ids.into_iter().enumerate() {
             let text_slot = text_slots.get(index).and_then(Option::as_ref);
@@ -131,12 +170,26 @@ impl OcrProvider for DocumentFastOcrProvider {
                     Some(
                         table_evidence(page, output.as_ref()).map(|(evidence, receipts)| {
                             let output = output.get_or_insert_with(OcrProviderOutput::default);
-                            output.model = Some(DOCUMENT_FAST_MODEL.to_string());
+                            output.model = Some(model_name.to_string());
                             output.execution_receipts.extend(receipts);
                             evidence
                         }),
                     )
                 }
+            };
+            let seal_resolution = match seal_slots
+                .get(index)
+                .and_then(Option::as_ref)
+                .map(|slot| slot.as_ref())
+            {
+                None => None,
+                Some(Err(error)) => Some(Err(error.clone())),
+                Some(Ok(page)) => Some(seal_evidence(page.clone()).map(|(evidence, receipts)| {
+                    let output = output.get_or_insert_with(OcrProviderOutput::default);
+                    output.model = Some(model_name.to_string());
+                    output.execution_receipts.extend(receipts);
+                    evidence
+                })),
             };
             let outcomes = stages
                 .iter()
@@ -164,10 +217,16 @@ impl OcrProvider for DocumentFastOcrProvider {
                             ),
                         ),
                     },
-                    OcrStage::Orientation
-                    | OcrStage::Layout
-                    | OcrStage::Formula
-                    | OcrStage::Seal => OcrStageOutcome::unsupported(*stage),
+                    OcrStage::Seal => match &seal_resolution {
+                        Some(Ok(evidence)) => {
+                            OcrStageOutcome::completed_with_evidence(evidence.clone())
+                        }
+                        Some(Err(error)) => OcrStageOutcome::failed(*stage, error.clone()),
+                        None => OcrStageOutcome::unsupported(*stage),
+                    },
+                    OcrStage::Orientation | OcrStage::Layout | OcrStage::Formula => {
+                        OcrStageOutcome::unsupported(*stage)
+                    }
                 })
                 .collect();
             outputs.push(OcrProviderBatchSlotOutput {
@@ -264,6 +323,44 @@ fn clone_page(page: &DetectedPage) -> DetectedPage {
     }
 }
 
+type SealSlot = Result<DetectedSealPage, UseError>;
+
+fn normalize_seal_slots(
+    result: Option<UseResult<SealStageBatch>>,
+    expected: &[crate::OcrBatchSlotId],
+) -> UseResult<(Vec<Option<SealSlot>>, Vec<crate::OcrExecutionReceipt>)> {
+    let Some(result) = result else {
+        return Ok(((0..expected.len()).map(|_| None).collect(), Vec::new()));
+    };
+    match result {
+        Ok(output) => {
+            if output.slots.len() != expected.len()
+                || output
+                    .slots
+                    .iter()
+                    .zip(expected)
+                    .any(|(slot, expected)| slot.slot_id != *expected)
+            {
+                return Err(composition_error(
+                    "The seal sub-provider changed document-fast slot identity or cardinality.",
+                ));
+            }
+            Ok((
+                output
+                    .slots
+                    .into_iter()
+                    .map(|slot| Some(slot.page))
+                    .collect(),
+                output.receipts,
+            ))
+        }
+        Err(error) => Ok((
+            expected.iter().map(|_| Some(Err(error.clone()))).collect(),
+            Vec::new(),
+        )),
+    }
+}
+
 fn composition_error(message: impl Into<String>) -> UseError {
     UseError::new("use.ocr.provider_batch_invalid", message)
 }
@@ -279,11 +376,11 @@ mod tests {
         };
         let provider = DocumentFastOcrProvider::from_env().unwrap();
         assert_eq!(provider.descriptor().id, DOCUMENT_FAST_PROVIDER_ID);
-        assert_eq!(
-            provider.descriptor().supported_stages,
-            vec![OcrStage::Preprocessing, OcrStage::Text, OcrStage::Table]
-        );
-        assert!(!provider.descriptor().supports_stage(OcrStage::Seal));
+        let mut expected = vec![OcrStage::Preprocessing, OcrStage::Text, OcrStage::Table];
+        if std::env::var_os("A3S_OCR_PICODET_LAYOUT_MODEL_DIR").is_some() {
+            expected.push(OcrStage::Seal);
+        }
+        assert_eq!(provider.descriptor().supported_stages, expected);
         assert_eq!(super::super::assets::MODEL_FAMILY, "slanet-plus-wired");
     }
 

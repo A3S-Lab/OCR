@@ -10,6 +10,7 @@ mod native;
 mod preprocess;
 mod projection;
 mod provider;
+mod seal;
 mod stage;
 mod wired;
 

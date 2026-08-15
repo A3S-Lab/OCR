@@ -42,6 +42,7 @@ fn seal_evidence_preserves_canvas_clipping_and_position() {
     outcome.validate().unwrap();
     let value = serde_json::to_value(&outcome).unwrap();
     let seal = &value["evidence"]["evidence"]["seals"][0];
+    assert_eq!(seal["status"], "confirmed");
     assert_eq!(seal["clippedEdges"], serde_json::json!(["right"]));
     assert_eq!(seal["region"]["boundingBox"]["x"], 900);
     assert_eq!(seal["region"]["boundingBox"]["width"], 100);
@@ -100,6 +101,11 @@ fn malformed_geometry_grid_and_clipping_are_rejected() {
     let mut confidence_without_text = seal_evidence();
     confidence_without_text.seals[0].recognized_text = None;
     assert_structured_stage_error(OcrStageEvidence::Seal(confidence_without_text));
+
+    let mut ungrounded_candidate = seal_evidence();
+    ungrounded_candidate.seals[0].status = crate::OcrSealDetectionStatus::BoundaryCandidate;
+    ungrounded_candidate.seals[0].clipped_edges.clear();
+    assert_structured_stage_error(OcrStageEvidence::Seal(ungrounded_candidate));
 }
 
 #[tokio::test]
@@ -169,6 +175,7 @@ fn seal_evidence() -> OcrSealStageEvidence {
         seals: vec![OcrSealEvidence {
             id: evidence_id("seal-1"),
             kind: OcrSealKind::Circular,
+            status: crate::OcrSealDetectionStatus::Confirmed,
             region: region(900, 300, 100, 120, Some(0.94)),
             clipped_edges: vec![OcrCanvasEdge::Right],
             recognized_text: Some("ACME".to_string()),

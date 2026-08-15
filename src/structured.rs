@@ -150,6 +150,18 @@ pub enum OcrSealKind {
     Unknown,
 }
 
+/// Whether one seal box is independently confirmed on its page or retained
+/// only for adjacent-page boundary reconciliation.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum OcrSealDetectionStatus {
+    #[default]
+    Confirmed,
+    BoundaryCandidate,
+}
+
 /// Source-canvas boundary on which a detected seal is visibly clipped.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
@@ -168,6 +180,8 @@ pub enum OcrCanvasEdge {
 pub struct OcrSealEvidence {
     pub id: OcrEvidenceId,
     pub kind: OcrSealKind,
+    #[serde(default)]
+    pub status: OcrSealDetectionStatus,
     pub region: OcrVisualRegion,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub clipped_edges: Vec<OcrCanvasEdge>,
@@ -341,6 +355,12 @@ fn validate_seal_stage(evidence: &OcrSealStageEvidence) -> UseResult<()> {
         }
         validate_region(&seal.region, evidence.canvas)?;
         validate_clipped_edges(seal, evidence.canvas)?;
+        if seal.status == OcrSealDetectionStatus::BoundaryCandidate && seal.clipped_edges.is_empty()
+        {
+            return Err(structured_error(
+                "An OCR seal boundary candidate must declare at least one clipped canvas edge.",
+            ));
+        }
         match (&seal.recognized_text, seal.recognition_confidence) {
             (Some(text), confidence) => {
                 validate_text(text, "seal recognition", &mut total_text_bytes)?;

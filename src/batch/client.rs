@@ -52,6 +52,7 @@ impl OcrClient {
                     provider_slots.push(OcrProviderBatchSlot {
                         slot_id: slot.slot_id,
                         input,
+                        adjacent_predecessor_slot_id: slot.adjacent_predecessor_slot_id,
                     });
                 }
                 Err(error) => {

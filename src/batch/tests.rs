@@ -272,6 +272,36 @@ fn batch_public_types_are_send_and_sync() {
 }
 
 #[test]
+fn adjacent_predecessors_are_explicit_and_immediately_ordered() {
+    let first_id = OcrBatchSlotId::new("page-1").unwrap();
+    let second_id = OcrBatchSlotId::new("page-2").unwrap();
+    let linked = OcrBatchRequest::new(
+        vec![OcrStage::Seal],
+        vec![
+            OcrBatchSlotRequest::new(first_id.clone(), "page-1.png"),
+            OcrBatchSlotRequest::new(second_id, "page-2.png")
+                .with_adjacent_predecessor(first_id.clone()),
+        ],
+    )
+    .unwrap();
+    assert_eq!(
+        linked.slots[1].adjacent_predecessor_slot_id,
+        Some(first_id.clone())
+    );
+
+    let wrong = OcrBatchRequest::new(
+        vec![OcrStage::Seal],
+        vec![
+            OcrBatchSlotRequest::new(first_id.clone(), "page-1.png")
+                .with_adjacent_predecessor(first_id),
+            OcrBatchSlotRequest::new(OcrBatchSlotId::new("page-2").unwrap(), "page-2.png"),
+        ],
+    )
+    .unwrap_err();
+    assert_eq!(wrong.code, "use.ocr.batch_invalid");
+}
+
+#[test]
 fn receipt_v4_requires_well_formed_microbatch_evidence() {
     let mut output = output();
     output.execution_receipts[0].schema = "a3s.power.embedded-execution-receipt.v4".to_string();

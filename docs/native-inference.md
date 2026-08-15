@@ -105,17 +105,18 @@ Schema `a3s.ocr.staged-batch.v2` carries structured page-local evidence on an
 exact source-image pixel canvas. A completed table stage must return bounded
 table regions and may return a validated grid with non-overlapping row/column
 spans and optional source-pixel cell regions. A completed seal stage must return
-bounded seal regions and explicitly names only canvas edges the region actually
-touches when a mark is clipped. Polygon envelopes, confidence values, IDs,
-counts, text, and containment are validated at the client boundary. This
-contract supplies evidence to Parser without moving cross-page reconciliation
-or normalized document geometry into OCR.
+bounded seal regions, distinguish confirmed objects from boundary candidates,
+and explicitly name only canvas edges the region actually touches when a mark
+is clipped. A boundary candidate must name at least one such edge. Polygon
+envelopes, confidence values, IDs, counts, text, and containment are validated
+at the client boundary. This contract supplies evidence to Parser without
+moving cross-page reconciliation or normalized document geometry into OCR.
 
 PP-OCRv6 implements preprocessing and text and returns table and seal as
 unsupported. `DocumentFastOcrProvider` is a separate explicit composition that
-adds only the table stage. It requires an operator-supplied, SHA-256-pinned
-SLANet-Plus wired-table bundle; it does not broaden the default provider or
-claim seal support. PP-OCRv6 staged execution is:
+adds the table stage and, only when its second pinned bundle is configured, the
+seal stage. It requires operator-supplied, SHA-256-pinned model assets and does
+not broaden the default provider. PP-OCRv6 staged execution is:
 
 ```text
 validated slots and exact caller IDs
@@ -240,8 +241,43 @@ one model-backed fragment. The checked grids are respectively 6 by 6
 with 29 cells, 8 by 7 with 25 cells, and 3 by 6 with 17 cells; all published
 cells have model geometry. These are fixture-specific correctness gates, not a
 general table-accuracy score. OCR does not decide that the three fragments are
-one logical table. Borderless-table detection and seal detection remain
-unsupported.
+one logical table. Borderless-table detection remains unsupported.
+
+### Document-fast seal positions
+
+The optional seal path owns a reviewed `PicoDet-L_layout_3cls` model and lowers
+its pre-NMS raw head to the static A3S Power graph contract. The development
+converter verifies exact Paddle graph, parameter, configuration, and archive
+SHA-256 values, cuts before provider scaling and NMS, writes one
+`[N,8500,7]` raw output, and produces byte-identical graph and SafeTensors
+assets on repeated runs. Paddle, Python, and external inference runtimes are
+not production dependencies.
+
+```text
+bounded source page
+  -> full-page 640x640 view + fixed left/right edge strips
+  -> bounded batches of at most eight views through one Power session
+  -> seal-class score filter + host NMS + exact source-pixel projection
+  -> confirmed page detections and explicitly clipped boundary candidates
+  -> optional predecessor-authorized local edge view
+  -> page-local evidence only; Parser reconciles adjacent units
+```
+
+Adjacent scanning is closed by construction. A request slot may name only the
+immediately preceding slot in the same validated batch. A predecessor edge
+candidate may trigger one 64-pixel-wide, 320-through-512-pixel-high view on the
+same edge of the current page. Two contained narrow model fragments plus one
+model envelope may be fused dimension-wise, but the result remains a boundary
+candidate. No color threshold, red-pixel rule, implicit slot-order assumption,
+or cross-page promotion exists in OCR.
+
+The retained real rider-seal fixture verifies three independently confirmed
+interior seals on page 2, a right-edge candidate on page 1, and a narrow
+right-edge candidate on page 2 recovered by the explicit predecessor view.
+This is fixture evidence, not a general accuracy or throughput claim. On the
+current Windows CPU host, the unoptimized generic Power graph took about 12.0
+seconds for the six baseline views and 2.84 seconds for the one follow-up view
+in an optimized build; CPU graph optimization remains an open release gate.
 
 ## Unlimited-OCR
 

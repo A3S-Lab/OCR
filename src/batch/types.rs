@@ -76,6 +76,8 @@ impl std::fmt::Display for OcrBatchSlotId {
 pub struct OcrBatchSlotRequest {
     pub slot_id: OcrBatchSlotId,
     pub path: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adjacent_predecessor_slot_id: Option<OcrBatchSlotId>,
 }
 
 impl OcrBatchSlotRequest {
@@ -83,7 +85,17 @@ impl OcrBatchSlotRequest {
         Self {
             slot_id,
             path: path.into(),
+            adjacent_predecessor_slot_id: None,
         }
+    }
+
+    /// Declare that this slot immediately follows another admitted source
+    /// unit in the same request. Providers may use this only to collect
+    /// additional page-local boundary evidence; they do not gain authority to
+    /// reconcile the units.
+    pub fn with_adjacent_predecessor(mut self, predecessor: OcrBatchSlotId) -> Self {
+        self.adjacent_predecessor_slot_id = Some(predecessor);
+        self
     }
 }
 
@@ -117,10 +129,18 @@ impl OcrBatchRequest {
             }
         }
         let mut slots = BTreeSet::new();
-        for slot in &self.slots {
+        for (index, slot) in self.slots.iter().enumerate() {
             slot.slot_id.validate()?;
             if !slots.insert(slot.slot_id.as_str()) {
                 return Err(batch_error("OCR batch slot IDs must be unique."));
+            }
+            if let Some(predecessor) = &slot.adjacent_predecessor_slot_id {
+                predecessor.validate()?;
+                if index == 0 || self.slots[index - 1].slot_id != *predecessor {
+                    return Err(batch_error(
+                        "An OCR adjacent predecessor must be the immediately preceding slot in the same batch.",
+                    ));
+                }
             }
         }
         Ok(())
@@ -233,6 +253,7 @@ impl OcrStageOutcome {
 pub struct OcrProviderBatchSlot {
     pub slot_id: OcrBatchSlotId,
     pub input: OcrInput,
+    pub adjacent_predecessor_slot_id: Option<OcrBatchSlotId>,
 }
 
 impl std::fmt::Debug for OcrProviderBatchSlot {
@@ -241,6 +262,10 @@ impl std::fmt::Debug for OcrProviderBatchSlot {
             .debug_struct("OcrProviderBatchSlot")
             .field("slot_id", &self.slot_id)
             .field("input", &"validated-image")
+            .field(
+                "has_adjacent_predecessor",
+                &self.adjacent_predecessor_slot_id.is_some(),
+            )
             .finish()
     }
 }

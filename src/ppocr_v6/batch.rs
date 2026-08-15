@@ -31,7 +31,11 @@ pub(super) async fn recognize_one(
         provider,
         OcrProviderBatchRequest {
             stages: vec![OcrStage::Preprocessing, OcrStage::Text],
-            slots: vec![OcrProviderBatchSlot { slot_id, input }],
+            slots: vec![OcrProviderBatchSlot {
+                slot_id,
+                input,
+                adjacent_predecessor_slot_id: None,
+            }],
         },
     )
     .await?;
