@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     OcrExecutionModel, OcrExecutionReceipt, OcrInput, OcrProviderDescriptor, OcrProviderOutput,
-    OcrResult,
+    OcrResult, OcrStageEvidence,
 };
 
 pub(super) const MAX_BATCH_SLOTS: usize = 256;
@@ -25,6 +25,7 @@ pub enum OcrStage {
     Text,
     Table,
     Formula,
+    Seal,
 }
 
 /// Stable caller-owned identity for one batch slot.
@@ -148,6 +149,8 @@ pub struct OcrStageOutcome {
     pub status: OcrStageStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<UseError>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<OcrStageEvidence>,
 }
 
 impl OcrStageOutcome {
@@ -156,6 +159,16 @@ impl OcrStageOutcome {
             stage,
             status: OcrStageStatus::Completed,
             error: None,
+            evidence: None,
+        }
+    }
+
+    pub fn completed_with_evidence(evidence: OcrStageEvidence) -> Self {
+        Self {
+            stage: evidence.stage(),
+            status: OcrStageStatus::Completed,
+            error: None,
+            evidence: Some(evidence),
         }
     }
 
@@ -164,6 +177,7 @@ impl OcrStageOutcome {
             stage,
             status: OcrStageStatus::Failed,
             error: Some(error),
+            evidence: None,
         }
     }
 
@@ -172,6 +186,7 @@ impl OcrStageOutcome {
             stage,
             status: OcrStageStatus::Unsupported,
             error: None,
+            evidence: None,
         }
     }
 
@@ -180,6 +195,7 @@ impl OcrStageOutcome {
             stage,
             status: OcrStageStatus::Skipped,
             error: Some(error),
+            evidence: None,
         }
     }
 
@@ -192,6 +208,21 @@ impl OcrStageOutcome {
             return Err(provider_batch_error(
                 "Failed or skipped OCR stages require an error, while completed or unsupported stages must not carry one.",
             ));
+        }
+        let expects_evidence = self.status == OcrStageStatus::Completed
+            && matches!(self.stage, OcrStage::Table | OcrStage::Seal);
+        if expects_evidence != self.evidence.is_some() {
+            return Err(provider_batch_error(
+                "Completed table or seal stages require typed evidence, while every other stage outcome must not carry it.",
+            ));
+        }
+        if let Some(evidence) = &self.evidence {
+            if evidence.stage() != self.stage {
+                return Err(provider_batch_error(
+                    "Structured OCR evidence must match its completed stage.",
+                ));
+            }
+            evidence.validate()?;
         }
         Ok(())
     }
@@ -379,7 +410,7 @@ pub struct OcrBatchResult {
 }
 
 impl OcrBatchResult {
-    pub const SCHEMA: &'static str = "a3s.ocr.staged-batch.v1";
+    pub const SCHEMA: &'static str = "a3s.ocr.staged-batch.v2";
 }
 
 pub(super) fn slot_status(stages: &[OcrStageOutcome]) -> OcrBatchSlotStatus {
@@ -425,5 +456,6 @@ const fn stage_tag(stage: OcrStage) -> u8 {
         OcrStage::Text => 3,
         OcrStage::Table => 4,
         OcrStage::Formula => 5,
+        OcrStage::Seal => 6,
     }
 }

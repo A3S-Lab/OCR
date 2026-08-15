@@ -128,11 +128,23 @@ async fn extract_surfaces(client: &OcrClient) -> UseResult<()> {
 ~~~
 
 The provider-neutral stage vocabulary is orientation, preprocessing, layout,
-text, table, and formula. A provider descriptor declares the subset it can
-complete; unimplemented stages are returned as `unsupported`, never inferred
-from text. The compatibility adapter for existing providers supports only the
-text stage. PP-OCRv6 currently declares preprocessing and text, where
-preprocessing means bounded image decode and canonicalization.
+text, table, formula, and seal. A provider descriptor declares the subset it
+can complete; unimplemented stages are returned as `unsupported`, never
+inferred from text. The compatibility adapter for existing providers supports
+only the text stage. PP-OCRv6 currently declares preprocessing and text, where
+preprocessing means bounded image decode and canonicalization. It does not yet
+claim table or seal detection.
+
+Staged-batch schema v2 requires every completed table or seal stage to carry a
+bounded typed payload on the exact source-image pixel canvas. Table evidence
+preserves the detected table region, optional grid dimensions, merged-cell
+spans, text, and only the cell geometry actually supplied by the provider. Seal
+evidence preserves its exact region, optional recognition, and canonical canvas
+edges when the visible mark is clipped. The client rejects invalid polygon
+envelopes, out-of-canvas regions, overlapping or out-of-grid cells, fabricated
+clipping, duplicate identities, and unbounded text before publishing a result.
+Cross-page table reconciliation remains a Parser responsibility; OCR produces
+page-local evidence and never joins pages itself.
 
 A request contains 1 through 256 unique slots and at most 256 MiB of validated
 input bytes in addition to the existing 32 MiB per-image limit. Malformed

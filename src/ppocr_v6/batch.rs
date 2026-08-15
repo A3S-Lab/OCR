@@ -442,9 +442,11 @@ fn stage_outcomes(
         .map(|stage| match stage {
             OcrStage::Preprocessing => preprocessing.outcome(*stage),
             OcrStage::Text => text.outcome(*stage),
-            OcrStage::Orientation | OcrStage::Layout | OcrStage::Table | OcrStage::Formula => {
-                OcrStageOutcome::unsupported(*stage)
-            }
+            OcrStage::Orientation
+            | OcrStage::Layout
+            | OcrStage::Table
+            | OcrStage::Formula
+            | OcrStage::Seal => OcrStageOutcome::unsupported(*stage),
         })
         .collect()
 }

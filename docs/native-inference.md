@@ -93,15 +93,26 @@ See [PP-OCRv6 Execution Baseline Protocol](execution-baseline.md).
 ### Staged batches and session ownership
 
 The public staged contract names orientation, preprocessing, layout, text,
-table, and formula without requiring every provider to implement every stage.
-Descriptors declare a canonical supported-stage set. The client validates up to
-256 caller-owned slot IDs, keeps the existing 32 MiB per-image bound, caps
+table, formula, and seal without requiring every provider to implement every
+stage. Descriptors declare a canonical supported-stage set. The client validates
+up to 256 caller-owned slot IDs, keeps the existing 32 MiB per-image bound, caps
 retained validated inputs at 256 MiB, and reconstructs exact caller order after
 the provider returns. Source and execution failures stay on their slots;
 malformed provider cardinality, identity, order, stage, or receipt evidence
 fails the provider contract globally.
 
-PP-OCRv6 implements preprocessing and text. Its staged execution is:
+Schema `a3s.ocr.staged-batch.v2` carries structured page-local evidence on an
+exact source-image pixel canvas. A completed table stage must return bounded
+table regions and may return a validated grid with non-overlapping row/column
+spans and optional source-pixel cell regions. A completed seal stage must return
+bounded seal regions and explicitly names only canvas edges the region actually
+touches when a mark is clipped. Polygon envelopes, confidence values, IDs,
+counts, text, and containment are validated at the client boundary. This
+contract supplies evidence to Parser without moving cross-page reconciliation
+or normalized document geometry into OCR.
+
+PP-OCRv6 implements preprocessing and text and returns table and seal as
+unsupported. Its staged execution is:
 
 ```text
 validated slots and exact caller IDs

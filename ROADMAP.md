@@ -119,7 +119,10 @@ client and exact model bundle.
 
 ### O5 — OCR capability depth
 
-- [ ] Add explicit orientation, layout, table, and formula providers/stages only
+- [x] Define staged-batch v2 page-local table and seal evidence with exact
+      source canvases, bounded regions, optional cell geometry, merged spans,
+      canonical clipped edges, and strict provider-output validation.
+- [ ] Add explicit orientation, layout, table, formula, and seal providers only
       with pinned assets, typed outputs, source-pixel geometry, and evidence.
 - [ ] Preserve provider-native fine geometry; never fabricate line, span, cell,
       or equation boxes from plain text.

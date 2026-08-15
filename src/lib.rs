@@ -33,6 +33,7 @@ mod preprocess;
 mod provider;
 #[cfg(feature = "power-runtime")]
 mod receipt;
+mod structured;
 #[cfg(feature = "unlimited-ocr")]
 mod unlimited_ocr;
 
@@ -65,6 +66,11 @@ pub use ppocr_v6::{PpOcrV6Provider, PP_OCR_V6_PROVIDER_ID};
 pub use provider::{
     OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
 };
+pub use structured::{
+    OcrCanvasEdge, OcrEvidenceId, OcrImageCanvas, OcrSealEvidence, OcrSealKind,
+    OcrSealStageEvidence, OcrStageEvidence, OcrTableCellEvidence, OcrTableEvidence, OcrTableKind,
+    OcrTableStageEvidence, OcrVisualRegion,
+};
 #[cfg(feature = "unlimited-ocr")]
 pub use unlimited_ocr::{
     UnlimitedOcrConfig, UnlimitedOcrProvider, UNLIMITED_OCR_MODEL, UNLIMITED_OCR_PROVIDER_ID,
@@ -89,3 +95,6 @@ mod tests {
             .is_file());
     }
 }
+
+#[cfg(test)]
+mod structured_tests;
