@@ -421,6 +421,7 @@ mod tests {
             adjacent_single_consumer_hard_sigmoid_mul(RECOGNITION_GRAPH),
             5
         );
+        assert_eq!(adjacent_single_consumer_gelu_erf(RECOGNITION_GRAPH), 13);
     }
 
     fn adjacent_single_consumer_hard_sigmoid_mul(graph: &str) -> usize {
@@ -446,6 +447,56 @@ mod tests {
                 direct_uses == 1 && graph_uses == 1
             })
             .count()
+    }
+
+    fn adjacent_single_consumer_gelu_erf(graph: &str) -> usize {
+        let graph: serde_json::Value = serde_json::from_str(graph).unwrap();
+        let nodes = graph["nodes"].as_array().unwrap();
+        let graph_output = graph["outputs"][0]["name"].as_str().unwrap();
+        nodes
+            .windows(5)
+            .filter(|window| {
+                if window
+                    .iter()
+                    .map(|node| node["op"].as_str().unwrap())
+                    .ne(["Div", "Erf", "Add", "Mul", "Mul"])
+                {
+                    return false;
+                }
+                let input = window[0]["inputs"][0].as_str().unwrap();
+                let divide = window[0]["outputs"][0].as_str().unwrap();
+                let erf = window[1]["outputs"][0].as_str().unwrap();
+                let add = window[2]["outputs"][0].as_str().unwrap();
+                let multiply = window[3]["outputs"][0].as_str().unwrap();
+                if window[1]["inputs"][0].as_str() != Some(divide)
+                    || !contains_once(&window[2]["inputs"], erf)
+                    || !contains_once(&window[3]["inputs"], input)
+                    || !contains_once(&window[3]["inputs"], add)
+                    || !contains_once(&window[4]["inputs"], multiply)
+                {
+                    return false;
+                }
+                [divide, erf, add, multiply].into_iter().all(|output| {
+                    output != graph_output
+                        && nodes
+                            .iter()
+                            .flat_map(|node| node["inputs"].as_array().unwrap())
+                            .filter(|input| input.as_str() == Some(output))
+                            .count()
+                            == 1
+                })
+            })
+            .count()
+    }
+
+    fn contains_once(inputs: &serde_json::Value, expected: &str) -> bool {
+        inputs
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|input| input.as_str() == Some(expected))
+            .count()
+            == 1
     }
 
     #[test]

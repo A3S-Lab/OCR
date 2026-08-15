@@ -107,6 +107,11 @@ client and exact model bundle.
       behavior, and the finite marker still rejects any non-finite source
       probability. The projection revision is bound into session and model
       execution identity.
+- [x] Lock the 13 adjacent decomposed GELU chains in the recognition graph and
+      pin Power's byte-exact single-kernel CUDA lowering. On the named RTX 4090,
+      five-run alternating-order medians fall from 1.489 to 1.463 seconds for
+      the six-page table document and from 6.255 to 5.838 seconds for the
+      29-page rider-seal document without changing text or structured geometry.
 - [ ] Define measured static shape classes and a fill threshold with the exact
       dynamic-width path as fallback; never pad unboundedly merely to hit a
       static class.
@@ -165,7 +170,7 @@ client and exact model bundle.
       baseline and does not meet the fine-parse target.
 - [ ] Reduce the remaining PP-OCRv6 recognition graph cost. On the retained
       29-page CUDA gate, 138 width-cohort calls dominate the optimized path;
-      complete text-plus-seal throughput is 4.244 pages/s, not 10 pages/s.
+      complete text-plus-seal throughput is 4.968 pages/s, not 10 pages/s.
 
 ## Cross-repository sequence
 

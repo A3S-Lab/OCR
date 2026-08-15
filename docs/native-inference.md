@@ -187,11 +187,15 @@ rasters, the full six-page table gate retains 71 cells and exactly two table
 continuations. The full 29-page rider-seal gate reduces 2,583 detected crops to
 138 physical recognition calls while retaining the CUDA text fingerprint,
 structured-geometry fingerprint, 12 confirmed seals, and two reconciled
-right-boundary fragments. Its optimized CUDA median is 6.834 seconds (4.244
-pages/s), versus 459.988 seconds (0.063 pages/s) on the generic CPU graph.
-Whitespace-only CTC results are filtered after inference because Parser cannot
-publish empty text blocks; detector-score overlap rules out a safe confidence
-prefilter. Broader official-image and corpus certification remains open.
+right-boundary fragments. On the named RTX 4090, the current five-run,
+alternating-order medians are 1.463 seconds (4.101 pages/s) for the table
+document and 5.838 seconds (4.968 pages/s) for the rider-seal document, versus
+same-run pre-fusion medians of 1.489 and 6.255 seconds. Current single-run CPU
+captures are 46.334 seconds (0.129 pages/s) and 334.596 seconds (0.087 pages/s),
+respectively. Whitespace-only CTC results are filtered after inference because
+Parser cannot publish empty text blocks; detector-score overlap rules out a
+safe confidence prefilter. Broader official-image and corpus certification
+remains open.
 
 The reviewed plans also retain an explicit inventory of adjacent,
 single-consumer `HardSigmoid`-to-`Mul` channel gates: 13 in detection and five
@@ -204,6 +208,15 @@ work may invoke either graph a different number of times. The optimization is
 private to Power's executor, does not rewrite the OCR-owned graph declaration,
 and preserves ordinary execution for every unmatched device, dtype, shape,
 broadcast form, layout, or multi-consumer value.
+
+The recognition plan separately locks 13 adjacent, single-consumer
+`Div`-`Erf`-`Add`-`Mul`-`Mul` chains with three scalar initializers. Power's
+private CUDA lowering reads those scalars once during model loading and retains
+all five original f32 rounding boundaries in one byte-exact kernel. Each
+chain avoids four intermediate buffers, and each recognition graph call avoids
+52 launches; the 29-page gate's 138 physical calls avoid 7,176 launches. The
+graph declaration, session identity, receipts, CTC projection, and CPU path
+remain unchanged.
 
 The pinned official 30-block image and clear 8-point and 12-point PDF text at
 144 DPI pass exact consumer gates. Five-point synthetic text does not, so the

@@ -381,11 +381,15 @@ full-document gates extend this to all six table pages and all 29 rider-seal
 pages: CUDA retains exact text and structured-geometry fingerprints, 71 table
 cells, two table continuations, 12 complete seals, and two reconciled boundary
 fragments with no unresolved candidate. On the named development RTX 4090,
-equal-canvas coalescing plus parallel recognition preprocessing reduced the
-29-page CUDA median from 8.400 to 6.834 seconds (4.244 pages/s); the same CPU
-path took 459.988 seconds (0.063 pages/s). The CUDA result is still below the
-10-pages/s complete fine-parse target. These are fixture-specific correctness
-and latency diagnostics, not corpus-wide OCR accuracy or throughput claims.
+equal-canvas coalescing plus parallel recognition preprocessing first reduced
+the 29-page CUDA median from 8.400 to 6.834 seconds. The current byte-exact GELU
+fusion then reduced five-run, alternating-order medians from 1.489 to 1.463
+seconds for the six-page table document (4.101 pages/s) and from 6.255 to 5.838
+seconds for the 29-page rider-seal document (4.968 pages/s). Current single-run
+CPU captures took 46.334 seconds (0.129 pages/s) and 334.596 seconds (0.087
+pages/s), respectively. The CUDA result is still below the 10-pages/s complete
+fine-parse target. These are fixture-specific correctness and latency
+diagnostics, not corpus-wide OCR accuracy or throughput claims.
 
 Recognition no longer materializes the complete 18,710-class probability row
 on the host. OCR applies a deterministic model-owned projection on the Power
@@ -416,6 +420,16 @@ byte-exact kernel, removing four launches and four intermediate buffers per
 site. Graph topology, receipts, and OCR ownership do not change. CPU and every
 unreviewed dtype, shape, broadcast form, or layout retain node-by-node
 execution.
+
+Recognition also contains 13 adjacent, single-consumer decomposed GELU chains,
+each expressed as `Div`-`Erf`-`Add`-`Mul`-`Mul` with three scalar initializers.
+The pinned Power executor captures those scalars once at model load and runs
+each chain as one CUDA kernel with explicit division, addition, and
+multiplication rounding boundaries. Its byte-exact kernel and full graph gates
+remove four launches per chain without rewriting the OCR-owned graph; the 138
+recognition calls in the retained 29-page seal gate therefore avoid 7,176
+launches. CPU and every unmatched graph, dtype, layout, device, output, or
+shared intermediate retain ordinary node-by-node execution.
 
 The current quality evidence covers the pinned 30-block official image and
 clear 8-point and 12-point PDF text rendered at 144 DPI. Five-point synthetic
@@ -674,7 +688,7 @@ pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
 
 The staged PP-OCRv6 integration pins the release-ready A3S Power 0.8.0 revision
-`51543d20a5da99187b3d05a382504605d2cfb685`. Source builds and CI execute that
+`9d52b0c64afff8d8b8d24decb38cae935b57d316`. Source builds and CI execute that
 exact Git revision. Package verification additionally resolves the declared
 `=0.8.0` registry dependency, so the package gate remains closed until the same
 Power release is visible on crates.io. No path or `[patch.crates-io]` override
