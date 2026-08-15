@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert pinned PP-OCRv6 ONNX containers into native Power model assets.
+"""Convert pinned OCR ONNX containers into native Power model assets.
 
 ONNX is an offline interchange input only. The generated SafeTensors weights
 and embedded A3S graph plans are the complete runtime inputs; a3s-power never
@@ -55,6 +55,11 @@ SUPPORTED_OPS = {
     "Unsqueeze",
 }
 
+SLANET_PLUS_ENCODER_SHA256 = (
+    "dbd5431b4051b0f3037e3f8650dba4297cdf38a6a132ac9ccf57886184f4b66e"
+)
+SLANET_PLUS_SHAPE_CONSUMERS = {"Concat", "Slice"}
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -92,12 +97,40 @@ def tensor_shape(value: onnx.ValueInfoProto) -> list[int | str]:
     return result
 
 
-def convert(source: Path, role: str, output: Path) -> None:
+def convert(
+    source: Path,
+    role: str,
+    output: Path,
+    *,
+    family: str = "pp-ocr-v6-small",
+    slanet_plus_encoder: bool = False,
+) -> None:
+    source_sha256 = sha256(source)
+    if slanet_plus_encoder and source_sha256 != SLANET_PLUS_ENCODER_SHA256:
+        raise ValueError("SLANet-Plus lowering requires the reviewed encoder SHA-256")
     model = onnx.load(str(source), load_external_data=True)
+    if slanet_plus_encoder:
+        if (
+            len(model.graph.input) != 1
+            or model.graph.input[0].name != "x"
+            or len(model.graph.output) != 1
+            or model.graph.output[0].name != "transpose_0.tmp_0.0"
+        ):
+            raise ValueError("SLANet-Plus encoder I/O identity changed")
+        # The reviewed split export omitted only the output ValueInfo shape.
+        # Its fixed 488x488 path is independently parity-bound to [N,256,96].
+        shape = model.graph.output[0].type.tensor_type.shape
+        shape.ClearField("dim")
+        shape.dim.add().dim_param = "batch"
+        shape.dim.add().dim_value = 256
+        shape.dim.add().dim_value = 96
     onnx.checker.check_model(model, full_check=True)
-    unsupported = sorted({node.op_type for node in model.graph.node} - SUPPORTED_OPS)
+    lowered_ops = {"Cast", "HardSwish"} if slanet_plus_encoder else set()
+    unsupported = sorted(
+        {node.op_type for node in model.graph.node} - SUPPORTED_OPS - lowered_ops
+    )
     if unsupported:
-        raise ValueError(f"unsupported PP-OCRv6 operators: {unsupported}")
+        raise ValueError(f"unsupported {family} operators: {unsupported}")
 
     tensors: dict[str, np.ndarray[Any, Any]] = {}
     initializers: list[dict[str, Any]] = []
@@ -118,28 +151,78 @@ def convert(source: Path, role: str, output: Path) -> None:
             }
         )
 
+    consumers: dict[str, list[str]] = {}
+    for node in model.graph.node:
+        for input_name in node.input:
+            consumers.setdefault(input_name, []).append(node.op_type)
+
     nodes = []
     for index, node in enumerate(model.graph.node):
+        name = node.name or f"{node.op_type}.{index}"
+        inputs = [input_name for input_name in node.input if input_name]
+        outputs = list(node.output)
+        attributes = {
+            attribute.name: attribute_value(attribute)
+            for attribute in node.attribute
+        }
+        if slanet_plus_encoder and node.op_type == "HardSwish":
+            if len(inputs) != 1 or len(outputs) != 1 or attributes:
+                raise ValueError(f"unreviewed SLANet-Plus HardSwish node {name!r}")
+            gate = f"{outputs[0]}.__hard_sigmoid"
+            nodes.extend(
+                [
+                    {
+                        "name": f"{name}.__hard_sigmoid",
+                        "op": "HardSigmoid",
+                        "inputs": inputs,
+                        "outputs": [gate],
+                        "attributes": {"alpha": 1.0 / 6.0, "beta": 0.5},
+                    },
+                    {
+                        "name": f"{name}.__multiply",
+                        "op": "Mul",
+                        "inputs": [inputs[0], gate],
+                        "outputs": outputs,
+                        "attributes": {},
+                    },
+                ]
+            )
+            continue
+        if slanet_plus_encoder and node.op_type == "Cast":
+            if (
+                len(inputs) != 1
+                or len(outputs) != 1
+                or attributes.get("to") not in (onnx.TensorProto.INT32, onnx.TensorProto.INT64)
+                or set(consumers.get(outputs[0], [])) - SLANET_PLUS_SHAPE_CONSUMERS
+            ):
+                raise ValueError(f"unreviewed SLANet-Plus shape Cast node {name!r}")
+            nodes.append(
+                {
+                    "name": f"{name}.__shape_identity",
+                    "op": "Identity",
+                    "inputs": inputs,
+                    "outputs": outputs,
+                    "attributes": {},
+                }
+            )
+            continue
         nodes.append(
             {
-                "name": node.name or f"{node.op_type}.{index}",
+                "name": name,
                 "op": node.op_type,
-                "inputs": [name for name in node.input if name],
-                "outputs": list(node.output),
-                "attributes": {
-                    attribute.name: attribute_value(attribute)
-                    for attribute in node.attribute
-                },
+                "inputs": inputs,
+                "outputs": outputs,
+                "attributes": attributes,
             }
         )
 
     plan = {
         "schemaVersion": SCHEMA_VERSION,
-        "family": "pp-ocr-v6-small",
+        "family": family,
         "role": role,
         "source": {
             "format": "onnx",
-            "sha256": sha256(source),
+            "sha256": source_sha256,
             "opset": max(entry.version for entry in model.opset_import),
         },
         "inputs": [
@@ -164,12 +247,26 @@ def convert(source: Path, role: str, output: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--det", type=Path, required=True)
-    parser.add_argument("--rec", type=Path, required=True)
+    parser.add_argument("--det", type=Path)
+    parser.add_argument("--rec", type=Path)
+    parser.add_argument("--table-encoder", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
-    convert(arguments.det, "detection", arguments.output / "det")
-    convert(arguments.rec, "recognition", arguments.output / "rec")
+    if (arguments.det is None) != (arguments.rec is None):
+        parser.error("--det and --rec must be supplied together")
+    if arguments.det is None and arguments.table_encoder is None:
+        parser.error("supply a PP-OCRv6 pair or --table-encoder")
+    if arguments.det is not None:
+        convert(arguments.det, "detection", arguments.output / "det")
+        convert(arguments.rec, "recognition", arguments.output / "rec")
+    if arguments.table_encoder is not None:
+        convert(
+            arguments.table_encoder,
+            "table-encoder",
+            arguments.output / "table",
+            family="slanet-plus",
+            slanet_plus_encoder=True,
+        )
 
 
 if __name__ == "__main__":
