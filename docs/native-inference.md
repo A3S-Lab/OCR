@@ -27,7 +27,9 @@ does not bind a socket or start another process.
 The PP-OCRv6 implementation contains two OCR-owned static graph plans:
 detection and recognition. Each plan is bound to the exact source graph digest,
 operator set, SafeTensors inventory, model revision, and canonical Power weight
-digest. Power validates the complete plan and inventory before execution.
+digest. Embedded document-fast graph digests cover the LF-normalized Git blobs,
+not a platform-specific checkout transformation. Power validates the complete
+plan and inventory before execution.
 
 ```text
 bounded image
@@ -194,7 +196,11 @@ same-run pre-fusion medians of 1.489 and 6.255 seconds. The later channel-bias
 A/B used nine alternating table runs and five seal runs under the current load:
 1.387 to 1.340 seconds (4.326 to 4.478 pages/s) and 6.067 to 5.960 seconds
 (4.780 to 4.866 pages/s). Every run retained the same text and structured
-geometry. Current single-run CPU captures are 46.334 seconds (0.129 pages/s)
+geometry. The next LayerNorm-tail A/B used the same alternating protocol: nine
+table runs fell from a 1.270-second median to 1.215 seconds (4.724 to 4.938
+pages/s), while five seal runs were effectively flat at 5.848 versus 5.840
+seconds (4.959 versus 4.966 pages/s). Current single-run CPU captures are
+46.334 seconds (0.129 pages/s)
 and 334.596 seconds (0.087 pages/s), respectively. Whitespace-only CTC results
 are filtered after inference because Parser cannot publish empty text blocks;
 detector-score overlap rules out a safe confidence prefilter. Broader
@@ -230,6 +236,16 @@ into the reviewed activation kernel, using 32-bit indexing after the existing
 `u32` launch bound. This removes 28 further launches per recognition call, or
 3,864 across the retained 138-call seal gate, without changing OCR topology,
 receipts, CPU behavior, or any unsupported fallback.
+
+The recognition plan also locks five adjacent decomposed LayerNorm affine
+tails, each expressed as
+`Add(epsilon)`-`Sqrt`-`Div`-`Mul(scale)`-`Add(bias)`. The inventory verifies a
+single-element F32 epsilon initializer, 120-element F32 scale/bias vectors, and
+private intermediate consumers. Power retains the two mean reductions,
+centering, and squaring, then evaluates the five pointwise nodes in one
+byte-exact CUDA kernel. This avoids 20 launches per recognition graph call, or
+2,760 across the retained 138-call seal gate, without changing graph identity,
+receipts, CTC projection, CPU behavior, or unsupported fallbacks.
 
 The pinned official 30-block image and clear 8-point and 12-point PDF text at
 144 DPI pass exact consumer gates. Five-point synthetic text does not, so the

@@ -35,6 +35,8 @@ client and exact model bundle.
 - [x] Bounded source admission and canonical SHA-256 provenance in `OcrClient`.
 - [x] Embedded PP-OCRv6 and Unlimited-OCR through model-neutral A3S Power,
       without ONNX Runtime, Python, subprocesses, services, or listeners.
+- [x] Bind embedded SLANet-Plus and PicoDet graph identities to LF-normalized
+      repository blobs and reject platform-specific line-ending drift.
 - [x] Source-pixel polygons/boxes, provider/model fingerprints, and Power
       execution receipts.
 
@@ -118,6 +120,11 @@ client and exact model bundle.
       five-run seal medians from 6.067 to 5.960 seconds while exact table
       continuations, cells, seal positions, and boundary fragments remain
       unchanged.
+- [x] Lock five decomposed LayerNorm affine tails and pin Power's byte-exact
+      CUDA lowering while retaining the original reductions, centering, and
+      squaring. Nine-run table medians fall from 1.270 to 1.215 seconds; the
+      five-run seal median remains effectively flat at 5.848 versus 5.840
+      seconds with exact text, structure, and geometry fingerprints.
 - [ ] Define measured static shape classes and a fill threshold with the exact
       dynamic-width path as fallback; never pad unboundedly merely to hit a
       static class.
@@ -176,8 +183,8 @@ client and exact model bundle.
       baseline and does not meet the fine-parse target.
 - [ ] Reduce the remaining PP-OCRv6 recognition graph cost. On the retained
       29-page CUDA gate, 138 width-cohort calls dominate the optimized path;
-      the latest channel-bias A/B median is 5.960 seconds (4.866 pages/s), not
-      10 pages/s.
+      the latest LayerNorm-tail A/B median is 5.840 seconds (4.966 pages/s),
+      not 10 pages/s.
 
 ## Cross-repository sequence
 

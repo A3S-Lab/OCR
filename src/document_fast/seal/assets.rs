@@ -9,7 +9,7 @@ pub(super) const MODEL_REVISION: &str = "paddleocr-paddle3-reviewed-v1";
 pub(super) const SOURCE_GRAPH_SHA256: &str =
     "9df09659ed993444d068cc41b8b3e69306890b79c2af6f674d4111ab86e845da";
 pub(super) const GRAPH_SHA256: &str =
-    "6857cc1407e2068c1e66efe7f72f2e4063a2f2908d022d1fa9d270839667d5e6";
+    "6903f703d263e965d82bd0327f51dceb3f787ffff0b9411960a551f1f8119bd5";
 pub(super) const WEIGHTS_FILE_SHA256: &str =
     "88c2d62f5ad48ff0487d0dc86e347f45ca369746cb8e0c8693ed9ecf1cb7fc9e";
 pub(super) const WEIGHTS_COLLECTION_SHA256: &str =

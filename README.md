@@ -308,7 +308,9 @@ bounded decode → cross-image letterbox → batched detection → per-slot DB
 The OCR-owned release packages pinned detection and recognition SafeTensors
 plus their inference configuration. Installation verifies the archive length
 and SHA-256, extracts only the four declared files, and records the exact Power
-weight digests. Installation and repair remain explicit:
+weight digests. Embedded SLANet-Plus and PicoDet graph identities hash the
+repository's LF-normalized JSON blobs; `.gitattributes` and digest tests reject
+platform line-ending drift. Installation and repair remain explicit:
 
 ~~~bash
 a3s install use/ocr
@@ -391,7 +393,11 @@ runs for the table gate and five for the seal gate: medians fell from 1.387 to
 1.340 seconds (4.326 to 4.478 pages/s, 3.4% lower latency) and from 6.067 to
 5.960 seconds (4.780 to 4.866 pages/s, 1.8% lower latency), respectively. Every
 run retained the same text, table continuation, cell, seal-position, and
-boundary-fragment assertions. Current single-run CPU captures took 46.334
+boundary-fragment assertions. The subsequent LayerNorm-affine-tail A/B used
+the same alternating protocol: the nine-run table median fell from 1.270 to
+1.215 seconds (4.724 to 4.938 pages/s, 4.3% lower latency), while the five-run
+seal median was effectively flat at 5.848 versus 5.840 seconds (4.959 versus
+4.966 pages/s). Current single-run CPU captures took 46.334
 seconds (0.129 pages/s) and 334.596 seconds (0.087 pages/s), respectively. The
 CUDA result is still below the 10-pages/s complete fine-parse target. These are
 fixture-specific correctness and latency diagnostics, not corpus-wide OCR
@@ -448,6 +454,16 @@ more full-tensor launches and buffers; the retained 138-call seal gate avoids
 3,864. Launch-bounded 32-bit channel indexing is required for the measured fast
 path. CPU and every unreviewed bias, shape, topology, device, dtype, or layout
 retain the ordinary graph.
+
+Five decomposed last-axis LayerNorm blocks in recognition retain their two
+mean reductions, centering, and squaring, while Power privately fuses each
+exact `Add(epsilon)`-`Sqrt`-`Div`-`Mul(scale)`-`Add(bias)` tail. The OCR-owned
+inventory test locks the five adjacent private windows, scalar epsilon, and
+120-element scale/bias initializers. Explicit F32 rounding boundaries make the
+CUDA tail byte-exact with the original five nodes. Each recognition call avoids
+20 further launches and intermediate buffers; the retained 138-call seal gate
+avoids 2,760. CPU and every unreviewed topology, shape, device, dtype, or layout
+retain ordinary execution.
 
 The current quality evidence covers the pinned 30-block official image and
 clear 8-point and 12-point PDF text rendered at 144 DPI. Five-point synthetic
@@ -706,7 +722,7 @@ pins an immutable OCR revision when assembling the built-in route, packaged
 Skill, and model assets.
 
 The staged PP-OCRv6 integration pins the release-ready A3S Power 0.8.0 revision
-`9d52b0c64afff8d8b8d24decb38cae935b57d316`. Source builds and CI execute that
+`2939668e8ad38e4d3f564144d01c2a5020aa39de`. Source builds and CI execute that
 exact Git revision. Package verification additionally resolves the declared
 `=0.8.0` registry dependency, so the package gate remains closed until the same
 Power release is visible on crates.io. No path or `[patch.crates-io]` override

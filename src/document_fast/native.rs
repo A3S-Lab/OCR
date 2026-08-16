@@ -20,7 +20,7 @@ use super::preprocess::INPUT_SIDE;
 
 const ENCODER_GRAPH: &str = include_str!("graphs/slanext_encoder.json");
 const ENCODER_GRAPH_SHA256: &str =
-    "a24cbfeac76d9e422ff7e0f417ab6c81dfd4007eab931e24cf7325dd1038da36";
+    "8c0ba5d81cd3229653b2ce37d2976647336a094444b0009515fc9ed0efa48c64";
 const GRAPH_FAMILY: &str = "slanet-plus";
 const ENCODER_OPSET: u32 = 14;
 const ENCODER_STEPS: usize = 256;

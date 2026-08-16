@@ -18,6 +18,27 @@ fn recognition_graph_keeps_the_biased_activation_inventory() {
     assert_eq!(reviewed_windows(&graph, Activation::GatedHardSigmoid), 5);
 }
 
+#[test]
+fn recognition_graph_keeps_the_layer_norm_affine_tail_inventory() {
+    let graph: Value = serde_json::from_str(RECOGNITION_GRAPH).unwrap();
+    let nodes = graph["nodes"].as_array().unwrap();
+    let signature = ["Add", "Sqrt", "Div", "Mul", "Add"];
+    let windows = nodes
+        .windows(signature.len())
+        .filter(|window| {
+            window
+                .iter()
+                .map(|node| node["op"].as_str().unwrap())
+                .eq(signature)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(windows.len(), 5);
+
+    for window in windows {
+        assert_layer_norm_affine_tail(&graph, nodes, window);
+    }
+}
+
 fn reviewed_windows(graph: &Value, activation: Activation) -> usize {
     let nodes = graph["nodes"].as_array().unwrap();
     let signature: &[&str] = match activation {
@@ -128,6 +149,63 @@ fn assert_channel_bias(graph: &Value, weight: &str, bias: &str) {
             Value::from(1),
         ]
     );
+}
+
+fn assert_layer_norm_affine_tail(graph: &Value, nodes: &[Value], window: &[Value]) {
+    assert!(window.iter().all(|node| node["attributes"]
+        .as_object()
+        .is_some_and(serde_json::Map::is_empty)));
+    let add_epsilon = &window[0];
+    let sqrt = &window[1];
+    let divide = &window[2];
+    let multiply = &window[3];
+    let add_bias = &window[4];
+    let epsilon_output = output(add_epsilon);
+    let sqrt_output = output(sqrt);
+    let divide_output = output(divide);
+    let multiply_output = output(multiply);
+    assert_eq!(sqrt["inputs"][0].as_str(), Some(epsilon_output));
+    assert_eq!(divide["inputs"][1].as_str(), Some(sqrt_output));
+    assert_eq!(uses_in(multiply, divide_output), 1);
+    assert_eq!(uses_in(add_bias, multiply_output), 1);
+    for value in [epsilon_output, sqrt_output, divide_output, multiply_output] {
+        assert_private(graph, nodes, value, 1);
+    }
+
+    let initializers = graph["initializers"].as_array().unwrap();
+    let epsilon = other_input(add_epsilon, epsilon_output, |name| {
+        initializers.iter().any(|value| {
+            value["name"].as_str() == Some(name)
+                && value["dtype"] == "float32"
+                && value["shape"] == serde_json::json!([1])
+        })
+    });
+    let variance = add_epsilon["inputs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|input| input.as_str().unwrap())
+        .find(|input| *input != epsilon)
+        .unwrap();
+    assert_ne!(divide["inputs"][0].as_str(), Some(variance));
+
+    let scale = other_input(multiply, divide_output, |_| true);
+    let bias = other_input(add_bias, multiply_output, |_| true);
+    for affine in [scale, bias] {
+        let value = initializer(initializers, affine);
+        assert_eq!(value["dtype"], "float32");
+        assert_eq!(value["shape"], serde_json::json!([120]));
+    }
+}
+
+fn other_input<'a>(node: &'a Value, chained: &str, predicate: impl Fn(&str) -> bool) -> &'a str {
+    node["inputs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|input| input.as_str().unwrap())
+        .find(|input| *input != chained && predicate(input))
+        .unwrap()
 }
 
 fn initializer<'a>(initializers: &'a [Value], name: &str) -> &'a Value {
