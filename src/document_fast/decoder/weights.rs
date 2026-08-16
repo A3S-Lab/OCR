@@ -7,7 +7,7 @@ pub(super) const CONTEXT_WIDTH: usize = 96;
 pub(super) const HIDDEN_WIDTH: usize = 256;
 pub(super) const VOCABULARY_SIZE: usize = 50;
 pub(super) const LOCATION_WIDTH: usize = 8;
-pub(super) const MAX_TOKENS: usize = 501;
+pub(super) const MAX_TOKENS: usize = 1_024;
 
 const EXPECTED_FLOATS: usize = 547_386;
 

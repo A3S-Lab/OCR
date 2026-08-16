@@ -11,8 +11,9 @@ use tokio_util::sync::CancellationToken;
 use super::assets::SlanetPlusAssets;
 use super::decoder::{SlanetPlusDecoder, StructureGrid};
 use super::native::{session_spec, NativeSlanetPlus};
+use super::orientation::TableCropOrientation;
 use super::preprocess::crop_tensor;
-use super::wired::{candidates, PixelRect};
+use super::wired::{candidates, PixelRect, WiredCandidate};
 use crate::cancellation::{check_cancelled, run_blocking_with};
 use crate::preprocess::decode_image;
 use crate::receipt::project_receipt;
@@ -53,9 +54,9 @@ impl TableStageRunner {
         let mut crops = Vec::new();
         for decoded in decoded {
             match decoded.page {
-                Ok(DecodedTablePage { image, regions }) => {
+                Ok(DecodedTablePage { image, candidates }) => {
                     let canvas = OcrImageCanvas::new(image.width(), image.height())?;
-                    if regions.len() > MAX_CANDIDATES_PER_PAGE {
+                    if candidates.len() > MAX_CANDIDATES_PER_PAGE {
                         pages.push(PageAccumulator::failed(
                             decoded.slot_id,
                             runtime_error(format!(
@@ -66,13 +67,15 @@ impl TableStageRunner {
                     }
                     let page_index = pages.len();
                     let image = Arc::new(image);
-                    let page = PageAccumulator::ready(decoded.slot_id, canvas, regions.len());
-                    for (table_index, region) in regions.into_iter().enumerate() {
+                    let page = PageAccumulator::ready(decoded.slot_id, canvas, candidates.len());
+                    for (table_index, candidate) in candidates.into_iter().enumerate() {
                         crops.push(CropReference {
                             page_index,
                             table_index,
                             image: Arc::clone(&image),
-                            region,
+                            region: candidate.inference_region,
+                            table_region: candidate.region,
+                            orientation: candidate.orientation,
                         });
                     }
                     pages.push(page);
@@ -224,8 +227,8 @@ async fn decode_pages(
                 .map(|slot| {
                     check_cancelled(&cancellation)?;
                     let page = decode_image(slot.input.bytes()).and_then(|image| {
-                        let regions = candidates(&image, &cancellation)?;
-                        Ok(DecodedTablePage { image, regions })
+                        let candidates = candidates(&image, &cancellation)?;
+                        Ok(DecodedTablePage { image, candidates })
                     });
                     Ok(DecodedPage {
                         slot_id: slot.slot_id,
@@ -251,7 +254,7 @@ async fn prepare_crops(
             );
             for crop in &crops {
                 check_cancelled(&cancellation)?;
-                tensor.extend(crop_tensor(&crop.image, crop.region)?);
+                tensor.extend(crop_tensor(&crop.image, crop.region, crop.orientation)?);
             }
             Ok(PreparedBatch { crops, tensor })
         },
@@ -293,6 +296,7 @@ async fn execute_batch(
                     .decode(
                         &encoded.tensor.values[start..end],
                         crop.region,
+                        crop.orientation,
                         &cancellation,
                     )
                     .and_then(|decoded| decoded.into_grid())
@@ -300,7 +304,7 @@ async fn execute_batch(
                 results.push(CropResult {
                     page_index: crop.page_index,
                     table_index: crop.table_index,
-                    region: crop.region,
+                    region: crop.table_region,
                     grid,
                 });
             }
@@ -350,7 +354,7 @@ struct DecodedPage {
 
 struct DecodedTablePage {
     image: RgbImage,
-    regions: Vec<PixelRect>,
+    candidates: Vec<WiredCandidate>,
 }
 
 struct PageAccumulator {
@@ -423,6 +427,8 @@ struct CropReference {
     table_index: usize,
     image: Arc<RgbImage>,
     region: PixelRect,
+    table_region: PixelRect,
+    orientation: TableCropOrientation,
 }
 
 struct PreparedBatch {

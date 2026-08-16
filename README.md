@@ -178,9 +178,20 @@ The provider admits conservative wired-table crops from intersecting page
 rules, runs the fixed 488-pixel SLANet-Plus encoder through A3S Power, decodes
 the autoregressive structure and cell quadrilaterals locally, and assigns
 PP-OCRv6 text blocks to model cells by source-pixel geometry. A line candidate
-alone is never published as table evidence. Borderless tables remain
-unsupported, and page-local fragments are not labeled as cross-page
-continuations by OCR.
+alone is never published as table evidence. A non-landscape grid whose wire
+counts are strongly transposed is rotated clockwise for inference without
+changing its immutable source canvas. Only that inference crop receives a
+bounded 4-through-32-pixel source-backed margin; the published table region
+remains the exact detected wire envelope, and decoded quadrilaterals are mapped
+back to the exact source canvas. The local recurrent decoder remains bounded at 1,024 tokens so a
+large table can reach its model-produced end token instead of losing its final
+rows at the historical 501-token boundary.
+
+The retained rotated-table gate SHA-pins six source pages and requires their
+exact candidate counts, orientations, token counts, grid dimensions, cell
+counts, and source-canvas geometry. It currently covers clockwise quarter-turn
+scans. Counter-clockwise quarter-turn scans, borderless tables, and page-local
+continuation labels remain unsupported by OCR.
 
 ### Opt-in model-backed seal positions
 

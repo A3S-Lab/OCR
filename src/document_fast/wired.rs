@@ -6,6 +6,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::cancellation::check_cancelled;
 
+use super::orientation::TableCropOrientation;
+
 const MAX_LINE_GAP: usize = 2;
 const INTERSECTION_TOLERANCE: u32 = 3;
 
@@ -15,6 +17,13 @@ pub(super) struct PixelRect {
     pub(super) y: u32,
     pub(super) width: u32,
     pub(super) height: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct WiredCandidate {
+    pub(super) region: PixelRect,
+    pub(super) inference_region: PixelRect,
+    pub(super) orientation: TableCropOrientation,
 }
 
 impl PixelRect {
@@ -44,7 +53,7 @@ struct Segment {
 pub(super) fn candidates(
     image: &RgbImage,
     cancellation: &CancellationToken,
-) -> UseResult<Vec<PixelRect>> {
+) -> UseResult<Vec<WiredCandidate>> {
     check_cancelled(cancellation)?;
     let width = image.width();
     let height = image.height();
@@ -202,7 +211,7 @@ fn connected_candidates(
     vertical: &[Segment],
     canvas_width: u32,
     canvas_height: u32,
-) -> Vec<PixelRect> {
+) -> Vec<WiredCandidate> {
     let total = horizontal.len().saturating_add(vertical.len());
     let mut union = UnionFind::new(total);
     let mut intersections = Vec::new();
@@ -262,13 +271,50 @@ fn connected_candidates(
                 width: right.saturating_sub(left).saturating_add(1),
                 height: bottom.saturating_sub(top).saturating_add(1),
             };
-            (candidate.width >= minimum_width && candidate.height >= minimum_height)
-                .then_some(candidate)
+            (candidate.width >= minimum_width && candidate.height >= minimum_height).then(|| {
+                let orientation = TableCropOrientation::from_grid(
+                    candidate,
+                    component.horizontal.len(),
+                    component.vertical.len(),
+                );
+                WiredCandidate {
+                    region: candidate,
+                    inference_region: inference_region(
+                        candidate,
+                        orientation,
+                        canvas_width,
+                        canvas_height,
+                    ),
+                    orientation,
+                }
+            })
         })
         .collect::<Vec<_>>();
-    admitted.sort_by_key(|candidate| (candidate.y, candidate.x));
+    admitted.sort_by_key(|candidate| (candidate.region.y, candidate.region.x));
     suppress_nested(&mut admitted);
     admitted
+}
+
+fn inference_region(
+    region: PixelRect,
+    orientation: TableCropOrientation,
+    canvas_width: u32,
+    canvas_height: u32,
+) -> PixelRect {
+    if orientation == TableCropOrientation::Upright {
+        return region;
+    }
+    let padding = (region.width.min(region.height) / 24).clamp(4, 32);
+    let left = region.x.saturating_sub(padding);
+    let top = region.y.saturating_sub(padding);
+    let right = region.right().saturating_add(padding).min(canvas_width);
+    let bottom = region.bottom().saturating_add(padding).min(canvas_height);
+    PixelRect {
+        x: left,
+        y: top,
+        width: right.saturating_sub(left),
+        height: bottom.saturating_sub(top),
+    }
 }
 
 fn intersects(horizontal: Segment, vertical: Segment) -> bool {
@@ -281,15 +327,15 @@ fn within(value: u32, start: u32, end: u32) -> bool {
         && value <= end.saturating_add(INTERSECTION_TOLERANCE)
 }
 
-fn suppress_nested(candidates: &mut Vec<PixelRect>) {
+fn suppress_nested(candidates: &mut Vec<WiredCandidate>) {
     let snapshot = candidates.clone();
     candidates.retain(|candidate| {
         !snapshot.iter().any(|other| {
             candidate != other
-                && other.x <= candidate.x
-                && other.y <= candidate.y
-                && other.right() >= candidate.right()
-                && other.bottom() >= candidate.bottom()
+                && other.region.x <= candidate.region.x
+                && other.region.y <= candidate.region.y
+                && other.region.right() >= candidate.region.right()
+                && other.region.bottom() >= candidate.region.bottom()
         })
     });
 }
@@ -330,129 +376,4 @@ impl UnionFind {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use image::{Rgb, RgbImage};
-
-    #[test]
-    fn admits_a_grid_and_rejects_an_isolated_page_rule() {
-        let mut image = RgbImage::from_pixel(400, 300, Rgb([255, 255, 255]));
-        draw_horizontal(&mut image, 20, 380, 25, Rgb([0, 80, 140]));
-        for y in [80, 150, 240] {
-            draw_horizontal(&mut image, 40, 360, y, Rgb([0, 0, 0]));
-        }
-        for x in [40, 180, 360] {
-            draw_vertical(&mut image, x, 80, 240, Rgb([0, 0, 0]));
-        }
-        assert_eq!(
-            candidates(&image, &CancellationToken::new()).unwrap(),
-            vec![PixelRect {
-                x: 40,
-                y: 80,
-                width: 321,
-                height: 161,
-            }]
-        );
-    }
-
-    #[test]
-    fn continuation_grid_can_touch_the_top_canvas_edge() {
-        let mut image = RgbImage::from_pixel(400, 300, Rgb([255, 255, 255]));
-        for y in [0, 100, 220] {
-            draw_horizontal(&mut image, 40, 360, y, Rgb([0, 0, 0]));
-        }
-        for x in [40, 180, 360] {
-            draw_vertical(&mut image, x, 0, 220, Rgb([0, 0, 0]));
-        }
-        assert_eq!(
-            candidates(&image, &CancellationToken::new()).unwrap()[0].y,
-            0
-        );
-    }
-
-    #[test]
-    fn cancelled_candidate_scan_publishes_no_region() {
-        let image = RgbImage::new(400, 300);
-        let cancellation = CancellationToken::new();
-        cancellation.cancel();
-        let error = candidates(&image, &cancellation).unwrap_err();
-        assert_eq!(error.code, "use.ocr.runtime_failed");
-    }
-
-    #[test]
-    fn real_fixture_candidates_are_close_to_reviewed_table_bounds() {
-        let Some(root) = std::env::var_os("A3S_OCR_REAL_CROSS_PAGE_TABLE_DIR") else {
-            return;
-        };
-        let expected = [
-            (
-                "page-0002.png",
-                PixelRect {
-                    x: 141,
-                    y: 391,
-                    width: 1390,
-                    height: 527,
-                },
-            ),
-            (
-                "page-0003.png",
-                PixelRect {
-                    x: 141,
-                    y: 204,
-                    width: 1390,
-                    height: 696,
-                },
-            ),
-            (
-                "page-0004.png",
-                PixelRect {
-                    x: 141,
-                    y: 204,
-                    width: 1390,
-                    height: 347,
-                },
-            ),
-        ];
-        for (name, reviewed) in expected {
-            let image = image::open(std::path::Path::new(&root).join(name))
-                .unwrap()
-                .into_rgb8();
-            let actual = candidates(&image, &CancellationToken::new()).unwrap();
-            assert_eq!(actual.len(), 1, "{name}: {actual:?}");
-            assert!(
-                intersection_over_union(actual[0], reviewed) >= 0.97,
-                "{name}: {actual:?}"
-            );
-        }
-    }
-
-    fn draw_horizontal(image: &mut RgbImage, start: u32, end: u32, y: u32, color: Rgb<u8>) {
-        for x in start..=end {
-            image.put_pixel(x, y, color);
-        }
-    }
-
-    fn draw_vertical(image: &mut RgbImage, x: u32, start: u32, end: u32, color: Rgb<u8>) {
-        for y in start..=end {
-            image.put_pixel(x, y, color);
-        }
-    }
-
-    fn intersection_over_union(left: PixelRect, right: PixelRect) -> f32 {
-        let width = left
-            .right()
-            .min(right.right())
-            .saturating_sub(left.x.max(right.x));
-        let height = left
-            .bottom()
-            .min(right.bottom())
-            .saturating_sub(left.y.max(right.y));
-        let intersection = width.saturating_mul(height);
-        let union = left
-            .width
-            .saturating_mul(left.height)
-            .saturating_add(right.width.saturating_mul(right.height))
-            .saturating_sub(intersection);
-        intersection as f32 / union.max(1) as f32
-    }
-}
+mod tests;
