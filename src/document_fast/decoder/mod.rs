@@ -7,6 +7,8 @@ use tokio_util::sync::CancellationToken;
 
 use self::dictionary::StructureDictionary;
 pub(super) use self::grid::StructureGrid;
+#[cfg(test)]
+pub(super) use self::grid::GridCell;
 use self::weights::{
     DecoderWeights, CONTEXT_WIDTH, ENCODER_STEPS, HIDDEN_WIDTH, LOCATION_WIDTH, MAX_TOKENS,
     VOCABULARY_SIZE,

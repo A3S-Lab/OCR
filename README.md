@@ -181,9 +181,11 @@ PP-OCRv6 text blocks to model cells by source-pixel geometry. A line candidate
 alone is never published as table evidence. A non-landscape grid whose wire
 counts are strongly transposed is rotated clockwise for inference without
 changing its immutable source canvas. Only that inference crop receives a
-bounded 4-through-32-pixel source-backed margin; the published table region
-remains the exact detected wire envelope, and decoded quadrilaterals are mapped
-back to the exact source canvas. The local recurrent decoder remains bounded at 1,024 tokens so a
+bounded 4-through-32-pixel source-backed margin. Decoded quadrilaterals are
+mapped back to the exact source canvas, and the published table region is the
+minimal envelope containing both the detected wire candidate and every
+model-backed cell quad.
+The local recurrent decoder remains bounded at 1,024 tokens so a
 large table can reach its model-produced end token instead of losing its final
 rows at the historical 501-token boundary.
 

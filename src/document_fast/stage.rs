@@ -19,6 +19,9 @@ use crate::preprocess::decode_image;
 use crate::receipt::project_receipt;
 use crate::{OcrExecutionReceipt, OcrImageCanvas, OcrProviderBatchSlot};
 
+#[cfg(test)]
+mod tests;
+
 const MAX_CANDIDATES_PER_PAGE: usize = 8;
 const MAX_ENCODER_BATCH: usize = 16;
 const MIN_STRUCTURE_CONFIDENCE: f32 = 0.5;
@@ -301,10 +304,14 @@ async fn execute_batch(
                     )
                     .and_then(|decoded| decoded.into_grid())
                     .and_then(validate_grid);
+                let region = grid
+                    .as_ref()
+                    .map(|grid| table_evidence_region(crop.table_region, grid))
+                    .unwrap_or(crop.table_region);
                 results.push(CropResult {
                     page_index: crop.page_index,
                     table_index: crop.table_index,
-                    region: crop.table_region,
+                    region,
                     grid,
                 });
             }
@@ -336,6 +343,27 @@ fn validate_grid(grid: StructureGrid) -> UseResult<StructureGrid> {
         )));
     }
     Ok(grid)
+}
+
+fn table_evidence_region(wire_region: PixelRect, grid: &StructureGrid) -> PixelRect {
+    let mut left = wire_region.x;
+    let mut top = wire_region.y;
+    let mut right = wire_region.x.saturating_add(wire_region.width);
+    let mut bottom = wire_region.y.saturating_add(wire_region.height);
+    for quad in grid.cells.iter().filter_map(|cell| cell.quad) {
+        for point in quad.chunks_exact(2) {
+            left = left.min(point[0]);
+            top = top.min(point[1]);
+            right = right.max(point[0]);
+            bottom = bottom.max(point[1]);
+        }
+    }
+    PixelRect {
+        x: left,
+        y: top,
+        width: right.saturating_sub(left),
+        height: bottom.saturating_sub(top),
+    }
 }
 
 fn fail_crop_pages(crops: &[CropReference], pages: &mut [PageAccumulator], error: UseError) {
