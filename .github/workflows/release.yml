@@ -122,17 +122,35 @@ jobs:
   publish-crate:
     needs: validate
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - id: auth
-        uses: rust-lang/crates-io-auth-action@v1
-      - run: cargo publish --locked
+      - name: Publish crate once
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CARGO_REGISTRY_TOKEN:-}"
+          if curl --retry 5 --retry-all-errors --retry-delay 5 -fsSL \
+            -A "a3s-use-ocr-release-check/1.0" \
+            "https://crates.io/api/v1/crates/a3s-use-ocr/${RELEASE_VERSION}" >/dev/null; then
+            echo "a3s-use-ocr ${RELEASE_VERSION} is already published"
+            exit 0
+          fi
+          cargo publish --locked
+          for attempt in $(seq 1 30); do
+            if curl --retry 5 --retry-all-errors --retry-delay 5 -fsSL \
+              -A "a3s-use-ocr-release-check/1.0" \
+              "https://crates.io/api/v1/crates/a3s-use-ocr/${RELEASE_VERSION}" >/dev/null; then
+              exit 0
+            fi
+            echo "Waiting for a3s-use-ocr ${RELEASE_VERSION} on crates.io (${attempt}/30)"
+            sleep 10
+          done
+          echo "a3s-use-ocr ${RELEASE_VERSION} did not become visible in time" >&2
+          exit 1
 
   release:
     needs: [validate, assets, binaries, publish-crate]
