@@ -138,12 +138,59 @@ claim table or seal detection. The separately constructed
 SLANet-Plus wired-table model and declares preprocessing, text, and table. When
 the separately pinned PicoDet layout bundle is configured, the same explicit
 provider also declares seal detection. It remains opt-in because every added
-model and its limitations must stay visible to the host.
+model and its limitations must stay visible to the host. Its public model name
+is derived from the exact SHA-256/size-admitted layout profile, so PicoDet-S and
+PicoDet-L cannot share an L-labelled provider or retained-evidence identity.
+The PP-OCRv6 text component is likewise derived from the typed detection and
+recognition profile: full small and small-detection/tiny-recognition have
+different composite identities. DocumentFast freezes the exact text session
+specification when it is constructed, validates every text-lane output and
+batch receipt against that binding, and fails closed if configuration bytes are
+changed afterward.
+
+When the separately pinned page-orientation bundle is configured, the explicit
+provider classifies the immutable source canvases before Text, Table, and Seal
+run in parallel. Power's `max_input_bytes` and `max_tensor_elements`, the exact
+`[N,3,224,224]` tensor size, and the 256-slot protocol bound derive the physical
+orientation batch; there is no fixed page-count or source-specific branch.
+Only pages whose first class is non-upright receive the three quarter-turn
+equivariance checks, and an inconsistent group abstains without changing the
+source canvas. On the 29-page RTX 4090 gate, alternating medians improved from
+581.342 ms at the former eight-page cap (49.885 pages/s) to 518.838 ms at the
+Power-derived cap (55.894 pages/s). Canonical outputs were exact after the
+expected execution-receipt regrouping.
+
+The three verification turns are sampled directly from immutable source
+coordinates instead of materializing full-resolution rotated copies. This is
+an execution change only: generated non-square image tests require every F32
+preprocessing tensor to be bit-exact with `image::imageops` materialization.
+On the current 29-page Orientation+Text+Table+Seal RTX 4090 gate, four
+alternating cold-process runs per side reduced median latency from 4,183.942 to
+3,949.546 ms (6.931 to 7.343 pages/s). The retained text and non-receipt
+semantic SHA-256 values remained exact. This decoded-raster measurement still
+excludes PDF rasterization and Office reconstruction and is not a 10-pages/s
+fine-parse claim.
+
+The CUDA model sessions now use Power's isolated single-stream lane contract,
+which removes only redundant per-activation cross-stream events. General Power
+runtimes retain event tracking, and no OCR graph, operator, tensor value,
+document identity, content, or measured-shape selector changed. In a fresh
+six-sample-per-side interleaved cold-process A/B on the same 29-page RTX 4090
+gate, median latency fell from 4,030.936 to 3,672.701 ms and p90 from 4,161.525
+to 3,895.917 ms (7.194 to 7.896 pages/s; 8.9% lower median latency and 9.8%
+higher throughput). Text and non-receipt semantic SHA-256 values remained
+exact. The timed boundary is still decoded raster evidence, so the 10-pages/s
+complete fine-parse target remains open.
 
 Staged-batch schema v2 requires every completed table or seal stage to carry a
 bounded typed payload on the exact source-image pixel canvas. Table evidence
 preserves the detected table region, optional grid dimensions, merged-cell
-spans, text, and only the cell geometry actually supplied by the provider. Seal
+spans, text, and only the cell geometry actually supplied by the provider. A
+cell may additionally retain canonical zero-based indices of text blocks from
+the same staged slot when the provider established their ownership in source
+pixels. References must be strictly increasing, in range, geometry-backed, and
+owned by one cell; the cell text must equal the ordered referenced block bytes.
+This is an identity contract, not downstream text matching. Seal
 evidence preserves its exact region, optional recognition, canonical canvas
 edges when the visible mark is clipped, and whether the model confirmed the
 object on that page or retained only a `boundary-candidate`. The client rejects
@@ -174,11 +221,44 @@ fn document_fast_client() -> UseResult<OcrClient> {
 }
 ~~~
 
+Hosts that need a stable product disposition can call
+`DocumentFastOcrProvider::from_env_typed()`. Its
+`DocumentFastInitializationErrorKind` distinguishes a missing mandatory model
+from invalid configuration without asking the caller to inspect the serialized
+`UseError` code. The existing `from_env()` remains a compatibility adapter and
+preserves the original `UseError`.
+
 The provider admits conservative wired-table crops from intersecting page
-rules, runs the fixed 488-pixel SLANet-Plus encoder through A3S Power, decodes
-the autoregressive structure and cell quadrilaterals locally, and assigns
-PP-OCRv6 text blocks to model cells by source-pixel geometry. A line candidate
-alone is never published as table evidence. A non-landscape grid whose wire
+rules, runs the fixed 488-pixel SLANet-Plus encoder through A3S Power only for
+unresolved crops, decodes the autoregressive structure and cell quadrilaterals
+locally, and assigns PP-OCRv6 text blocks to cells by source-pixel geometry. It
+publishes the assigned blocks' exact staged-output indices with each cell so
+downstream consumers do not need to repeat an ambiguous bounding-box
+assignment.
+
+A line candidate alone is never published as table evidence. Retained tracks
+must have local contrast against their parallel background, which rejects dense
+security texture without reading page content. Repeated perpendicular terminals
+may close only the nearest open component side; internal terminals cannot
+invent primitive axes. Before invoking the model, the provider tests every
+primitive boundary against immutable source pixels. Missing detector tracks are
+negative evidence only over intervals the detector was long enough to observe.
+A separator must connect both grid junctions within the detector's spatial
+tolerance. A newly discovered T junction additionally requires one exact,
+centerline-connected crossbar through both neighboring structural intervals.
+Disconnected foreground cannot extend a junction footprint, and damaged
+one-sided support remains unknown.
+
+The zero-model path is used only when a bounded exhaustive search finds exactly
+one rectangular cell partition consistent with all present and absent edges.
+Multiple partitions, damaged rules, or a search beyond the fixed work budget
+fall back to SLANet-Plus. This decision uses geometry, detector authority, and
+connectivity, never document text, file names, page numbers, sample names, or
+provider labels. Candidate detection and source proof execute in the existing
+bounded blocking preparation phase, parallel across pages; they do not block
+the async scheduler thread.
+
+A non-landscape grid whose wire
 counts are strongly transposed is rotated clockwise for inference without
 changing its immutable source canvas. Only that inference crop receives a
 bounded 4-through-32-pixel source-backed margin. Decoded quadrilaterals are
@@ -187,33 +267,94 @@ minimal envelope containing both the detected wire candidate and every
 model-backed cell quad.
 The local recurrent decoder remains bounded at 1,024 tokens so a
 large table can reach its model-produced end token instead of losing its final
-rows at the historical 501-token boundary.
+rows at the historical 501-token boundary. At model load, the pinned vocabulary
+must realize the exact reviewed 50-entry index map and is compiled into typed
+row, cell, delimiter, and span tokens. Page decoding and grid construction use
+that typed grammar rather than reparsing HTML-like token strings.
 
-The retained rotated-table gate SHA-pins six source pages and requires their
-exact candidate counts, orientations, token counts, grid dimensions, cell
-counts, and source-canvas geometry. It currently covers clockwise quarter-turn
-scans. Counter-clockwise quarter-turn scans, borderless tables, and page-local
-continuation labels remain unsupported by OCR.
+The retained rotated-table model gate SHA-pins 18 source pages and requires
+their exact candidate counts, orientations, token counts, grid dimensions,
+cell counts, and source-canvas geometry. The independent source-proof gate
+examines 21 candidates on pages 7 through 24; all 21 now have one reviewed,
+unique rectangular partition and none invokes the structure model. Separate
+certificate-texture negatives on pages 26, 28, and 29 produce no wired-table
+candidates. These are corpus-specific topology and precision gates, not a
+general table-accuracy score.
+
+On the 10-core/20-thread Intel Xeon w5-2445 development CPU, the retained
+29-page in-memory raster gate contains 23 source-backed tables and zero model
+fallbacks. Three default `cargo test --locked` runs of candidate detection plus
+source topology took 261.328, 266.309, and 269.421 milliseconds: 110.972,
+108.896, and 107.638 pages per second, with a 108.896-pages/s median. The timed
+region excludes PNG decoding, PDF rasterization, text OCR, seals, Parser
+reconciliation, and Office reconstruction, so it is table-stage evidence only
+and not a complete fine-parse throughput claim. The reviewed path currently
+covers clockwise quarter-turn scans. Counter-clockwise quarter-turn scans,
+borderless tables, and page-local continuation labels remain unsupported by
+OCR.
 
 ### Opt-in model-backed seal positions
 
 Set `A3S_OCR_PICODET_LAYOUT_MODEL_DIR` to the reviewed local directory that
-contains the converted `model.safetensors`. The checked-in graph is a
-deterministic lowering of the pinned PaddleOCR `PicoDet-L_layout_3cls` raw head;
-production loads neither Paddle nor Python. The model owns the `seal` class and
-the host performs bounded score filtering and NMS in source-pixel coordinates.
+contains the converted `model.safetensors`. Exact weight SHA-256 and byte size
+select the reviewed PicoDet-S 480-pixel or PicoDet-L 640-pixel graph profile;
+unknown or mismatched assets fail closed. The checked-in graphs are
+deterministic lowerings of the corresponding pinned PaddleOCR raw heads;
+production loads neither Paddle nor Python. The exact admitted profile appears
+in the provider model declaration and every result. The model owns the `seal`
+class and the host performs bounded score filtering and NMS in source-pixel
+coordinates. PicoDet-L is the current fine-profile candidate; PicoDet-S remains
+a distinct lower-compute capability and failed the reviewed rider recall gate.
 
-The normal page path uses one 640-pixel full-page view plus fixed left and right
-edge strips. Full-page detections at the reviewed threshold are `confirmed`.
+The normal page path uses one exact-profile square full-page view for every
+valid page: 480 pixels for S or 640 pixels for L.
+Chromatic components may add bounded local high-resolution views, while
+model-supported pages may add left or right edge refinement; neither path ever
+suppresses another page's full-page inference because color is not valid
+negative evidence for black, gray, or embossed seals.
+Full-page and chromatic views are both source-derived before inference, so they
+share one canonical initial batch sequence. Boundary refinements and
+predecessor-bound adjacent views remain later phases because their admission
+depends on earlier model output. This scheduling changes no view, threshold,
+or evidence rule.
+Before model admission, a chromatic support region must pass the exact same
+area, minimum-dimension, aspect, and source-color predicates that the decoder
+will apply after replacing a local model box with that immutable support.
+Likewise, an ordinary boundary strip is omitted only when the entire strip has
+fewer than the decoder's required six chromatic source pixels. These are
+necessary-condition proofs: adjacent-page views retain their achromatic path,
+and every valid page still receives full-page inference.
+Full-page detections at the reviewed threshold are `confirmed`.
 Low-confidence edge evidence is never promoted: it is returned as
 `boundary-candidate`, must touch the declared source-canvas edge, and remains
 unpublishable as a confirmed object without downstream reconciliation.
 
+The decoder reduces repeated observations of one clipped object before
+publishing typed evidence. The observations must name the same exact edge, and
+each interval along that edge must contain the other's center. The retained box
+is their exact common source intersection and carries the lower confidence.
+The perpendicular extent is not used for identity because clipping censored it.
+This canonical, input-order-independent reduction does not rank by confidence
+or size and does not inspect document text, file names, sample names, or
+provider names. It is page-local detector normalization; Parser alone owns
+cross-page identity.
+
+A complete confirmed region also dominates one overlapping censored boundary
+observation when their intersection covers at least the exact profile's NMS
+fraction of the smaller region and the complete center lies inside the censored
+extent. The confirmed region must have no clipped edge and the other observation
+must declare one. This handles the information asymmetry introduced by clipping
+without collapsing distinct boundary objects. The rule uses typed status,
+geometry, clipping, and the admitted model contract only; it has no source,
+page, text, pixel, fingerprint, model-name, or corpus selector.
+
 For an admitted sequence, a caller may explicitly bind a slot to its immediate
 predecessor with `with_adjacent_predecessor`. When the predecessor contains a
-bounded edge candidate, OCR runs at most one additional local view for that
-edge on the current page. This recovered the narrow right-edge fragment in the
-retained two-page rider-seal fixture while the second page independently
+bounded edge candidate, OCR runs one additional local view for every distinct
+exact source window on the current page. Identical windows share one inference,
+and the existing 64-seal page bound also bounds this work. No candidate is
+chosen by confidence or box size. This recovered the narrow right-edge fragment
+in the retained two-page rider-seal fixture while the second page independently
 retained its three interior seals. The adjacency declaration authorizes only
 extra page-local evidence collection; Parser still owns cross-page matching,
 promotion, and canonical geometry. Seal text recognition and a general seal
@@ -228,6 +369,16 @@ provider and per-slot model fingerprints plus digest-only execution receipts;
 raw source bytes, tensor values, and local paths are not placed in scheduling
 evidence.
 
+Staged-batch schema `a3s.ocr.staged-batch.v3` adds an optional normalized Text
+selection window and binds support into provider fingerprint v2. A provider
+that declares support must run detection on the complete immutable source,
+select every detected block whose source bounding box has positive-area
+intersection with the window, recognize that whole block, and retain its
+original source-canvas geometry. The window therefore reduces recognition
+work only; it cannot crop detector input, clip text, change Table or Seal
+stages, or route on file names, page numbers, text, hashes, or provider/model
+labels. Providers without the capability reject windowed slots.
+
 ## Result contract: OCR plus provenance
 
 The provider owns recognition. `OcrClient` owns the evidence envelope.
@@ -235,7 +386,7 @@ The provider owns recognition. `OcrClient` owns the evidence envelope.
 | Owned by `OcrClient` | Owned by the provider |
 | --- | --- |
 | Canonical path, detected media type, byte size, SHA-256 | Recognition text and model identity |
-| Input bounds and supported image signatures | Optional confidence, category, polygons, and bounding boxes |
+| Input bounds and supported image signatures | Optional confidence, category, polygons, bounding boxes, and crop-bound text rotation |
 | Provider-output validation | Readiness messages and provider-specific warnings |
 | Final `OcrResult` assembly | Declared off-device source policy |
 
@@ -287,8 +438,11 @@ Category, confidence, and geometry are optional. `category.rawLabel` preserves
 a bounded provider label without declaring the provider taxonomy closed;
 `category.role` is a conservative provider-neutral interpretation. Component
 boxes retain exact provider geometry, while `boundingBox` is their compatibility
-envelope. OCR output is evidence derived from the source, not verified source
-text.
+envelope. A provider may publish `textRotationMillidegrees` only with one
+polygon and no component boxes. It is the canonical clockwise source-image
+angle in `[-180000, 180000)` of the recognition x-axis established by the exact
+perspective crop, not an angle inferred later from recognized text. OCR output
+is evidence derived from the source, not verified source text.
 
 ## Providers
 
@@ -297,7 +451,7 @@ Provider choice is a typed object, never a raw backend-name switch.
 | Provider | OCR-owned implementation | Execution substrate | Source boundary |
 | --- | --- | --- | --- |
 | `PpOcrV6Provider` | Detection/recognition graphs, image pipeline, DB/CTC postprocessing | Embedded A3S Power | Always on device |
-| `DocumentFastOcrProvider` | PP-OCRv6 text, SLANet-Plus wired-table structure, and optional PicoDet-L seal positions with typed boundary candidates | Embedded A3S Power | Always on device |
+| `DocumentFastOcrProvider` | PP-OCRv6 text, SLANet-Plus wired-table structure, and optional exact-profile PicoDet-S/L seal positions with typed boundary candidates | Embedded A3S Power | Always on device |
 | `UnlimitedOcrProvider` | Vision towers, projector, decoder, tokenizer, generation, and grounding | Embedded A3S Power | Always on device |
 | Custom `OcrProvider` | Defined by the implementation | Defined by the implementation | Required in its descriptor |
 
@@ -347,47 +501,61 @@ subprocess, an inference service, or a Web listener.
 
 Staged PP-OCRv6 batches reuse an exact, lazily loaded Power model session and
 plan deterministic contiguous microbatches from live host/device memory
-snapshots. Each admitted microbatch holds one cancellation token, device
-permit, and engine lock across its slots and emits a schema-v4 receipt with the
-session declaration, plan digest, batch index/count, slot count, and queue
-evidence. Detection preprocessing and DB postprocessing use at most 16 bounded
-workers and preserve exact slot order. The fast detector bounds the longest
-side at 896 pixels, while polygons are mapped back to the immutable source and
-recognition crops that original image. An empty fast result on a source with at
-least 32 levels of channel variation receives one scalar quality retry with a
-4,000-pixel maximum side; both detection receipts remain attached. This retry
-protects empty-result quality but is not a guarantee against partial small-text
-misses.
+snapshots. OCR first derives deterministic detection-cohort canvases only to
+declare each slot's conservative peak memory; it does not turn those canvases
+into separate admission plans. Each admitted microbatch holds one cancellation
+token, device permit, and engine lock across all its slots and emits one
+schema-v4 receipt with the session declaration, plan digest, batch index/count,
+slot count, and queue evidence. Detection preprocessing and DB postprocessing
+use at most 16 bounded workers and preserve exact slot order. The fast detector
+bounds the longest side at 896 pixels, while polygons are mapped back to the
+immutable source and recognition crops that original image. An empty fast
+result on a source with at least 32 levels of channel variation receives one
+scalar quality retry with a 4,000-pixel maximum side; both detection receipts
+remain attached. This retry protects empty-result quality but is not a
+guarantee against partial small-text misses.
 
-Images with different resized dimensions are letterboxed at the top-left of
-one normalized-black canvas when every slot retains at least 90% canvas fill.
-OCR deterministically splits lower-fill shape outliers and any cohort whose
-reviewed peak intermediate would exceed Power's tensor-element limit. Each
-compatible cohort contains at most 16 images and executes one dynamic
-`[B,3,H,W]` detection graph call. Power validates leading-axis assembly and
+Detection candidates share one top-left-aligned normalized-black canvas only
+when the combined canvas area multiplied by its batch cardinality is no larger
+than the sum of executing the existing cohort and candidate separately. This
+exact no-additional-work proof replaces the former 90% canvas-fill threshold.
+OCR also splits any cohort whose reviewed peak intermediate would exceed
+Power's tensor-element limit. Each compatible cohort contains at most 16
+images and executes one dynamic `[B,3,H,W]` detection graph call. Power validates leading-axis assembly and
 output partitions; OCR retains each slot's content extent, excludes padding
 from DB postprocessing, and maps polygons through that extent into source
 pixels. OCR then flattens detected crops across the admitted images while
-retaining exact slot, detection, and reading-order identity. It stable-sorts
-dynamic recognition widths into canonical groups of at most eight crops whose
-widest canvas is no more than 16 pixels wider than the narrowest. Because every
-recognition canvas is at least 320 pixels wide, the reviewed bound adds at most
-5% right padding while collapsing pixel-level crop jitter; larger width
-differences remain separate. Adjacent canonical groups are coalesced only when
-their final canvas width is already identical, with a hard physical limit of
-32 crops. This changes neither padding nor model input values. Perspective
-crops and recognition tensors use the shared Rayon worker pool and restore the
-same deterministic order; scalar-versus-batch tensor tests are byte-exact. The
-planner materializes only the active group and restores blocks and receipts to
-their source slots. Unbounded width mixing remains forbidden because
-PP-OCRv6 recognition has global width context and can change decoded text. A
-failed shared graph call retries its affected crops through the scalar path so
+retaining exact slot, detection, and reading-order identity. Detection cohorts
+remain separate graph calls, but they are no longer recognition barriers:
+successful crops from every cohort inside the same admitted microbatch enter
+one width plan. It stable-sorts dynamic recognition widths into canonical
+groups of at most eight crops, but only crops with exactly identical tensor
+width may share an inference batch. Adjacent canonical groups are coalesced
+only when that exact width remains identical, with an accelerator cap of 128
+crops. The planner derives a second, width-specific cap from the complete input
+plus classifier reservation and Power's tensor-element limit, so wide inputs
+can only reduce the physical batch. No empirical width-difference threshold is used, and batching changes
+neither padding nor model input values. Exact-width recognition batches enter
+the bounded execution window in descending declared tensor-reservation order;
+ties retain canonical order. This reduces the final long-job tail without
+inspecting pixels or decoded content. Perspective crops publish the exact recognition x-axis
+back into source-image millidegrees, including the quarter-turn applied to tall
+crops. Crops and recognition tensors use the shared Rayon worker pool and
+restore the same deterministic order; scalar-versus-batch tensor tests are
+byte-exact. The planner materializes only the active group and restores blocks
+and receipts to their source slots. A failed detection cohort fails only its
+own slots. Unbounded width mixing remains forbidden because PP-OCRv6
+recognition has global width context and can change decoded text. A failed
+shared recognition call retries its affected crops through the scalar path so
 a non-cancellation failure remains isolated; cancellation still terminates the
 admitted request. Recognition results containing only whitespace are omitted
 from public blocks rather than publishing invalid empty evidence; this filter
-runs after inference and is not a detector-confidence shortcut.
+runs after inference and is not a detector-confidence shortcut. Cohort and
+recognition decisions use only tensor dimensions, declared limits, and retained
+slot/block identities; they never inspect file names, page numbers, recognized
+text, or sample fingerprints.
 
-The bounded-width release gate uses SHA-pinned Parser rasters. The three-page
+The historical exact-width release gate uses SHA-pinned Parser rasters. The three-page
 cross-page-table fixture retains its exact text fingerprint, `6x6/29`,
 `8x7/25`, and `3x6/17` grids/cells, and two continuation edges. The two-page
 rider-seal fixture retains its exact text fingerprint, three complete seals,
@@ -415,6 +583,263 @@ seconds (0.129 pages/s) and 334.596 seconds (0.087 pages/s), respectively. The
 CUDA result is still below the 10-pages/s complete fine-parse target. These are
 fixture-specific correctness and latency diagnostics, not corpus-wide OCR
 accuracy or throughput claims.
+
+The current four-stage rider gate additionally compares the former 32-crop
+cap with the resource-bounded 128-crop cap in alternating order. On the named
+RTX 4090, three 29-page runs per candidate produced medians of 6.889 seconds
+(4.210 pages/s) and 6.472 seconds (4.481 pages/s), respectively: 6.0% lower
+latency and 6.4% higher throughput. All 2,125 published Text blocks retained
+exact text, order, source geometry, detection confidence, and every other
+canonical field after execution receipts and recognition confidence were
+excluded. Recognition confidence remained finite and in range; 1,727 values
+changed because CUDA convolution arithmetic depends on batch shape, with a
+maximum absolute difference of `1.704692841e-5`. The 128-crop runs retained
+text SHA-256
+`8e5a458d896ffee83f46e775e9fcd9f07c179d6b17aec2cf90b9845c3c22dbf8`
+and a stable full-result semantic SHA-256
+`3cea2ae1b7fa15992e212c54f98eb1ea82035fe11f0d2227d8b59a3d9e87dcdc`.
+This timed region covers Orientation, Text, Table, and Seal over retained PNG
+rasters; it excludes PDF rasterization and A3S Office reconstruction and is
+still below the 10-pages/s complete fine-parse target.
+
+With both the 128-crop recognition scheduler and resource-derived orientation
+batching enabled, three uncontended runs of that earlier revision took 6.412,
+6.411, and 6.429 seconds, a 6.412-second median or 4.523 pages/s. Text and
+semantic fingerprints remained stable. This is historical decoded-raster
+four-stage evidence, not an end-to-end PDF reconstruction rate.
+
+The current seal-text verifier now groups only identical preprocessed tensor
+shapes and derives each physical batch from Power's input-byte and
+tensor-element limits plus the public slot bound. The 29-page rider request
+therefore executes its 116 required orthogonal views as 12 bounded graph calls
+with a maximum batch of 11; a failed shared call falls back to its scalar views
+for failure isolation. A clean same-binary RTX 4090 A/B on the newer evidence
+path measured scalar runs of 8.164, 8.346, and 9.120 seconds and batched runs of
+7.225, 7.791, and 7.498 seconds. Medians fell from 8.346 to 7.498 seconds
+(3.475 to 3.868 pages/s), a 10.2% latency and 11.3% throughput improvement.
+Every run retained text SHA-256
+`8e5a458d896ffee83f46e775e9fcd9f07c179d6b17aec2cf90b9845c3c22dbf8`
+and full non-receipt semantic SHA-256
+`781d5a5e7796f462fa1aeba661e7252ef2edfbde7e1d80bd1de8e6976507b750`.
+That median remains below the earlier historical core capture and far
+below 10 pages/s, so it supersedes neither release evidence nor the open
+complete fine-parse gate.
+
+The subsequent model-neutral runtime optimization removes cudarc activation
+events only from isolated, host-bounded model-session CUDA streams. A fresh
+six-sample-per-side interleaved cold-process A/B on the complete 29-page
+Orientation+Text+Table+Seal raster gate reduced the median from 4.031 to 3.673
+seconds (7.194 to 7.896 pages/s) and p90 from 4.162 to 3.896 seconds. All 12
+runs retained the exact text SHA-256
+`8e5a458d896ffee83f46e775e9fcd9f07c179d6b17aec2cf90b9845c3c22dbf8`
+and non-receipt semantic SHA-256
+`bdfedd8b50cc1bf2b863e4892ff3344fba116b1e758ebc8c33d1665a92dd7092`.
+This retained decoded-raster GPU result is not complete PDF rasterization,
+Parser reconciliation, or A3S Office reconstruction throughput.
+
+The 2026-08-25 exact-profile checkpoint supersedes it only as a current-tree
+diagnostic. PicoDet-S processed all 64 retained pages at about 8.335 pages/s but
+returned only four rider seals and was rejected. The first exact PicoDet-L v3
+capture restored rider `10/10` but returned three conference-invitation seals
+instead of one and was also rejected. After the general complete-versus-censored
+geometry correction, all 17 decoder tests, the 29-page rider position gate, and
+the 35-page precision gate passed. A fresh L-v3 all-corpus run retained rider
+`10/10`, invitation `1/1`, and merged table `68/68` positioned cells. Its five
+unguarded decoded-raster Orientation+Text+Table+Seal durations totaled 6.231
+seconds, about **10.271 pages/s**. The interactive WDDM GPU was shared and not
+continuously process-guarded, so this is not stable 10-pages/s certification;
+Parser/A3S Office still reports `fine_parse_ready=false` for every source.
+
+A later Power-only candidate folds private contiguous constant `Reshape` views
+once at executor construction. The current PicoDet-L trace executes 12 rather
+than 28 reshapes per graph call and exposes exactly 16 existing convolution
+channel-bias fusion windows, selected only from topology, constants, layout,
+and resource bounds. Frozen baseline/candidate runs retain exact current cache
+replay, all reconstruction and visual hashes, rider `10/10`, invitation `1/1`,
+merged-table `68/68`, and both seal accuracy gates. Stable speed evidence is
+still absent: the first timing comparison used unequal tracing and the first
+strict trace-free cohort launched zero samples after its quiet guard observed
+unrelated compilers. The older six-page strict table-text golden also fails
+identically on both binaries (`d2329b...` actual versus `d675b5...` expected),
+so it remains an open accuracy transition rather than being updated for the
+candidate.
+
+The next Power-only candidate lowers exact private CUDA F32 sigmoid products.
+For the current PicoDet-L broadcast, it retains the already computed
+`[N, 1, H, W]` gate and combines only the full-shape Sigmoid with its terminal
+Mul; this avoids recomputing the smaller gate's exponential across the three
+output channels. The generic Power contract also covers equal-shape products
+and `[N, C, 1, 1]` multipliers, with no model, node, source, page, text, pixel,
+fingerprint, corpus, or observed-shape selector. The official graph now consumes
+four active pairs per call, reducing Mul executions from 14 to 10.
+
+CPU/CUDA graph suites pass, and a fresh source-bound Parser binary reproduces
+all five normalized cache files over 64 distinct pages plus all 74 A3S Office
+reconstruction artifacts byte-for-byte. The reviewed merged table remains
+`68/68` positioned cells and the rider remains `10/10` positioned seals; every
+existing `fine_parse_ready=false` gap remains visible. The first post-validation
+GPU snapshot was already above the strict idle limit before either binary ran,
+so no throughput improvement or stable 10-pages/s claim is attached.
+
+The combined follow-up applies an adjacent private
+`BatchNormalization -> Sigmoid` edge in Power's normalization output pass.
+Swish retains its existing precedence, and the new path requires one private
+consumer without extending or reordering convolution. Complete CPU/CUDA graph
+suites pass. On the same official Layout graph, BatchNormalization accounts for
+`52 / 152` executions/source nodes, Sigmoid falls to `8 / 12`, and Mul remains
+`10 / 14`, removing four more execution boundaries per call. A new 64-page
+cache and all 74 Office artifacts remain exact. Their unguarded 6.001-second OCR
+sum (about 10.665 pages/s) is a diagnostic only: it was not an adjacent guarded
+A/B, and the following strict snapshot exceeded the GPU-idleness gate before
+either frozen binary ran.
+
+The latest Power follow-up prepares static BatchNormalization
+`[mean, sqrt(variance + epsilon)]` statistics once per graph executor, retaining
+the former CPU and CUDA F32 operations and the runtime
+`sub -> div -> mul -> add` sequence. Ordinary normalization and its depthwise
+and spatial convolution compositions share the prepared tensor. Three direct
+GPU tests are byte-exact, complete CPU/CUDA graph suites remain `120/0/9` and
+`124/0/39`, and the official Layout operation counts are unchanged as expected.
+All five normalized 64-page caches and all 74 Office artifacts match the prior
+candidate, including `68/68` merged-table cells and `10/10` rider seals. Its
+unguarded 6.570-second OCR sum (about 9.741 pages/s) is not performance evidence;
+the later preflight still had active compilers and about 15% shared GPU use.
+
+The retained DocumentFast seal scheduler uses at most four isolated CUDA
+layout sessions. Device memory keeps a fixed 2 GiB reserve and budgets 4 GiB
+per session; CPU and Metal remain single-session. Source and orientation-
+normalized supplemental branches receive sessions from typed view cardinality,
+and unchanged batches are assigned by remaining work before results return to
+source order. A fifth-session candidate preserved all 64-page caches exactly,
+but failed a strict `4,5,5,4,5,4,4,5` cohort: it won only two of four aggregate
+pairs and one of four pairs on the only document that admitted the fifth
+session, while regressing that document's mean/median from 3,021.0/3,026.0 to
+3,074.0/3,099.0 ms. The fifth replica was removed. Every fixed-corpus cache and
+test-process repetition exceeded 10 pages/s; complete live PDF parsing and
+Office reconstruction remain separate open gates.
+
+Power now gives each CUDA model-session lane its own fixed vendor-sized cuBLAS
+workspace. The handle and stream remain alive with that allocation; teardown
+synchronizes and resets the same handle to the vendor pool before freeing the
+buffer. This restores exact concurrent F32 output without a process-global
+workspace switch or a dangling workspace for an independently retained Candle
+device. The contract contains no model, graph, source, page, content, geometry,
+corpus, or timing selector.
+
+The proposed cross-branch refinement pool was still slower and has been removed.
+A strict fixed-order eight-run cohort retained normalized-exact 64-page output,
+but static/pooling cache means were 6,210.25/6,307 ms, medians were
+6,116/6,316 ms, and pooling won only one of four adjacent pairs. Production
+keeps model-contract, refinement, and adjacent-boundary work inside the static
+source/supplement partitions, with existing whole-batch least-work scheduling
+only inside each branch.
+
+The final Parser integration binary
+`58763c3308f0fb8d50abf4decfa1f22d1e86ec4c27b8c9a1d23a60db61717aac`
+completed two independent 64-page runs without `CUBLAS_WORKSPACE_CONFIG`.
+Both equal the strict static control at normalized cache SHA-256
+`8df7df06a2a87950d233ad319a571b2eb07d0698e35a6972c1044fbad8c5ad7b`.
+The cache-backed Office tree is path-and-byte identical across all 74 artifacts,
+including `68/68` positioned merged-table cells and all `11/11` seals. The
+unguarded cache sums and process walls are excluded; the first final strict
+timing admission launched no binary because an unrelated compiler chain
+appeared, so stable live 10 pages/s is not claimed.
+
+The canonical history of every rejected, inconclusive, invalid, mixed, and
+reverted optimization or validation attempt is the Parser
+[append-before-removal negative-result ledger](https://github.com/contra-sense/agentic-parser/blob/main/docs/ocr-acceleration-plan.md#2026-08-24-onward-performance-negative-result-ledger).
+It includes model-profile failures, invalid compiler/test/shell invocations,
+missing A/B evidence, and measured first-principles upper-bound rejections;
+successful later evidence never deletes an earlier attempt.
+
+The 2026-08-21 CPU Text-window gate on the Xeon w5-2445 uses 21 structurally
+selected pages from the external real-PDF corpus. Against complete-source Text
+detection and recognition, the window path retained exactly 368 of 368
+positive-intersection blocks with zero missing and zero additional blocks. Two
+current-tree warm runs took 15.079--15.297 seconds for full recognition and
+11.398--12.185 seconds for windowed recognition (1.373--1.393 versus
+1.723--1.842 pages/s, 1.255--1.323x). These runs include exact-width
+largest-declared-work-first scheduling, nested-parallel-aware pointwise
+execution, removal of a redundant depthwise output clear, Power's generic
+eight-lane AVX2/FMA stride-one depthwise interior, and `gemm` runtime dispatch
+to its x86-v4 kernel on an AVX-512F host. Alternating retained FMA and x86-v4
+binaries reduced full latency by 9.9--13.6% and window latency by 4.6--14.9%
+while preserving all 368 blocks exactly. Both dispatches use live ISA and tensor
+facts only and retain portable fallbacks. Custom pointwise rows, four-output
+tiles, and pretransposed weights were rejected after broad-shape regressions;
+no model, document, content, corpus, or empirical-shape threshold was added.
+This is a Text-stage routing diagnostic, not complete fine parsing and not a
+10-pages/s claim.
+
+Alternating binaries pass the six-page Text-plus-Table gate in 5.485--5.547
+seconds with x86-v4 versus 6.040--6.287 seconds with the prior FMA path,
+preserving both fingerprints, three table fragments, 68 cells, and two
+unresolved continuation reviews. The 29-page Text-plus-Seal diagnostic takes
+36.247--36.891 seconds with x86-v4 versus 40.016--41.492 seconds with FMA. That
+rejected evidence identity observes eight confirmed seals, four reconciled edge
+fragments, and reviewed positions. The strict test still rejects Text fingerprint
+`fb590fe31928f2ba06106fc2cd4282528b75d7917cba266a304785264945b58e`
+because it is not a reviewed CPU/CUDA golden. An AVX-disabled run produced the
+same fingerprint in 51.749 seconds, isolating that accuracy drift from the SIMD
+change. The golden remains unchanged and complete fine-parse readiness remains
+open.
+
+The fingerprint history is revision evidence, not an optimization target. The
+reviewed CPU fingerprint
+`91ad46b4501dc82bc7baba87334f735f35ec9eb10ba6b0306213e9cf9dc95ec5`
+was emitted by an older binary whose recognition planner could right-pad crops
+by up to 16 pixels to share a call. The current exact-width planner repeatedly
+emits the still-unreviewed `fb590fe...` result. Temporarily restoring the former
+allowance on the current tree emitted a third Text fingerprint,
+`191d7c408ec1d091744771f529a62c963bd06a66eab77d573f5ee32a1ed1cc82`,
+and changed pages in both directions relative to the old and current results.
+This neither validates the current text nor identifies one historical change as
+the cause. It does show that forcing the old fingerprint would be corpus
+overfitting. Exact-width batching remains because it preserves input values for
+a graph with global width context; a new golden requires independent text truth
+and A3S Office reconstruction review.
+
+Four one-variable CPU diagnostics retained the current fingerprint: disabling
+direct spatial convolution took 41.632 seconds, replacing the terminal
+classifier projection with explicit graph operations took 48.659 seconds,
+serializing outer graph-job windows took 74.554 seconds, and disabling CPU
+convolution-bias activation fusion took 54.675 seconds. None was retained as an
+accuracy workaround. A current 29-page Text-only trace takes 30.028 seconds
+(0.966 pages/s). Recognition accounts for 242.253 seconds of summed CPU graph
+work compressed to 22.858 wall seconds, detection for 10.627 summed seconds
+compressed to 5.929 wall seconds, and crop plus tensor preparation for about
+1.017 seconds. The next order-of-magnitude path is a separately digest-pinned
+lower-compute model or precision revision with independent text, geometry,
+table, seal, cross-page, and Office-reconstruction gates. Runtime-selected
+silent quantization and document- or corpus-dependent precision are forbidden.
+
+An earlier CPU diagnostic isolates the cross-detection-cohort
+recognition boundary. Two real table pages retain 55 crops and 28 exact dynamic
+widths while reducing physical recognition calls from 22 to 19; same-machine
+wall time fell from 7.612 to 7.045 seconds (0.263 to 0.284 pages/s). The strict
+six-page Text-plus-Table gate fell from 25.430 to 24.428 seconds (0.236 to 0.246
+pages/s) and retained the exact text SHA-256
+`d675b5a37ea9f9fa8666a8a97296d0d651567480dd0a190b88b2bedc19daba55`,
+structure SHA-256
+`45515d3752806d043920eb3f3d6eaffbc9ecbe7449deca0f4f3094dac9d1cbed`,
+three table fragments, 68 cells, and two unresolved continuation reviews. The
+official scalar/batch gate also retains text, confidence, geometry, per-source
+failure isolation, and one admission receipt for a mixed-shape three-slot
+microbatch. These CPU captures are exact-fixture regression evidence, not a
+general throughput claim, and remain far below the 10-pages/s complete
+fine-parse target.
+
+Historical CPU seal-only integration gates cover 29 positive pages and 35
+precision pages. Necessary-condition admission reduced the positive fixture
+from 67 to 44 model views; those captures took 24.255 seconds (1.196 pages/s)
+and 21.286 seconds (1.644 pages/s). The current typed contract retains eight
+reviewed complete rider seals plus only the page-1/page-2 boundary pair, which
+Parser reconciles into two positioned elements and one continuation; no
+page-26/page-27 relation is fabricated. Current unguarded CUDA seal-stage
+diagnostics take 3.035 seconds (9.555 pages/s) for the rider and 2.410 seconds
+(14.521 pages/s) for the precision corpus, retaining exactly the invitation's
+one reviewed seal and no unresolved precision candidate. These stage-only
+numbers do not establish complete fine-parse throughput.
 
 Recognition no longer materializes the complete 18,710-class probability row
 on the host. OCR applies a deterministic model-owned projection on the Power
@@ -478,6 +903,90 @@ CUDA tail byte-exact with the original five nodes. Each recognition call avoids
 avoids 2,760. CPU and every unreviewed topology, shape, device, dtype, or layout
 retain ordinary execution.
 
+The next Power slice combines a contiguous F32 `BatchNormalization` with its
+exact private error-function GELU chain while preserving every graph rounding
+boundary. A batch-128 recognition profile reduced the matched normalization
+and activation work by about 37.5%, saving 182--192 microseconds. An
+alternating 29-page full-stage comparison reduced the baseline mean from
+3,232.997 to 3,156.856 ms (2.36%) with unchanged output. Power then lets an
+exact rank-three last-two-axis transpose view feed its contiguous rank-two
+classifier matrix directly through CUDA strided GEMM. Matching uses only
+device, F32 dtype, rank, contiguity, compatible nonzero dimensions, and exact
+strides; all other layouts keep materialization. The recognition probe removes
+all 386 matching transpose launches (989.750 microseconds in the retained
+baseline). Across two precommitted interleaved 29-page cohorts totaling nine
+samples per binary, mean latency moved from 3,371.218 to 3,354.116 ms (0.51%)
+and median latency from 3,412.336 to 3,373.865 ms (1.13%). Every full-stage run
+retained 2,518 blocks, text SHA-256
+`8e5a458d896ffee83f46e775e9fcd9f07c179d6b17aec2cf90b9845c3c22dbf8`, and
+non-receipt semantic SHA-256
+`49efe252b380179b4385eb114adf1897a9cbe7f1b949a7e9b6037958158cd1ff`.
+The latter result is small and contention-sensitive; neither measurement is a
+stable 10-pages/s complete fine-parse claim. The ignored strict rider gate
+still rejects that shared semantic fingerprint against its older reviewed
+golden; the expectation was not relaxed for this optimization.
+
+Power now also combines an exact private last-axis bias addition, Sigmoid, and
+self-multiplication into one contiguous CUDA F32 pass. The OCR topology gate
+locks exactly two source `Add`-`Identity`-`Sigmoid`-`Mul` windows, while Power
+matches only the normalized formula, private use counts, rank, exact last-axis
+geometry, dtype, device, layout, cancellation, and declared bounds. A launch-
+blocked full-stage trace observed 142 dynamic matches and removed 284
+standalone pointwise launches. Two precommitted interleaved 29-page A/B cohorts
+improved independently: six samples per binary moved from 3,081.185 to
+2,932.748 ms, and a reverse-order four samples per binary moved from 3,162.325
+to 3,037.512 ms. Across all ten samples per binary, mean latency fell 4.46%
+from 3,113.641 to 2,974.654 ms, median latency fell 3.14%, and mean throughput
+rose from 9.337 to 9.757 pages/s. All runs retained 2,518 blocks and the same
+text/semantic hashes above. Individual samples crossed 10 pages/s, but the
+stable throughput gate and older semantic-golden gate remain open.
+
+The next generic Power path reuses an exact private `MatMul` output for its
+last-axis bias and composes the same retained Swish tail when present. OCR's
+source-topology gate locks nine adjacent `MatMul -> Add` windows with private
+MatMul outputs, empty attributes, rank-two F32 weights, rank-one F32 biases,
+and matching output columns. The existing terminal classifier projection owns
+one; six internal bias windows and two internal bias-plus-Swish windows are
+eligible without exporting model or node identity to Power. Each removes one
+allocation/free pair, but no kernel launch relative to the preceding
+biased-Swish baseline. Generic rank-two through rank-four and nonzero-offset
+CUDA cases are byte-exact.
+
+The first six-sample-per-binary 29-page cohort improved 2.35% by mean and 3.95%
+by median. In the reverse-order four-sample cohort, the mean improved only
+0.34% and the median regressed 0.66%. Combined means moved from 3,024.159 to
+2,976.892 ms (1.56%), combined medians from 2,999.025 to 2,885.866 ms (3.77%),
+and mean throughput from 9.589 to 9.742 pages/s; seven of ten pairs favored the
+candidate and every run retained the 2,518 blocks and both hashes above. A
+noisy isolated-graph series improved mean and 10% trimmed mean but regressed
+median from 9.634 to 10.128 ms. The allocation reduction is retained with
+mixed timing evidence, not as stable 10-pages/s proof. A preceding standalone
+MatMul-bias attempt was rejected before A/B because it intercepted the two Add
+nodes needed by the existing Swish fusion and re-exposed two Sigmoid and two
+Mul executions per graph. Parser's append-before-removal ledger records this
+and every other identified poor, unstable, invalid, or unpromoted attempt; no
+model, file, page, text, value, fingerprint, corpus, or measured-shape selector
+may recover one.
+
+Recognition calls above 32 items now retain the same CUDA reduction launch
+quantum as the reviewed at-most-32 path. Power lowers the full spatial input
+once, partitions only pointwise/spatial batched GEMM by a fixed leading-axis
+quantum of 32, and writes each partition directly into one final allocation.
+This is selected from device, dtype, layout, geometry, and resource bounds;
+OCR/model/source/content identity is not visible to the executor. A complete
+batch-128 recognition-graph comparison found zero differing bits across all
+95,795,200 output values. The earlier unpartitioned batch-128 path changed 313
+OCR confidence fields, and every one of 41 explicit cuBLAS algorithms failed a
+generic exact-parity case, so neither is admissible.
+
+This numerical fix does not promote a larger OCR batch. One-pass 29-page
+throughput for batch sizes `64/96/128/160/192/224/256` was respectively
+`9.580/8.950/9.593/7.061/9.339/9.447/9.472 pages/s`; the non-monotonic series
+cannot select a production threshold. A four-text-lane follow-up was exact but
+slower at both batch 32 (`9.190 pages/s`) and batch 128 (`8.848 pages/s`) and
+was reverted. The public recognition default remains 32 and stable 10 pages/s
+remains open.
+
 The current quality evidence covers the pinned 30-block official image and
 clear 8-point and 12-point PDF text rendered at 144 DPI. Five-point synthetic
 text did not pass exact publication and is not a supported quality claim. The
@@ -490,8 +999,10 @@ shapes, item counts, and byte lengths for the zero-tensor detection and
 recognition fixtures. It then downloads PaddleOCR's SHA-256-pinned
 `general_ocr_002` image and executes the complete Rust pipeline: resize,
 detection, DB postprocessing, reading-order sort, perspective crops, batched
-recognition, CTC decoding, source-coordinate polygons, and eight Power execution
-receipts. The 30 output blocks are checked against a reference generated with
+recognition, CTC decoding, source-coordinate polygons, one detection receipt,
+and at least one recognition receipt. Physical recognition-call count is a
+scheduler result rather than an accuracy golden. The 30 output blocks are
+checked against a reference generated with
 Paddle 3.3.1 and PaddleOCR 3.7.0 using explicit text, score, and four-point
 coordinate tolerances. The same gate compares one official crop at scalar and
 cross-image batch width two, requiring identical text and geometry, recognition
@@ -612,7 +1123,9 @@ telemetry, and receipt guarantees; source bytes and detailed routing data are
 never exported by this provider.
 
 The provider applies the upstream single-image prompt and no-repeat n-gram
-policy in the native generation loop and preserves generated Markdown. It
+policy in the native generation loop and preserves generated Markdown. Apart
+from removing the exact terminal control token, it does not rewrite recognized
+substrings such as LaTeX-like operators. It
 strictly parses both grounding forms reviewed in the upstream model
 implementation:
 
@@ -627,9 +1140,10 @@ A3S OCR resolves the verified input dimensions and maps valid non-image
 grounding into typed source-pixel `OcrBlock` evidence. Every valid component
 box is preserved in model order and `boundingBox` remains the bounded union for
 compatibility. The bounded raw label is retained next to a conservative role:
-explicit titles, headings, paragraphs, tables, captions, equations, running
+only exact reviewed labels for titles, headings, paragraphs, tables, captions, equations, running
 headers/footers, footnotes, page numbers, and code receive matching roles;
-other valid labels remain `unknown` rather than being promoted. The upstream
+case variants, punctuation variants, and other valid labels remain `unknown`
+rather than being promoted. The upstream
 taxonomy is intentionally treated as open.
 
 The implementation evaluates no model text as code, fabricates no confidence, and

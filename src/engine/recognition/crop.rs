@@ -13,6 +13,7 @@ pub(super) struct PerspectiveCropPlan {
     width: u32,
     height: u32,
     rotate: bool,
+    text_rotation_millidegrees: i32,
 }
 
 impl PerspectiveCropPlan {
@@ -42,11 +43,19 @@ impl PerspectiveCropPlan {
         let projection = Projection::from_control_points(source, destination).ok_or_else(|| {
             crop_error("PP-OCRv6 detected a degenerate text polygon that cannot be rectified.")
         })?;
+        let rotate = f64::from(height) / f64::from(width) >= 1.5;
+        let reading_end = if rotate { polygon[3] } else { polygon[1] };
+        let text_rotation_millidegrees = canonical_millidegrees(
+            f64::from(reading_end.y - polygon[0].y)
+                .atan2(f64::from(reading_end.x - polygon[0].x))
+                .to_degrees(),
+        );
         Ok(Self {
             projection,
             width,
             height,
-            rotate: f64::from(height) / f64::from(width) >= 1.5,
+            rotate,
+            text_rotation_millidegrees,
         })
     }
 
@@ -56,6 +65,10 @@ impl PerspectiveCropPlan {
         } else {
             (self.width, self.height)
         }
+    }
+
+    pub(super) fn text_rotation_millidegrees(&self) -> i32 {
+        self.text_rotation_millidegrees
     }
 
     pub(super) fn execute(&self, image: &RgbImage) -> UseResult<RgbImage> {
@@ -78,6 +91,17 @@ impl PerspectiveCropPlan {
 #[cfg(test)]
 fn perspective_crop(image: &RgbImage, detection: &Detection) -> UseResult<RgbImage> {
     PerspectiveCropPlan::new(detection)?.execute(image)
+}
+
+fn canonical_millidegrees(degrees: f64) -> i32 {
+    let mut value = (degrees * 1_000.0).round() as i32;
+    while value >= 180_000 {
+        value -= 360_000;
+    }
+    while value < -180_000 {
+        value += 360_000;
+    }
+    value
 }
 
 fn distance(left: Point<f32>, right: Point<f32>) -> f32 {
@@ -123,5 +147,23 @@ mod tests {
         let plan = PerspectiveCropPlan::new(&detection).unwrap();
 
         assert_eq!(plan.output_dimensions(), (40, 10));
+        assert_eq!(plan.text_rotation_millidegrees(), 90_000);
+    }
+
+    #[test]
+    fn source_rotation_follows_the_exact_recognition_x_axis() {
+        let detection = Detection {
+            polygon: [
+                Point::new(10.0, 20.0),
+                Point::new(110.0, 30.0),
+                Point::new(106.0, 70.0),
+                Point::new(6.0, 60.0),
+            ],
+            confidence: 1.0,
+        };
+        let plan = PerspectiveCropPlan::new(&detection).unwrap();
+
+        assert_eq!(plan.output_dimensions(), (100, 40));
+        assert_eq!(plan.text_rotation_millidegrees(), 5_711);
     }
 }

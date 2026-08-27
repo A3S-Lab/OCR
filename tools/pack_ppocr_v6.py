@@ -58,6 +58,9 @@ SUPPORTED_OPS = {
 SLANET_PLUS_ENCODER_SHA256 = (
     "dbd5431b4051b0f3037e3f8650dba4297cdf38a6a132ac9ccf57886184f4b66e"
 )
+PP_OCR_V4_MOBILE_SEAL_DET_SHA256 = (
+    "39854c9489b4cb0c5f47ff361b31e966d56b791b92a7ac99686f8a1a2fd8e5c1"
+)
 SLANET_PLUS_SHAPE_CONSUMERS = {"Concat", "Slice"}
 SLANET_PLUS_CONTROL_RESHAPE_OUTPUTS = {
     "helper.reshape.0",
@@ -118,8 +121,11 @@ def convert(
     *,
     family: str = "pp-ocr-v6-small",
     slanet_plus_encoder: bool = False,
+    expected_source_sha256: str | None = None,
 ) -> None:
     source_sha256 = sha256(source)
+    if expected_source_sha256 is not None and source_sha256 != expected_source_sha256:
+        raise ValueError(f"reviewed {family} source SHA-256 changed")
     if slanet_plus_encoder and source_sha256 != SLANET_PLUS_ENCODER_SHA256:
         raise ValueError("SLANet-Plus lowering requires the reviewed encoder SHA-256")
     model = onnx.load(str(source), load_external_data=True)
@@ -139,7 +145,9 @@ def convert(
         shape.dim.add().dim_value = 256
         shape.dim.add().dim_value = 96
     onnx.checker.check_model(model, full_check=True)
-    lowered_ops = {"Cast", "HardSwish"} if slanet_plus_encoder else set()
+    lowered_ops = {"HardSwish"}
+    if slanet_plus_encoder:
+        lowered_ops.add("Cast")
     unsupported = sorted(
         {node.op_type for node in model.graph.node} - SUPPORTED_OPS - lowered_ops
     )
@@ -179,9 +187,9 @@ def convert(
             attribute.name: attribute_value(attribute)
             for attribute in node.attribute
         }
-        if slanet_plus_encoder and node.op_type == "HardSwish":
+        if node.op_type == "HardSwish":
             if len(inputs) != 1 or len(outputs) != 1 or attributes:
-                raise ValueError(f"unreviewed SLANet-Plus HardSwish node {name!r}")
+                raise ValueError(f"unreviewed HardSwish node {name!r}")
             gate = f"{outputs[0]}.__hard_sigmoid"
             nodes.extend(
                 [
@@ -321,12 +329,17 @@ def main() -> None:
     parser.add_argument("--det", type=Path)
     parser.add_argument("--rec", type=Path)
     parser.add_argument("--table-encoder", type=Path)
+    parser.add_argument("--seal-det", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
     if (arguments.det is None) != (arguments.rec is None):
         parser.error("--det and --rec must be supplied together")
-    if arguments.det is None and arguments.table_encoder is None:
-        parser.error("supply a PP-OCRv6 pair or --table-encoder")
+    if (
+        arguments.det is None
+        and arguments.table_encoder is None
+        and arguments.seal_det is None
+    ):
+        parser.error("supply a PP-OCRv6 pair, --table-encoder, or --seal-det")
     if arguments.det is not None:
         convert(arguments.det, "detection", arguments.output / "det")
         convert(arguments.rec, "recognition", arguments.output / "rec")
@@ -337,6 +350,14 @@ def main() -> None:
             arguments.output / "table",
             family="slanet-plus",
             slanet_plus_encoder=True,
+        )
+    if arguments.seal_det is not None:
+        convert(
+            arguments.seal_det,
+            "seal-text-detection",
+            arguments.output / "seal-det",
+            family="pp-ocr-v4-mobile-seal-det",
+            expected_source_sha256=PP_OCR_V4_MOBILE_SEAL_DET_SHA256,
         )
 
 

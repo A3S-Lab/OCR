@@ -5,10 +5,9 @@ mod weights;
 use a3s_use_core::{UseError, UseResult};
 use tokio_util::sync::CancellationToken;
 
-use self::dictionary::StructureDictionary;
-pub(super) use self::grid::StructureGrid;
-#[cfg(test)]
+use self::dictionary::{StructureDictionary, StructureToken};
 pub(super) use self::grid::GridCell;
+pub(super) use self::grid::StructureGrid;
 use self::weights::{
     DecoderWeights, CONTEXT_WIDTH, ENCODER_STEPS, HIDDEN_WIDTH, LOCATION_WIDTH, MAX_TOKENS,
     VOCABULARY_SIZE,
@@ -130,9 +129,10 @@ impl SlanetPlusDecoder {
 
             if best != self.dictionary.sos() {
                 let token_position = tokens.len();
-                tokens.push(self.dictionary.token(best)?.to_string());
+                let token = self.dictionary.token(best)?;
+                tokens.push(token);
                 confidence_sum += confidence;
-                if self.dictionary.is_cell(best) {
+                if token.carries_cell_geometry() {
                     matrix_vector_input_output(
                         &scratch.hidden,
                         &self.weights.location_hidden,
@@ -173,7 +173,7 @@ impl SlanetPlusDecoder {
 }
 
 pub(super) struct DecodedStructure {
-    pub(super) tokens: Vec<String>,
+    pub(super) tokens: Vec<StructureToken>,
     pub(super) cells: Vec<DecodedCell>,
     pub(super) confidence: f32,
 }

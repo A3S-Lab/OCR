@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::io::Cursor;
 
+use a3s_power::inference::ExecutionDigest;
 use a3s_use_core::{UseError, UseResult};
 use image::imageops::FilterType;
 use image::{ImageReader, Limits, RgbImage};
@@ -20,7 +21,11 @@ const DETECTION_MIN_SIDE: u32 = 64;
 const DETECTION_FAST_MAX_SIDE: u32 = 896;
 pub(crate) const DETECTION_QUALITY_MAX_SIDE: u32 = 4_000;
 const DETECTION_MAX_BATCH_SIZE: usize = 16;
-const RECOGNITION_MAX_BATCH_SIZE: usize = 32;
+// The dynamic-batch graph remains bounded independently from the public
+// 256-slot request contract. Thirty-two crops keep preprocessing granular
+// enough to overlap across admitted model-session lanes without changing any
+// crop canvas; the width-specific tensor reservation can only reduce this cap.
+pub(crate) const RECOGNITION_MAX_BATCH_SIZE: usize = 32;
 const RECOGNITION_MAX_WIDTH: u32 = 3_200;
 
 pub(crate) struct DetectionInput {
@@ -43,9 +48,11 @@ pub(crate) struct DetectionBatchInput {
     pub(crate) geometries: Vec<DetectionGeometry>,
 }
 
+#[derive(Clone)]
 pub(crate) struct RecognitionInput {
     pub(crate) data: Vec<f32>,
     pub(crate) shape: [usize; 4],
+    pub(crate) digest: ExecutionDigest,
 }
 
 pub(crate) fn decode_image(bytes: &[u8]) -> UseResult<RgbImage> {
@@ -189,10 +196,69 @@ pub(crate) fn detection_input_with_max_side(
     })
 }
 
+/// Reproduces PaddleOCR's reviewed `resize_long` detector contract: scale the
+/// longer side to the declared length, then round each side up to the model
+/// stride. This is intentionally separate from the ordinary bounded-max-side
+/// policy because the two transforms have different semantics.
+pub(crate) fn detection_input_with_resize_long(
+    image: &RgbImage,
+    config: &DetectionConfig,
+    resize_long: u32,
+    stride: u32,
+) -> UseResult<DetectionInput> {
+    let dimensions =
+        detection_resize_long_dimensions(image.width(), image.height(), resize_long, stride)?;
+    let plane = usize::try_from(u64::from(dimensions.0) * u64::from(dimensions.1))
+        .map_err(|_| image_error("Detection tensor dimensions overflowed."))?;
+    let tensor_elements = plane
+        .checked_mul(3)
+        .ok_or_else(|| image_error("Detection tensor dimensions overflowed."))?;
+    let mut data = vec![0.0_f32; tensor_elements];
+    let geometry = write_detection_input(image, dimensions, dimensions, plane, &mut data, config)?;
+    Ok(DetectionInput {
+        data,
+        shape: [1, 3, dimensions.1 as usize, dimensions.0 as usize],
+        geometry,
+    })
+}
+
+pub(crate) fn detection_resize_long_dimensions(
+    width: u32,
+    height: u32,
+    resize_long: u32,
+    stride: u32,
+) -> UseResult<(u32, u32)> {
+    if width == 0 || height == 0 {
+        return Err(image_error("OCR image has zero width or height."));
+    }
+    if resize_long == 0
+        || resize_long > DETECTION_QUALITY_MAX_SIDE
+        || stride == 0
+        || stride > resize_long
+    {
+        return Err(image_error(
+            "OCR resize-long dimensions require a bounded positive length and stride.",
+        ));
+    }
+    let longest = width.max(height);
+    let scaled =
+        |side: u32| u64::from(side).saturating_mul(u64::from(resize_long)) / u64::from(longest);
+    let align_up = |side: u64| {
+        side.max(1)
+            .div_ceil(u64::from(stride))
+            .saturating_mul(u64::from(stride))
+    };
+    let resized_width = u32::try_from(align_up(scaled(width)))
+        .map_err(|_| image_error("OCR resize-long width overflowed."))?;
+    let resized_height = u32::try_from(align_up(scaled(height)))
+        .map_err(|_| image_error("OCR resize-long height overflowed."))?;
+    Ok((resized_width, resized_height))
+}
+
 fn write_detection_input(
     image: &RgbImage,
     (content_width, content_height): (u32, u32),
-    (canvas_width, _canvas_height): (u32, u32),
+    (canvas_width, canvas_height): (u32, u32),
     plane: usize,
     data: &mut [f32],
     config: &DetectionConfig,
@@ -209,20 +275,25 @@ fn write_detection_input(
             FilterType::Triangle,
         ))
     };
-    for channel in 0..3 {
-        data[channel * plane..(channel + 1) * plane]
-            .fill(-config.mean[channel] / config.std[channel]);
+    let (blue_plane, remaining) = data.split_at_mut(plane);
+    let (green_plane, red_plane) = remaining.split_at_mut(plane);
+    if content_width != canvas_width || content_height != canvas_height {
+        blue_plane.fill(-config.mean[0] / config.std[0]);
+        green_plane.fill(-config.mean[1] / config.std[1]);
+        red_plane.fill(-config.mean[2] / config.std[2]);
     }
-    for y in 0..content_height {
-        for x in 0..content_width {
-            let pixel = resized.get_pixel(x, y);
-            let target = y as usize * canvas_width as usize + x as usize;
-            let channels = [pixel[2], pixel[1], pixel[0]];
-            for channel in 0..3 {
-                data[channel * plane + target] = (f32::from(channels[channel]) * config.scale
-                    - config.mean[channel])
-                    / config.std[channel];
-            }
+    let content_row_bytes = content_width as usize * 3;
+    let canvas_width = canvas_width as usize;
+    for (y, row) in resized.as_raw().chunks_exact(content_row_bytes).enumerate() {
+        let target_row = y * canvas_width;
+        for (x, pixel) in row.chunks_exact(3).enumerate() {
+            let target = target_row + x;
+            blue_plane[target] =
+                (f32::from(pixel[2]) * config.scale - config.mean[0]) / config.std[0];
+            green_plane[target] =
+                (f32::from(pixel[1]) * config.scale - config.mean[1]) / config.std[1];
+            red_plane[target] =
+                (f32::from(pixel[0]) * config.scale - config.mean[2]) / config.std[2];
         }
     }
     Ok(DetectionGeometry {
@@ -254,13 +325,38 @@ fn canvas_dimensions(dimensions: &[(u32, u32)]) -> UseResult<(u32, u32)> {
         .ok_or_else(|| image_error("PP-OCRv6 detection batch has no canvas dimensions."))
 }
 
+#[cfg(test)]
 pub(crate) fn recognition_input(
     images: &[&RgbImage],
     config: &RecognitionConfig,
 ) -> UseResult<RecognitionInput> {
-    if images.is_empty() || images.len() > RECOGNITION_MAX_BATCH_SIZE {
+    let (model_height, resized_widths, canvas_width) = recognition_input_layout(images, config)?;
+    materialize_recognition_input(images, config, model_height, &resized_widths, canvas_width)
+}
+
+pub(crate) fn recognition_input_with_canvas_width(
+    images: &[&RgbImage],
+    config: &RecognitionConfig,
+    canvas_width: u32,
+) -> UseResult<RecognitionInput> {
+    let (model_height, resized_widths, natural_canvas_width) =
+        recognition_input_layout(images, config)?;
+    if canvas_width < natural_canvas_width || canvas_width > RECOGNITION_MAX_WIDTH {
         return Err(image_error(format!(
-            "PP-OCRv6 recognition batches must contain from 1 through {RECOGNITION_MAX_BATCH_SIZE} text crops."
+            "PP-OCRv6 recognition canvas width must contain the natural {natural_canvas_width}-pixel input and cannot exceed {RECOGNITION_MAX_WIDTH} pixels."
+        )));
+    }
+    materialize_recognition_input(images, config, model_height, &resized_widths, canvas_width)
+}
+
+fn recognition_input_layout(
+    images: &[&RgbImage],
+    config: &RecognitionConfig,
+) -> UseResult<(u32, Vec<u32>, u32)> {
+    let maximum_batch_size = recognition_max_batch_size();
+    if images.is_empty() || images.len() > maximum_batch_size {
+        return Err(image_error(format!(
+            "PP-OCRv6 recognition batches must contain from 1 through {maximum_batch_size} text crops."
         )));
     }
     if images
@@ -268,6 +364,11 @@ pub(crate) fn recognition_input(
         .any(|image| image.width() == 0 || image.height() == 0)
     {
         return Err(image_error("PP-OCRv6 text crop has zero width or height."));
+    }
+    if config.channels != 3 {
+        return Err(image_error(
+            "PP-OCRv6 recognition input requires exactly three color channels.",
+        ));
     }
     let model_height = recognition_model_height(config)?;
     let resized_widths = images
@@ -278,13 +379,37 @@ pub(crate) fn recognition_input(
     let canvas_width = recognition_default_width(config)?
         .max(widest)
         .min(RECOGNITION_MAX_WIDTH);
+    Ok((model_height, resized_widths, canvas_width))
+}
+
+pub(crate) fn recognition_max_batch_size() -> usize {
+    #[cfg(test)]
+    if let Some(value) = std::env::var_os("A3S_OCR_TEST_RECOGNITION_MAX_BATCH_SIZE") {
+        if let Ok(value) = value.to_string_lossy().parse::<usize>() {
+            return value.clamp(1, crate::batch::MAX_BATCH_SLOTS);
+        }
+    }
+    RECOGNITION_MAX_BATCH_SIZE
+}
+
+fn materialize_recognition_input(
+    images: &[&RgbImage],
+    config: &RecognitionConfig,
+    model_height: u32,
+    resized_widths: &[u32],
+    canvas_width: u32,
+) -> UseResult<RecognitionInput> {
     let target_plane = usize::try_from(u64::from(canvas_width) * u64::from(model_height))
         .map_err(|_| image_error("Recognition tensor dimensions overflowed."))?;
     let batch_stride = config
         .channels
         .checked_mul(target_plane)
         .ok_or_else(|| image_error("Recognition tensor dimensions overflowed."))?;
-    let mut data = vec![0.0_f32; images.len() * batch_stride];
+    let tensor_elements = images
+        .len()
+        .checked_mul(batch_stride)
+        .ok_or_else(|| image_error("Recognition tensor dimensions overflowed."))?;
+    let mut data = vec![0.0_f32; tensor_elements];
     data.par_chunks_exact_mut(batch_stride)
         .zip(
             images
@@ -295,26 +420,35 @@ pub(crate) fn recognition_input(
         .for_each(|(slot, (image, resized_width))| {
             let resized =
                 image::imageops::resize(image, resized_width, model_height, FilterType::Triangle);
-            for y in 0..model_height {
-                for x in 0..resized_width {
-                    let pixel = resized.get_pixel(x, y);
-                    let target = y as usize * canvas_width as usize + x as usize;
-                    let channels = [pixel[2], pixel[1], pixel[0]];
-                    for channel in 0..config.channels {
-                        slot[channel * target_plane + target] =
-                            f32::from(channels[channel]) / 127.5 - 1.0;
-                    }
+            let (blue, remaining) = slot.split_at_mut(target_plane);
+            let (green, red) = remaining.split_at_mut(target_plane);
+            let resized_width = resized_width as usize;
+            let canvas_width = canvas_width as usize;
+            for (y, row) in resized
+                .as_raw()
+                .chunks_exact(resized_width * config.channels)
+                .enumerate()
+            {
+                let target_row = y * canvas_width;
+                for (x, pixel) in row.chunks_exact(config.channels).enumerate() {
+                    let target = target_row + x;
+                    blue[target] = f32::from(pixel[2]) / 127.5 - 1.0;
+                    green[target] = f32::from(pixel[1]) / 127.5 - 1.0;
+                    red[target] = f32::from(pixel[0]) / 127.5 - 1.0;
                 }
             }
         });
+    let shape = [
+        images.len(),
+        config.channels,
+        config.height,
+        canvas_width as usize,
+    ];
+    let digest = ExecutionDigest::f32_tensor(&shape, &data);
     Ok(RecognitionInput {
         data,
-        shape: [
-            images.len(),
-            config.channels,
-            config.height,
-            canvas_width as usize,
-        ],
+        shape,
+        digest,
     })
 }
 
@@ -323,11 +457,18 @@ pub(crate) fn recognition_canvas_width(
     height: u32,
     config: &RecognitionConfig,
 ) -> UseResult<u32> {
-    let resized_width =
-        recognition_resized_width(width, height, recognition_model_height(config)?)?;
+    let resized_width = recognition_content_width(width, height, config)?;
     Ok(recognition_default_width(config)?
         .max(resized_width)
         .min(RECOGNITION_MAX_WIDTH))
+}
+
+pub(crate) fn recognition_content_width(
+    width: u32,
+    height: u32,
+    config: &RecognitionConfig,
+) -> UseResult<u32> {
+    recognition_resized_width(width, height, recognition_model_height(config)?)
 }
 
 fn recognition_resized_width(width: u32, height: u32, model_height: u32) -> UseResult<u32> {
@@ -400,6 +541,7 @@ mod tests {
 
     fn detection_config() -> DetectionConfig {
         DetectionConfig {
+            model_variant: crate::config::ModelVariant::Small,
             scale: 1.0 / 255.0,
             mean: [0.485, 0.456, 0.406],
             std: [0.229, 0.224, 0.225],
@@ -412,6 +554,7 @@ mod tests {
 
     fn recognition_config() -> RecognitionConfig {
         RecognitionConfig {
+            model_variant: crate::config::ModelVariant::Small,
             channels: 3,
             height: 48,
             default_width: 320,
@@ -429,6 +572,18 @@ mod tests {
             (4_000, 992)
         );
         assert!(detection_dimensions_with_max_side(320, 320, 32).is_err());
+    }
+
+    #[test]
+    fn resize_long_scales_then_aligns_each_side_to_the_declared_stride() {
+        assert_eq!(
+            detection_resize_long_dimensions(1_190, 1_684, 736, 128).unwrap(),
+            (640, 768)
+        );
+        assert_eq!(
+            detection_resize_long_dimensions(1_684, 1_190, 736, 128).unwrap(),
+            (768, 640)
+        );
     }
 
     #[test]
@@ -523,6 +678,31 @@ mod tests {
     }
 
     #[test]
+    fn forced_recognition_canvas_preserves_the_original_batch_slot_tensor() {
+        let narrow = RgbImage::from_pixel(100, 20, image::Rgb([240, 80, 20]));
+        let wide = RgbImage::from_pixel(400, 20, image::Rgb([20, 80, 240]));
+        let config = recognition_config();
+
+        let mixed = recognition_input(&[&narrow, &wide], &config).unwrap();
+        assert_eq!(mixed.shape, [2, 3, 48, 960]);
+        let forced = recognition_input_with_canvas_width(&[&narrow], &config, 960).unwrap();
+        assert_eq!(forced.shape, [1, 3, 48, 960]);
+        assert_eq!(forced.data, mixed.data[..forced.data.len()]);
+    }
+
+    #[test]
+    fn forced_recognition_canvas_rejects_width_below_natural_input() {
+        let wide = RgbImage::new(400, 20);
+        let config = recognition_config();
+
+        let error = match recognition_input_with_canvas_width(&[&wide], &config, 959) {
+            Ok(_) => panic!("a forced canvas below the natural width must be rejected"),
+            Err(error) => error,
+        };
+        assert_eq!(error.code, "use.ocr.image_invalid");
+    }
+
+    #[test]
     fn recognition_batch_preserves_input_order_and_scalar_values() {
         let red = RgbImage::from_pixel(80, 20, image::Rgb([255, 0, 0]));
         let green = RgbImage::from_pixel(80, 20, image::Rgb([0, 255, 0]));
@@ -539,5 +719,34 @@ mod tests {
                 single.data
             );
         }
+    }
+
+    #[test]
+    fn recognition_packing_matches_the_pixel_index_reference() {
+        let image = RgbImage::from_fn(13, 7, |x, y| {
+            image::Rgb([
+                (x * 17 + y * 3) as u8,
+                (x * 5 + y * 19) as u8,
+                (x * 11 + y * 7) as u8,
+            ])
+        });
+        let config = recognition_config();
+        let input = recognition_input_with_canvas_width(&[&image], &config, 320).unwrap();
+        let resized_width = recognition_resized_width(image.width(), image.height(), 48).unwrap();
+        let resized = image::imageops::resize(&image, resized_width, 48, FilterType::Triangle);
+        let plane = 48 * 320;
+        let mut expected = vec![0.0_f32; 3 * plane];
+        for y in 0..48 {
+            for x in 0..resized_width {
+                let pixel = resized.get_pixel(x, y);
+                let target = y as usize * 320 + x as usize;
+                let channels = [pixel[2], pixel[1], pixel[0]];
+                for channel in 0..3 {
+                    expected[channel * plane + target] = f32::from(channels[channel]) / 127.5 - 1.0;
+                }
+            }
+        }
+
+        assert_eq!(input.data, expected);
     }
 }

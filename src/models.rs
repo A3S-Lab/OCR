@@ -74,6 +74,14 @@ pub struct OcrBlock {
         description = "Provider text-detection confidence from 0 through 1, when available"
     )]
     pub detection_confidence: Option<f32>,
+    /// Clockwise rotation of the recognition x-axis in source-image
+    /// coordinates. A provider may publish this only when it is bound to the
+    /// block's single source polygon by the exact crop used for recognition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        description = "Clockwise source-image text rotation in canonical millidegrees [-180000, 180000), when established by the recognition crop"
+    )]
+    pub text_rotation_millidegrees: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(description = "Four polygon vertices in source-image coordinates, when available")]
     pub polygon: Option<[OcrPoint; 4]>,

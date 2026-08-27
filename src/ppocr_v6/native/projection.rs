@@ -1,46 +1,77 @@
 use a3s_power::error::{PowerError, Result as PowerResult};
 use candle_core::{DType, Tensor};
 
-pub(super) const REVISION: &str = "ctc-top1-last-tie-finite-v1";
-pub(super) const IDENTITY: &[u8] = b"a3s-ocr-ppocr-v6-ctc-top1-last-tie-finite-v1\0";
+pub(super) const REVISION: &str = "ctc-matmul-bias-softmax-top1-last-tie-finite-v6";
+pub(super) const IDENTITY: &[u8] =
+    b"a3s-ocr-ppocr-v6-ctc-matmul-bias-softmax-top1-last-tie-finite-v6\0";
 
-/// Projects `[N, T, C]` recognition probabilities to
-/// `[N, T, index/score/finite]` on the execution device.
-///
-/// Rust's scalar CTC decoder selects the last class when scores tie. Candle's
-/// reductions select the first class, so reversing the class axis before
-/// `argmax` preserves the reviewed scalar behavior. The finite marker covers
-/// every source probability, including values that were not selected.
-pub(super) fn ctc_top1(output: &Tensor) -> PowerResult<Tensor> {
-    if output.dtype() != DType::F32 {
-        return Err(projection_error(format!(
-            "PP-OCRv6 recognition projection requires F32 input, found {:?}",
-            output.dtype()
-        )));
-    }
-    let (batch, timesteps, classes) = output.dims3().map_err(candle_error)?;
-    if batch == 0 || timesteps == 0 || classes == 0 || classes > (1 << 24) {
+/// Applies the reviewed classifier to bounded `[..., F]` feature rows, adds
+/// its bias, and projects to `[..., index/probability/finite]` on the
+/// execution device. The CPU implementation retains only bounded classifier
+/// tiles. Leading dimensions do not participate in classifier arithmetic, so
+/// Power may safely coalesce rows from exact-shape graph prefixes.
+pub(super) fn ctc_top1_from_classifier(
+    features: &Tensor,
+    weights: &Tensor,
+    bias: &Tensor,
+) -> PowerResult<Tensor> {
+    if features.dtype() != DType::F32 || weights.dtype() != DType::F32 || bias.dtype() != DType::F32
+    {
         return Err(projection_error(
-            "PP-OCRv6 recognition projection received an invalid bounded shape",
+            "PP-OCRv6 classifier projection requires F32 features, weights, and bias",
+        ));
+    }
+    let dimensions = features.dims();
+    let Some(&feature_count) = dimensions.last().filter(|_| dimensions.len() >= 2) else {
+        return Err(projection_error(
+            "PP-OCRv6 classifier projection requires rank-two-or-higher feature rows",
+        ));
+    };
+    let (weight_features, classes) = weights.dims2().map_err(candle_error)?;
+    if dimensions[..dimensions.len() - 1].contains(&0)
+        || feature_count == 0
+        || feature_count != weight_features
+        || classes == 0
+        || classes > (1 << 24)
+        || bias.dims() != [classes]
+    {
+        return Err(projection_error(
+            "PP-OCRv6 classifier projection received incompatible bounded shapes",
         ));
     }
 
-    let reversed = output.flip(&[2]).map_err(candle_error)?;
-    let reversed_indices = reversed.argmax_keepdim(2).map_err(candle_error)?;
-    let scores = reversed
-        .gather(&reversed_indices, 2)
-        .map_err(candle_error)?;
-    let indices = reversed_indices
-        .to_dtype(DType::F32)
-        .and_then(|indices| indices.affine(-1.0, (classes - 1) as f64))
-        .map_err(candle_error)?;
-    let finite = output
-        .abs()
-        .and_then(|values| values.le(f32::MAX))
-        .and_then(|values| values.min_keepdim(2))
-        .and_then(|values| values.to_dtype(DType::F32))
-        .map_err(candle_error)?;
-    Tensor::cat(&[&indices, &scores, &finite], 2).map_err(candle_error)
+    a3s_power::inference::graph::row_matmul_bias_softmax_top1_last_finite(features, weights, bias)
+}
+
+/// Adds the reviewed classifier bias to `[N, T, C]` recognition logits and
+/// projects the result to
+/// `[N, T, index/probability/finite]` on the execution device.
+///
+/// Rust's scalar CTC decoder selects the last class when scores tie. Candle's
+/// reductions select the first class, so the fused projection explicitly
+/// preserves the reviewed last-tie behavior. The finite marker covers every
+/// source logit, including values that were not selected.
+#[cfg(test)]
+pub(super) fn ctc_top1_from_unbiased_logits(logits: &Tensor, bias: &Tensor) -> PowerResult<Tensor> {
+    if logits.dtype() != DType::F32 {
+        return Err(projection_error(format!(
+            "PP-OCRv6 recognition logits projection requires F32 input, found {:?}",
+            logits.dtype()
+        )));
+    }
+    let (batch, timesteps, classes) = logits.dims3().map_err(candle_error)?;
+    if batch == 0 || timesteps == 0 || classes == 0 || classes > (1 << 24) {
+        return Err(projection_error(
+            "PP-OCRv6 recognition logits projection received an invalid bounded shape",
+        ));
+    }
+    if bias.dtype() != DType::F32 || bias.dims() != [classes] {
+        return Err(projection_error(
+            "PP-OCRv6 recognition bias must have exact F32 [classes] shape",
+        ));
+    }
+
+    a3s_power::inference::graph::row_bias_softmax_top1_last_finite(logits, bias)
 }
 
 fn candle_error(error: candle_core::Error) -> PowerError {
@@ -61,38 +92,82 @@ mod tests {
 
     #[test]
     fn projection_preserves_last_class_ties_and_source_finiteness() {
-        let output = Tensor::from_vec(
+        let logits = Tensor::from_vec(
             vec![0.1_f32, 0.8, 0.8, 0.2, 0.9, f32::NAN, 0.1, 0.0],
             (1, 2, 4),
             &Device::Cpu,
         )
         .unwrap();
+        let bias = Tensor::zeros(4, DType::F32, &Device::Cpu).unwrap();
 
-        let projected = ctc_top1(&output)
+        let projected = ctc_top1_from_unbiased_logits(&logits, &bias)
             .unwrap()
             .flatten_all()
             .unwrap()
             .to_vec1::<f32>()
             .unwrap();
 
-        assert_eq!(projected[..3], [2.0, 0.8, 1.0]);
-        assert_eq!(projected[3], 0.0);
-        assert_eq!(projected[4], 0.9);
+        assert_eq!(projected[0], 2.0);
+        assert!(projected[1] > 0.0 && projected[1] < 1.0);
+        assert_eq!(projected[2], 1.0);
         assert_eq!(projected[5], 0.0);
+    }
+
+    #[test]
+    fn bounded_classifier_projection_matches_explicit_logits_bits() {
+        let features = Tensor::from_vec(
+            vec![0.1_f32, 0.8, 0.2, 0.9, -0.3, 0.1],
+            (1, 2, 3),
+            &Device::Cpu,
+        )
+        .unwrap();
+        let weights = Tensor::from_vec(
+            vec![
+                0.5_f32, -0.2, 0.1, 0.7, -0.3, 0.4, 0.8, -0.6, 0.2, 0.9, -0.5, 0.3,
+            ],
+            (3, 4),
+            &Device::Cpu,
+        )
+        .unwrap();
+        let bias = Tensor::new(&[0.2_f32, -0.1, 0.3, 0.0], &Device::Cpu).unwrap();
+        let logits = features.broadcast_matmul(&weights).unwrap();
+        let expected = ctc_top1_from_unbiased_logits(&logits, &bias)
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .to_vec1::<f32>()
+            .unwrap();
+        let actual = ctc_top1_from_classifier(&features, &weights, &bias)
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .to_vec1::<f32>()
+            .unwrap();
+        let coalesced_rows = features.reshape((2, 3)).unwrap();
+        let row_actual = ctc_top1_from_classifier(&coalesced_rows, &weights, &bias)
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .to_vec1::<f32>()
+            .unwrap();
+
+        assert_eq!(actual, expected);
+        assert_eq!(row_actual, expected);
     }
 
     #[test]
     #[ignore = "requires an explicit CUDA build and device"]
     fn reviewed_recognition_shape_projects_on_cuda() {
         let device = Device::new_cuda(0).unwrap();
-        let output = Tensor::zeros((8, 40, 18_710), DType::F32, &device).unwrap();
+        let logits = Tensor::zeros((8, 40, 18_710), DType::F32, &device).unwrap();
+        let bias = Tensor::zeros(18_710, DType::F32, &device).unwrap();
 
-        let projected = ctc_top1(&output).unwrap();
+        let projected = ctc_top1_from_unbiased_logits(&logits, &bias).unwrap();
         let values = projected.flatten_all().unwrap().to_vec1::<f32>().unwrap();
 
         assert_eq!(projected.dims(), [8, 40, 3]);
-        assert!(values
-            .chunks_exact(3)
-            .all(|row| row == [18_709.0, 0.0, 1.0]));
+        assert!(values.chunks_exact(3).all(|row| {
+            row[0] == 18_709.0 && (row[1] - 1.0 / 18_710.0).abs() <= 1e-7 && row[2] == 1.0
+        }));
     }
 }

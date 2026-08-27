@@ -74,11 +74,16 @@ ppocr-v6 = [
     "dep:tar",
 ]
 ppocr-v6-cuda = ["ppocr-v6", "a3s-power/embedded-cuda"]
+ppocr-v6-cpu-optimized = ["ppocr-v6", "a3s-power/embedded-cpu-optimized"]
+ppocr-v6-cpu-bf16-experimental = [
+    "ppocr-v6-cpu-optimized",
+    "a3s-power/embedded-cpu-bf16-experimental",
+]
 mcp = ["dep:rmcp", "dep:serde_json", "tokio/io-std"]
 cli = ["ppocr-v6", "mcp", "dep:clap"]
 
 [dependencies]
-a3s-power = { version = "=0.8.0", git = "https://github.com/A3S-Lab/Power.git", rev = "2939668e8ad38e4d3f564144d01c2a5020aa39de", default-features = false, features = ["embedded-inference"], optional = true }
+a3s-power = { version = "=0.8.0", git = "https://github.com/A3S-Lab/Power.git", rev = "f0ee67732959ea1fb972bcf39648edd0e2823aaa", default-features = false, features = ["embedded-inference"], optional = true }
 a3s-use-core = "0.2.0"
 anyhow = { version = "1", optional = true }
 async-trait = "0.1"

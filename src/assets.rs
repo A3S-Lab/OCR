@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use a3s_use_core::{UseError, UseResult};
 use serde::{Deserialize, Serialize};
 
-use crate::config::{load_detection, load_recognition, MODEL_FAMILY};
+use crate::config::{load_detection, load_recognition, ModelProfile, ModelVariant, MODEL_FAMILY};
 
 pub(crate) const RECEIPT_FILE: &str = ".a3s-ppocr-v6.json";
 
@@ -34,7 +34,31 @@ pub(crate) struct ModelAssets {
     pub(crate) detection_config: PathBuf,
     pub(crate) recognition_weights: PathBuf,
     pub(crate) recognition_config: PathBuf,
+    pub(crate) profile: ModelProfile,
+    pub(crate) graphs: ModelGraphAssets,
     pub(crate) source: OcrInstallSource,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ModelGraphAssets {
+    pub(crate) detection: ModelGraphAsset,
+    pub(crate) recognition: ModelGraphAsset,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ModelGraphAsset {
+    Embedded,
+    ReviewedFile(PathBuf),
+}
+
+impl ModelGraphAssets {
+    #[cfg(test)]
+    pub(crate) const fn embedded() -> Self {
+        Self {
+            detection: ModelGraphAsset::Embedded,
+            recognition: ModelGraphAsset::Embedded,
+        }
+    }
 }
 
 pub fn ocr_status() -> OcrRuntimeStatus {
@@ -43,7 +67,7 @@ pub fn ocr_status() -> OcrRuntimeStatus {
         Ok(assets) => OcrRuntimeStatus {
             available: true,
             source: assets.source,
-            model: MODEL_FAMILY.to_string(),
+            model: assets.profile.family().to_string(),
             model_dir: Some(assets.root),
             managed_root,
             detail: "ready".to_string(),
@@ -118,8 +142,13 @@ pub(crate) fn validate_assets(root: &Path, source: OcrInstallSource) -> UseResul
         checked_file(&root, "rec/model.safetensors", 256 * 1024 * 1024, source)?;
     let recognition_config = checked_file(&root, "rec/inference.yml", 2 * 1024 * 1024, source)?;
 
-    load_detection(&detection_config)?;
-    load_recognition(&recognition_config)?;
+    let detection = load_detection(&detection_config)?;
+    let recognition = load_recognition(&recognition_config)?;
+    let profile = ModelProfile::new(detection.model_variant, recognition.model_variant);
+    let graphs = ModelGraphAssets {
+        detection: graph_asset(&root, "det/graph.json", detection.model_variant, source)?,
+        recognition: graph_asset(&root, "rec/graph.json", recognition.model_variant, source)?,
+    };
 
     Ok(ModelAssets {
         root,
@@ -127,8 +156,24 @@ pub(crate) fn validate_assets(root: &Path, source: OcrInstallSource) -> UseResul
         detection_config,
         recognition_weights,
         recognition_config,
+        profile,
+        graphs,
         source,
     })
+}
+
+fn graph_asset(
+    root: &Path,
+    relative: &str,
+    variant: ModelVariant,
+    source: OcrInstallSource,
+) -> UseResult<ModelGraphAsset> {
+    match variant {
+        ModelVariant::Small => Ok(ModelGraphAsset::Embedded),
+        ModelVariant::Tiny => {
+            checked_file(root, relative, 2 * 1024 * 1024, source).map(ModelGraphAsset::ReviewedFile)
+        }
+    }
 }
 
 pub(crate) fn managed_root() -> UseResult<PathBuf> {
@@ -259,5 +304,97 @@ fn absolute(path: PathBuf) -> UseResult<PathBuf> {
                     format!("Failed to resolve OCR data path: {error}"),
                 )
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mixed_model_roles_resolve_graph_assets_independently() {
+        let small_detection_tiny_recognition = tempfile::tempdir().unwrap();
+        write_bundle(
+            small_detection_tiny_recognition.path(),
+            "PP-OCRv6_small_det",
+            "PP-OCRv6_tiny_rec",
+            false,
+            true,
+        );
+        let assets = validate_assets(
+            small_detection_tiny_recognition.path(),
+            OcrInstallSource::Environment,
+        )
+        .unwrap();
+        assert_eq!(
+            assets.profile,
+            ModelProfile::new(ModelVariant::Small, ModelVariant::Tiny)
+        );
+        assert!(matches!(assets.graphs.detection, ModelGraphAsset::Embedded));
+        assert!(matches!(
+            assets.graphs.recognition,
+            ModelGraphAsset::ReviewedFile(_)
+        ));
+
+        let tiny_detection_small_recognition = tempfile::tempdir().unwrap();
+        write_bundle(
+            tiny_detection_small_recognition.path(),
+            "PP-OCRv6_tiny_det",
+            "PP-OCRv6_small_rec",
+            true,
+            false,
+        );
+        let assets = validate_assets(
+            tiny_detection_small_recognition.path(),
+            OcrInstallSource::Environment,
+        )
+        .unwrap();
+        assert_eq!(
+            assets.profile,
+            ModelProfile::new(ModelVariant::Tiny, ModelVariant::Small)
+        );
+        assert!(matches!(
+            assets.graphs.detection,
+            ModelGraphAsset::ReviewedFile(_)
+        ));
+        assert!(matches!(
+            assets.graphs.recognition,
+            ModelGraphAsset::Embedded
+        ));
+    }
+
+    fn write_bundle(
+        root: &Path,
+        detection_model: &str,
+        recognition_model: &str,
+        detection_graph: bool,
+        recognition_graph: bool,
+    ) {
+        let detection_root = root.join("det");
+        let recognition_root = root.join("rec");
+        std::fs::create_dir_all(&detection_root).unwrap();
+        std::fs::create_dir_all(&recognition_root).unwrap();
+        std::fs::write(detection_root.join("model.safetensors"), b"detection").unwrap();
+        std::fs::write(recognition_root.join("model.safetensors"), b"recognition").unwrap();
+        std::fs::write(
+            detection_root.join("inference.yml"),
+            format!(
+                "Global:\n  model_name: {detection_model}\nPreProcess:\n  transform_ops:\n    - NormalizeImage:\n        mean: [0.485, 0.456, 0.406]\n        std: [0.229, 0.224, 0.225]\nPostProcess:\n  name: DBPostProcess\n"
+            ),
+        )
+        .unwrap();
+        std::fs::write(
+            recognition_root.join("inference.yml"),
+            format!(
+                "Global:\n  model_name: {recognition_model}\nPreProcess:\n  transform_ops:\n    - RecResizeImg:\n        image_shape: [3, 48, 320]\nPostProcess:\n  name: CTCLabelDecode\n  character_dict: [a]\n"
+            ),
+        )
+        .unwrap();
+        if detection_graph {
+            std::fs::write(detection_root.join("graph.json"), b"{}").unwrap();
+        }
+        if recognition_graph {
+            std::fs::write(recognition_root.join("graph.json"), b"{}").unwrap();
+        }
     }
 }

@@ -115,7 +115,7 @@ fn parses_reviewed_grounding_forms_into_source_pixel_blocks() {
     )
     .unwrap();
 
-    assert_eq!(parsed.text, "# Heading\ncontinued\nBody := value");
+    assert_eq!(parsed.text, "# Heading\ncontinued\nBody \\coloneqq value");
     assert!(parsed.warnings.is_empty());
     assert_eq!(parsed.blocks.len(), 2);
     assert_eq!(parsed.blocks[0].page, 1);
@@ -145,6 +145,7 @@ fn parses_reviewed_grounding_forms_into_source_pixel_blocks() {
             height: 75,
         })
     );
+    assert_eq!(parsed.blocks[1].text, "Body \\coloneqq value");
     assert_eq!(
         parsed.blocks[1].bounding_boxes,
         [
@@ -194,6 +195,39 @@ fn preserves_open_labels_with_conservative_canonical_roles() {
             ("equation_isolated", crate::OcrBlockRole::EquationBlock),
             ("figure_caption", crate::OcrBlockRole::Caption),
             ("vendor-special", crate::OcrBlockRole::Unknown),
+        ]
+    );
+}
+
+#[test]
+fn canonical_roles_require_exact_reviewed_labels() {
+    let raw = concat!(
+        "<|det|>title [0, 0, 100, 100]<|/det|>Exact\n",
+        "<|det|>Title [0, 200, 100, 300]<|/det|>Open label\n",
+        "<|det|>IMAGE [0, 400, 100, 500]<|/det|>Not a protocol image"
+    );
+    let parsed = parse_model_output(
+        raw,
+        Some(GroundingGeometry {
+            width: 999,
+            height: 999,
+        }),
+    )
+    .unwrap();
+
+    assert_eq!(
+        parsed
+            .blocks
+            .iter()
+            .map(|block| {
+                let category = block.category.as_ref().unwrap();
+                (category.raw_label.as_str(), category.role)
+            })
+            .collect::<Vec<_>>(),
+        [
+            ("title", crate::OcrBlockRole::Title),
+            ("Title", crate::OcrBlockRole::Unknown),
+            ("IMAGE", crate::OcrBlockRole::Unknown),
         ]
     );
 }

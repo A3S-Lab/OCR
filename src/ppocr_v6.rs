@@ -1,13 +1,20 @@
 mod batch;
 pub(crate) mod native;
 
-use std::sync::Mutex;
+use std::sync::Arc;
 
-use a3s_power::inference::{DevicePreference, ModelSessionPool, ModelSessionPoolPolicy};
+use a3s_power::inference::{
+    DevicePreference, HardwareMemorySnapshot, ModelSessionPool, ModelSessionPoolPolicy,
+    ModelSessionSpec, RuntimeDeviceKind,
+};
 use a3s_use_core::{Readiness, UseError, UseResult};
 use async_trait::async_trait;
+use image::RgbImage;
+use tokio_util::sync::CancellationToken;
 
-use crate::assets::{ocr_status, OcrInstallSource};
+use crate::assets::{ocr_status, resolve_model_assets, ModelAssets, OcrInstallSource};
+use crate::config::ModelProfile;
+#[cfg(test)]
 use crate::config::MODEL_FAMILY;
 use crate::engine::{EngineExtraction, PpOcrV6Engine};
 use crate::models::{OcrBlock, OcrBoundingBox, OcrPoint};
@@ -19,28 +26,131 @@ use crate::{OcrProviderBatchOutput, OcrProviderBatchRequest, OcrStage};
 
 pub const PP_OCR_V6_PROVIDER_ID: &str = "pp-ocr-v6";
 const ENGINE_NAME: &str = "a3s-power-native";
+const MAX_EXECUTION_REPLICAS: usize = 3;
 
 /// Local PP-OCRv6 provider shipped as the default A3S Use integration.
 #[derive(Clone)]
 pub struct PpOcrV6Provider {
     descriptor: OcrProviderDescriptor,
     sessions: ModelSessionPool<PpOcrV6Session>,
+    execution_replica: usize,
+    bound_model: Option<Arc<BoundPpOcrV6Model>>,
 }
 
 pub(super) struct PpOcrV6Session {
-    engine: Mutex<PpOcrV6Engine>,
+    engine: PpOcrV6Engine,
+}
+
+#[derive(Clone)]
+struct BoundPpOcrV6Model {
+    assets: ModelAssets,
+    session_spec: ModelSessionSpec,
 }
 
 impl PpOcrV6Provider {
     pub fn from_env() -> UseResult<Self> {
-        let policy = ModelSessionPoolPolicy::new(2, 1024 * 1024 * 1024, 1, 32)
-            .map_err(|error| pool_error("configure", error))?;
+        Self::new(None)
+    }
+
+    /// Resolve and freeze the exact local model/configuration used by a
+    /// composite provider. A later environment-variable change cannot switch
+    /// the already-admitted document pipeline to another PP-OCRv6 profile.
+    pub(crate) fn from_env_bound() -> UseResult<Self> {
+        let assets = resolve_model_assets()?;
+        let session_spec = native::session_spec(&assets)?;
+        Self::new(Some(BoundPpOcrV6Model {
+            assets,
+            session_spec,
+        }))
+    }
+
+    fn new(bound_model: Option<BoundPpOcrV6Model>) -> UseResult<Self> {
+        let policy = ModelSessionPoolPolicy::new(
+            MAX_EXECUTION_REPLICAS,
+            1024 * 1024 * 1024,
+            MAX_EXECUTION_REPLICAS,
+            32,
+        )
+        .map_err(|error| pool_error("configure", error))?;
         Ok(Self {
             descriptor: OcrProviderDescriptor::new(PP_OCR_V6_PROVIDER_ID, ENGINE_NAME, false)?
-                .with_stages(vec![OcrStage::Preprocessing, OcrStage::Text])?,
+                .with_stages(vec![OcrStage::Preprocessing, OcrStage::Text])?
+                .with_text_windows(true)?,
             sessions: ModelSessionPool::new(DevicePreference::Auto, policy)
                 .map_err(|error| pool_error("initialize", error))?,
+            execution_replica: 0,
+            bound_model: bound_model.map(Arc::new),
         })
+    }
+
+    pub(crate) fn configured_model_profile(&self) -> UseResult<ModelProfile> {
+        self.bound_model
+            .as_ref()
+            .map(|model| Ok(model.assets.profile))
+            .unwrap_or_else(|| resolve_model_assets().map(|assets| assets.profile))
+    }
+
+    pub(super) fn resolved_session_assets(&self) -> UseResult<(ModelAssets, ModelSessionSpec)> {
+        let Some(bound) = self.bound_model.as_ref() else {
+            let assets = resolve_model_assets()?;
+            let spec = native::session_spec(&assets)?;
+            return Ok((assets, spec));
+        };
+        let observed = native::session_spec(&bound.assets)?;
+        if observed != bound.session_spec {
+            return Err(UseError::new(
+                "use.ocr.model_configuration_changed",
+                "The bound PP-OCRv6 model configuration changed after provider initialization.",
+            )
+            .with_suggestion(
+                "Create a new OCR provider after restoring or intentionally replacing the model bundle.",
+            ));
+        }
+        Ok((bound.assets.clone(), bound.session_spec.clone()))
+    }
+
+    pub(crate) fn execution_replica(&self, execution_replica: usize) -> UseResult<Self> {
+        if execution_replica >= MAX_EXECUTION_REPLICAS {
+            return Err(pool_error(
+                "select",
+                format!(
+                    "execution replica {execution_replica} exceeds the PP-OCRv6 bound of {MAX_EXECUTION_REPLICAS}"
+                ),
+            ));
+        }
+        if execution_replica > 0 && self.runtime_device_kind() != RuntimeDeviceKind::Cuda {
+            return Err(pool_error(
+                "select",
+                "additional PP-OCRv6 execution replicas require CUDA",
+            ));
+        }
+        Ok(Self {
+            descriptor: self.descriptor.clone(),
+            sessions: self.sessions.clone(),
+            execution_replica,
+            bound_model: self.bound_model.clone(),
+        })
+    }
+
+    pub(crate) async fn recognize_batch_decoded_with_helpers(
+        &self,
+        helpers: &[Self],
+        request: OcrProviderBatchRequest,
+        images: Vec<Result<std::sync::Arc<RgbImage>, UseError>>,
+        cancellation: &CancellationToken,
+    ) -> UseResult<OcrProviderBatchOutput> {
+        batch::recognize_batch_decoded_with_helpers(self, helpers, request, images, cancellation)
+            .await
+    }
+
+    pub(crate) fn runtime_memory_snapshot(&self) -> UseResult<HardwareMemorySnapshot> {
+        self.sessions
+            .memory_snapshot()
+            .map_err(|error| pool_error("inspect device memory for", error))
+    }
+
+    pub(crate) fn runtime_device_kind(&self) -> RuntimeDeviceKind {
+        self.sessions.snapshot().device.kind
     }
 }
 
@@ -51,6 +161,31 @@ impl OcrProvider for PpOcrV6Provider {
     }
 
     fn diagnostic(&self) -> OcrProviderStatus {
+        if let Some(bound) = self.bound_model.as_ref() {
+            let (readiness, message, suggestions) = match self.resolved_session_assets() {
+                Ok(_) => (
+                    Readiness::Ready,
+                    "The bound local PP-OCRv6 detection and recognition models are ready."
+                        .to_string(),
+                    Vec::new(),
+                ),
+                Err(error) => (
+                    Readiness::Broken,
+                    error.message,
+                    vec![
+                        "Create a new OCR provider after restoring or intentionally replacing the model bundle."
+                            .to_string(),
+                    ],
+                ),
+            };
+            return OcrProviderStatus {
+                readiness,
+                model: Some(bound.assets.profile.family().to_string()),
+                model_dir: Some(bound.assets.root.clone()),
+                message,
+                suggestions,
+            };
+        }
         let status = ocr_status();
         let (readiness, suggestions) = if status.available {
             (Readiness::Ready, Vec::new())
@@ -97,8 +232,14 @@ impl OcrProvider for PpOcrV6Provider {
 }
 
 pub(super) fn build_output(extraction: EngineExtraction) -> UseResult<OcrProviderOutput> {
-    let EngineExtraction { blocks, receipts } = extraction;
-    if std::env::var_os("A3S_OCR_TRACE_STAGE_TIMINGS").is_some() {
+    let EngineExtraction {
+        model,
+        blocks,
+        receipts,
+    } = extraction;
+    if std::env::var_os("A3S_OCR_TRACE_STAGE_TIMINGS").is_some()
+        || std::env::var_os("A3S_OCR_TRACE_RECOGNITION_SUMMARY").is_some()
+    {
         let blank = blocks
             .iter()
             .filter(|block| block.text.trim().is_empty())
@@ -142,6 +283,7 @@ pub(super) fn build_output(extraction: EngineExtraction) -> UseResult<OcrProvide
                 category: None,
                 confidence: Some(block.confidence),
                 detection_confidence: Some(block.detection_confidence),
+                text_rotation_millidegrees: Some(block.text_rotation_millidegrees),
                 polygon: Some(polygon),
                 bounding_box: Some(OcrBoundingBox {
                     x: min_x,
@@ -160,7 +302,7 @@ pub(super) fn build_output(extraction: EngineExtraction) -> UseResult<OcrProvide
         .collect::<Vec<_>>()
         .join("\n");
     Ok(OcrProviderOutput {
-        model: Some(MODEL_FAMILY.to_string()),
+        model: Some(model.to_string()),
         text,
         blocks,
         execution_receipts: receipts.into_iter().map(project_receipt).collect(),
@@ -206,11 +348,13 @@ mod tests {
         ];
         let block = |text: &str| crate::engine::EngineBlock {
             polygon,
+            text_rotation_millidegrees: 0,
             detection_confidence: 0.9,
             text: text.to_string(),
             confidence: 0.8,
         };
         let output = build_output(EngineExtraction {
+            model: MODEL_FAMILY,
             blocks: vec![block(""), block(" \t\r\n"), block("preserved text")],
             receipts: Vec::new(),
         })
@@ -219,6 +363,7 @@ mod tests {
         assert_eq!(output.text, "preserved text");
         assert_eq!(output.blocks.len(), 1);
         assert_eq!(output.blocks[0].text, "preserved text");
+        assert_eq!(output.blocks[0].text_rotation_millidegrees, Some(0));
     }
 
     #[test]
@@ -227,10 +372,55 @@ mod tests {
         assert_eq!(provider.descriptor().id, PP_OCR_V6_PROVIDER_ID);
         assert_eq!(provider.descriptor().engine, ENGINE_NAME);
         assert!(!provider.descriptor().sends_source_off_device);
+        assert!(provider.descriptor().supports_text_windows);
         assert_eq!(
             provider.descriptor().supported_stages,
             vec![OcrStage::Preprocessing, OcrStage::Text]
         );
+    }
+
+    #[test]
+    fn bound_provider_rejects_a_post_admission_configuration_change() {
+        let directory = tempfile::tempdir().unwrap();
+        let detection_root = directory.path().join("det");
+        let recognition_root = directory.path().join("rec");
+        std::fs::create_dir_all(&detection_root).unwrap();
+        std::fs::create_dir_all(&recognition_root).unwrap();
+        std::fs::write(detection_root.join("model.safetensors"), b"detection").unwrap();
+        std::fs::write(recognition_root.join("model.safetensors"), b"recognition").unwrap();
+        std::fs::write(
+            detection_root.join("inference.yml"),
+            "Global:\n  model_name: PP-OCRv6_small_det\nPreProcess:\n  transform_ops:\n    - NormalizeImage:\n        mean: [0.485, 0.456, 0.406]\n        std: [0.229, 0.224, 0.225]\nPostProcess:\n  name: DBPostProcess\n",
+        )
+        .unwrap();
+        let recognition_config = recognition_root.join("inference.yml");
+        std::fs::write(
+            &recognition_config,
+            "Global:\n  model_name: PP-OCRv6_small_rec\nPreProcess:\n  transform_ops:\n    - RecResizeImg:\n        image_shape: [3, 48, 320]\nPostProcess:\n  name: CTCLabelDecode\n  character_dict: [a]\n",
+        )
+        .unwrap();
+        let assets = crate::assets::validate_assets(
+            directory.path(),
+            crate::assets::OcrInstallSource::Environment,
+        )
+        .unwrap();
+        let session_spec = native::session_spec(&assets).unwrap();
+        let provider = PpOcrV6Provider::new(Some(BoundPpOcrV6Model {
+            assets,
+            session_spec,
+        }))
+        .unwrap();
+        assert_eq!(provider.diagnostic().readiness, Readiness::Ready);
+
+        std::fs::write(
+            recognition_config,
+            "Global:\n  model_name: PP-OCRv6_small_rec\nPreProcess:\n  transform_ops:\n    - RecResizeImg:\n        image_shape: [3, 48, 320]\nPostProcess:\n  name: CTCLabelDecode\n  character_dict: [a, b]\n",
+        )
+        .unwrap();
+
+        let error = provider.resolved_session_assets().unwrap_err();
+        assert_eq!(error.code, "use.ocr.model_configuration_changed");
+        assert_eq!(provider.diagnostic().readiness, Readiness::Broken);
     }
 
     #[tokio::test]
@@ -370,40 +560,15 @@ mod tests {
             tall_batch.execution_receipts[0].input.item_count,
             tall_scalar.execution_receipts[0].input.item_count
         );
-        let mut cohort_slot_counts = batch
-            .execution_receipts
-            .iter()
-            .map(|receipt| receipt.microbatch.as_ref().unwrap().slot_count)
-            .collect::<Vec<_>>();
-        cohort_slot_counts.sort_unstable();
-        assert_eq!(cohort_slot_counts, vec![1, 2]);
-        assert_eq!(
-            batch
-                .execution_receipts
-                .iter()
-                .map(|receipt| receipt.microbatch.as_ref().unwrap().slot_count)
-                .sum::<usize>(),
-            3
-        );
+        assert_eq!(batch.execution_receipts.len(), 1);
         for receipt in &batch.execution_receipts {
             assert_eq!(receipt.schema, "a3s.power.embedded-execution-receipt.v4");
             let evidence = receipt.microbatch.as_ref().unwrap();
             assert!(evidence.session_declaration_sha256.is_some());
+            assert_eq!(evidence.slot_count, 3);
             assert_eq!(evidence.batch_count, 1);
             assert_eq!(evidence.batch_index, 0);
         }
-        assert_ne!(
-            batch.execution_receipts[0]
-                .microbatch
-                .as_ref()
-                .unwrap()
-                .plan_sha256,
-            batch.execution_receipts[1]
-                .microbatch
-                .as_ref()
-                .unwrap()
-                .plan_sha256
-        );
     }
 
     fn assert_token_f1(label: &str, scalar: &str, batch: &str) {

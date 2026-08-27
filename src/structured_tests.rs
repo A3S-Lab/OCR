@@ -3,16 +3,34 @@ use async_trait::async_trait;
 
 use crate::{
     OcrBatchRequest, OcrBatchResult, OcrBatchSlotId, OcrBatchSlotRequest, OcrBoundingBox,
-    OcrCanvasEdge, OcrClient, OcrEvidenceId, OcrImageCanvas, OcrInput, OcrPoint, OcrProvider,
-    OcrProviderBatchOutput, OcrProviderBatchRequest, OcrProviderBatchSlotOutput,
-    OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus, OcrSealEvidence, OcrSealKind,
-    OcrSealStageEvidence, OcrStage, OcrStageEvidence, OcrStageOutcome, OcrStageStatus,
-    OcrTableCellEvidence, OcrTableEvidence, OcrTableKind, OcrTableStageEvidence, OcrVisualRegion,
+    OcrCanvasEdge, OcrClient, OcrEvidenceId, OcrImageCanvas, OcrInput, OcrLayoutRegionEvidence,
+    OcrLayoutRole, OcrLayoutStageEvidence, OcrPoint, OcrProvider, OcrProviderBatchOutput,
+    OcrProviderBatchRequest, OcrProviderBatchSlotOutput, OcrProviderDescriptor, OcrProviderOutput,
+    OcrProviderStatus, OcrSealEvidence, OcrSealKind, OcrSealStageEvidence, OcrStage,
+    OcrStageEvidence, OcrStageOutcome, OcrStageStatus, OcrTableCellEvidence, OcrTableEvidence,
+    OcrTableKind, OcrTableStageEvidence, OcrVisualRegion,
 };
 
 #[test]
+fn layout_evidence_preserves_typed_semantics_and_geometry_ownership() {
+    let evidence = OcrStageEvidence::Layout(layout_evidence(vec![0]));
+    let outcome = OcrStageOutcome::completed_with_evidence(evidence);
+
+    outcome.validate().unwrap();
+    let value = serde_json::to_value(&outcome).unwrap();
+    assert_eq!(value["stage"], "layout");
+    assert_eq!(value["evidence"]["evidenceType"], "layout");
+    let region = &value["evidence"]["evidence"]["regions"][0];
+    assert_eq!(region["rawLabel"], "doc_title");
+    assert_eq!(region["role"], "title");
+    assert_eq!(region["sourceTextBlockIndices"], serde_json::json!([0]));
+}
+
+#[test]
 fn table_evidence_preserves_merged_cells_and_exact_geometry() {
-    let evidence = OcrStageEvidence::Table(table_evidence());
+    let mut table = table_evidence();
+    table.tables[0].cells[1].source_text_block_indices = vec![0, 2];
+    let evidence = OcrStageEvidence::Table(table);
     let outcome = OcrStageOutcome::completed_with_evidence(evidence.clone());
 
     outcome.validate().unwrap();
@@ -28,6 +46,10 @@ fn table_evidence_preserves_merged_cells_and_exact_geometry() {
     assert!(value["evidence"]["evidence"]["tables"][0]["cells"][0]
         .get("region")
         .is_none());
+    assert_eq!(
+        value["evidence"]["evidence"]["tables"][0]["cells"][1]["sourceTextBlockIndices"],
+        serde_json::json!([0, 2])
+    );
     assert_eq!(
         serde_json::from_value::<OcrStageOutcome>(value).unwrap(),
         outcome
@@ -92,6 +114,14 @@ fn malformed_geometry_grid_and_clipping_are_rejected() {
     duplicate_id.tables[0].cells[0].id = evidence_id("table-1");
     assert_structured_stage_error(OcrStageEvidence::Table(duplicate_id));
 
+    let mut ungrounded_text_reference = table_evidence();
+    ungrounded_text_reference.tables[0].cells[0].source_text_block_indices = vec![0];
+    assert_structured_stage_error(OcrStageEvidence::Table(ungrounded_text_reference));
+
+    let mut noncanonical_text_references = table_evidence();
+    noncanonical_text_references.tables[0].cells[1].source_text_block_indices = vec![1, 0];
+    assert_structured_stage_error(OcrStageEvidence::Table(noncanonical_text_references));
+
     let mut false_clip = seal_evidence();
     false_clip.seals[0].region.bounding_box.x = 899;
     false_clip.seals[0].region.bounding_box.width = 100;
@@ -109,7 +139,7 @@ fn malformed_geometry_grid_and_clipping_are_rejected() {
 }
 
 #[tokio::test]
-async fn batch_v2_carries_validated_table_and_seal_evidence() {
+async fn batch_v3_carries_validated_table_and_seal_evidence() {
     let directory = tempfile::tempdir().unwrap();
     let image = directory.path().join("page.bmp");
     std::fs::write(&image, b"BMstructured-fixture").unwrap();
@@ -129,7 +159,7 @@ async fn batch_v2_carries_validated_table_and_seal_evidence() {
         .await
         .unwrap();
 
-    assert_eq!(result.schema, "a3s.ocr.staged-batch.v2");
+    assert_eq!(result.schema, "a3s.ocr.staged-batch.v3");
     assert_eq!(result.schema, OcrBatchResult::SCHEMA);
     assert_eq!(
         result.requested_stages,
@@ -160,6 +190,7 @@ fn table_evidence() -> OcrTableStageEvidence {
                     row_span: 1,
                     column_span: 2,
                     text: Some("Merged heading".to_string()),
+                    source_text_block_indices: Vec::new(),
                     region: None,
                 },
                 cell("table-1:cell-2", 1, 0, "left", 120),
@@ -184,6 +215,19 @@ fn seal_evidence() -> OcrSealStageEvidence {
     }
 }
 
+fn layout_evidence(source_text_block_indices: Vec<u32>) -> OcrLayoutStageEvidence {
+    OcrLayoutStageEvidence {
+        canvas: OcrImageCanvas::new(1_000, 2_000).unwrap(),
+        regions: vec![OcrLayoutRegionEvidence {
+            id: evidence_id("layout-1"),
+            raw_label: "doc_title".to_string(),
+            role: OcrLayoutRole::Title,
+            region: region(90, 90, 220, 80, Some(0.96)),
+            source_text_block_indices,
+        }],
+    }
+}
+
 fn cell(id: &str, row: u32, column: u32, text: &str, x: u32) -> OcrTableCellEvidence {
     OcrTableCellEvidence {
         id: evidence_id(id),
@@ -192,6 +236,7 @@ fn cell(id: &str, row: u32, column: u32, text: &str, x: u32) -> OcrTableCellEvid
         row_span: 1,
         column_span: 1,
         text: Some(text.to_string()),
+        source_text_block_indices: Vec::new(),
         region: Some(region(x, 700, 370, 250, None)),
     }
 }

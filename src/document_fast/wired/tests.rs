@@ -27,6 +27,42 @@ fn admits_a_grid_and_rejects_an_isolated_page_rule() {
                 height: 161,
             },
             orientation: TableCropOrientation::Upright,
+            horizontal_lines: vec![80, 150, 240],
+            vertical_lines: vec![40, 180, 360],
+            horizontal_tracks: vec![
+                LineTrack {
+                    fixed: 80,
+                    start: 40,
+                    end: 360,
+                },
+                LineTrack {
+                    fixed: 150,
+                    start: 40,
+                    end: 360,
+                },
+                LineTrack {
+                    fixed: 240,
+                    start: 40,
+                    end: 360,
+                },
+            ],
+            vertical_tracks: vec![
+                LineTrack {
+                    fixed: 40,
+                    start: 80,
+                    end: 240,
+                },
+                LineTrack {
+                    fixed: 180,
+                    start: 80,
+                    end: 240,
+                },
+                LineTrack {
+                    fixed: 360,
+                    start: 80,
+                    end: 240,
+                },
+            ],
         }]
     );
 }
@@ -46,6 +82,146 @@ fn continuation_grid_can_touch_the_top_canvas_edge() {
             .y,
         0
     );
+}
+
+#[test]
+fn recurring_perpendicular_endpoints_complete_an_open_outer_axis() {
+    let mut image = RgbImage::from_pixel(400, 300, Rgb([255, 255, 255]));
+    for y in [80, 150, 240] {
+        draw_horizontal(&mut image, 40, 360, y, Rgb([0, 0, 0]));
+    }
+    for x in [40, 180] {
+        draw_vertical(&mut image, x, 80, 240, Rgb([0, 0, 0]));
+    }
+
+    let candidate = candidates(&image, &CancellationToken::new()).unwrap()[0].clone();
+
+    assert_eq!(candidate.region.x, 40);
+    assert_eq!(candidate.region.right(), 361);
+    assert_eq!(candidate.vertical_lines, vec![40, 180, 360]);
+    assert_eq!(candidate.vertical_tracks.len(), 2);
+}
+
+#[test]
+fn recurring_terminal_coordinates_are_clustered_without_page_content() {
+    let tracks = [
+        LineTrack {
+            fixed: 40,
+            start: 20,
+            end: 100,
+        },
+        LineTrack {
+            fixed: 80,
+            start: 20,
+            end: 102,
+        },
+        LineTrack {
+            fixed: 120,
+            start: 20,
+            end: 180,
+        },
+        LineTrack {
+            fixed: 160,
+            start: 20,
+            end: 180,
+        },
+    ];
+
+    assert_eq!(recurring_terminal_axes(&tracks), vec![20, 101, 180]);
+}
+
+#[test]
+fn only_the_nearest_recurring_terminal_closes_each_open_side() {
+    let tracks = [
+        LineTrack {
+            fixed: 40,
+            start: 20,
+            end: 150,
+        },
+        LineTrack {
+            fixed: 80,
+            start: 20,
+            end: 152,
+        },
+        LineTrack {
+            fixed: 120,
+            start: 30,
+            end: 180,
+        },
+        LineTrack {
+            fixed: 160,
+            start: 30,
+            end: 182,
+        },
+    ];
+
+    assert_eq!(recurring_outer_axes(&tracks, 40, 100), vec![30, 151]);
+}
+
+#[test]
+fn recurring_internal_terminals_do_not_expand_the_primitive_axis_set() {
+    let mut image = RgbImage::from_pixel(400, 300, Rgb([255, 255, 255]));
+    for y in [40, 240] {
+        draw_horizontal(&mut image, 40, 360, y, Rgb([0, 0, 0]));
+    }
+    for y in [100, 180] {
+        draw_horizontal(&mut image, 40, 260, y, Rgb([0, 0, 0]));
+    }
+    for x in [40, 180, 360] {
+        draw_vertical(&mut image, x, 40, 240, Rgb([0, 0, 0]));
+    }
+
+    let candidate = candidates(&image, &CancellationToken::new()).unwrap()[0].clone();
+
+    assert_eq!(candidate.vertical_lines, vec![40, 180, 360]);
+}
+
+#[test]
+fn parallel_component_extension_requires_two_spacing_consistent_axes() {
+    let tracks = [
+        LineTrack {
+            fixed: 40,
+            start: 20,
+            end: 220,
+        },
+        LineTrack {
+            fixed: 60,
+            start: 20,
+            end: 220,
+        },
+        LineTrack {
+            fixed: 80,
+            start: 20,
+            end: 220,
+        },
+        LineTrack {
+            fixed: 100,
+            start: 20,
+            end: 220,
+        },
+        LineTrack {
+            fixed: 120,
+            start: 20,
+            end: 220,
+        },
+        LineTrack {
+            fixed: 140,
+            start: 230,
+            end: 290,
+        },
+    ];
+    let mut admitted = [0_usize, 1, 2].into_iter().collect();
+
+    extend_parallel_continuations(&mut admitted, &tracks);
+
+    assert_eq!(
+        admitted.into_iter().collect::<Vec<_>>(),
+        vec![0, 1, 2, 3, 4]
+    );
+
+    let mut single = [0_usize, 1, 2].into_iter().collect();
+    extend_parallel_continuations(&mut single, &tracks[..4]);
+    assert_eq!(single.into_iter().collect::<Vec<_>>(), vec![0, 1, 2]);
 }
 
 #[test]
@@ -118,6 +294,43 @@ fn real_fixture_candidates_are_close_to_reviewed_table_bounds() {
             "{name}: {actual:?}"
         );
         assert_eq!(actual[0].orientation, TableCropOrientation::Upright);
+    }
+}
+
+#[test]
+fn rejects_dense_periodic_texture_without_structural_line_contrast() {
+    let mut image = RgbImage::from_pixel(400, 300, Rgb([255, 255, 255]));
+    for y in (0..300).step_by(6) {
+        draw_horizontal(&mut image, 0, 399, y, Rgb([0, 0, 0]));
+    }
+    for x in (0..400).step_by(6) {
+        draw_vertical(&mut image, x, 0, 299, Rgb([0, 0, 0]));
+    }
+
+    let cancellation = CancellationToken::new();
+    let (horizontal, vertical) = scan_segments(&image, 96, 64, &cancellation).unwrap();
+    let horizontal = cluster_segments(horizontal);
+    let vertical = cluster_segments(vertical);
+    assert!(!connected_candidates(&horizontal, &vertical, 400, 300).is_empty());
+    assert!(candidates(&image, &cancellation).unwrap().is_empty());
+}
+
+#[test]
+#[ignore = "requires retained reviewed certificate-page rasters"]
+fn real_certificate_texture_does_not_become_a_wired_table() {
+    let root = std::env::var_os("A3S_OCR_REAL_ROTATED_TABLE_DIR")
+        .expect("A3S_OCR_REAL_ROTATED_TABLE_DIR must name the retained raster root");
+    for page in [26_u32, 28, 29] {
+        let name = format!("page-{page:04}.png");
+        let image = image::open(std::path::Path::new(&root).join(&name))
+            .unwrap()
+            .into_rgb8();
+        assert!(
+            candidates(&image, &CancellationToken::new())
+                .unwrap()
+                .is_empty(),
+            "{name}"
+        );
     }
 }
 

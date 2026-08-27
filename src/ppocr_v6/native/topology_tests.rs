@@ -39,6 +39,164 @@ fn recognition_graph_keeps_the_layer_norm_affine_tail_inventory() {
     }
 }
 
+#[test]
+fn recognition_graph_keeps_the_batch_norm_swish_inventory() {
+    let graph: Value = serde_json::from_str(RECOGNITION_GRAPH).unwrap();
+    let nodes = graph["nodes"].as_array().unwrap();
+    let signature = ["BatchNormalization", "Sigmoid", "Mul"];
+    let windows = nodes
+        .windows(signature.len())
+        .filter(|window| {
+            window
+                .iter()
+                .map(|node| node["op"].as_str().unwrap())
+                .eq(signature)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(windows.len(), 3);
+
+    for window in windows {
+        let normalized = output(&window[0]);
+        let gate = output(&window[1]);
+        assert_eq!(window[1]["inputs"][0].as_str(), Some(normalized));
+        assert_eq!(uses_in(&window[2], normalized), 1);
+        assert_eq!(uses_in(&window[2], gate), 1);
+        assert_private(&graph, nodes, normalized, 2);
+        assert_private(&graph, nodes, gate, 1);
+    }
+}
+
+#[test]
+fn recognition_graph_keeps_the_last_axis_biased_swish_inventory() {
+    let graph: Value = serde_json::from_str(RECOGNITION_GRAPH).unwrap();
+    let nodes = graph["nodes"].as_array().unwrap();
+    let initializers = graph["initializers"].as_array().unwrap();
+    let signature = ["Add", "Identity", "Sigmoid", "Mul"];
+    let windows = nodes
+        .windows(signature.len())
+        .filter(|window| {
+            window
+                .iter()
+                .map(|node| node["op"].as_str().unwrap())
+                .eq(signature)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(windows.len(), 2);
+
+    for window in windows {
+        let [add, identity, sigmoid, multiply] = window else {
+            unreachable!()
+        };
+        let add_output = output(add);
+        let biased = output(identity);
+        let gate = output(sigmoid);
+        assert_eq!(identity["inputs"][0].as_str(), Some(add_output));
+        assert_eq!(sigmoid["inputs"][0].as_str(), Some(biased));
+        assert_eq!(uses_in(multiply, biased), 1);
+        assert_eq!(uses_in(multiply, gate), 1);
+        assert_private(&graph, nodes, add_output, 1);
+        assert_private(&graph, nodes, biased, 2);
+        assert_private(&graph, nodes, gate, 1);
+
+        let bias = add["inputs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|input| input.as_str().unwrap())
+            .find(|input| {
+                initializers.iter().any(|value| {
+                    value["name"].as_str() == Some(*input)
+                        && value["dtype"] == "float32"
+                        && value["shape"].as_array().is_some_and(|shape| {
+                            shape.len() == 1
+                                && shape[0].as_u64().is_some_and(|dimension| dimension > 0)
+                        })
+                })
+            })
+            .expect("the reviewed biased Swish window must retain a rank-one F32 bias");
+        let bias = initializer(initializers, bias);
+        assert_eq!(bias["dtype"], "float32");
+        assert_eq!(bias["shape"].as_array().unwrap().len(), 1);
+    }
+}
+
+#[test]
+fn recognition_graph_keeps_the_private_matmul_bias_inventory() {
+    let graph: Value = serde_json::from_str(RECOGNITION_GRAPH).unwrap();
+    let nodes = graph["nodes"].as_array().unwrap();
+    let initializers = graph["initializers"].as_array().unwrap();
+    let windows = nodes
+        .windows(2)
+        .filter(|window| window[0]["op"] == "MatMul" && window[1]["op"] == "Add")
+        .collect::<Vec<_>>();
+    assert_eq!(windows.len(), 9);
+
+    for window in windows {
+        let [matmul, add] = window else {
+            unreachable!()
+        };
+        assert!(matmul["attributes"]
+            .as_object()
+            .is_some_and(serde_json::Map::is_empty));
+        assert!(add["attributes"]
+            .as_object()
+            .is_some_and(serde_json::Map::is_empty));
+        let matmul_output = output(matmul);
+        assert_eq!(uses_in(add, matmul_output), 1);
+        assert_private(&graph, nodes, matmul_output, 1);
+
+        let weight_name = matmul["inputs"][1].as_str().unwrap();
+        let bias_name = other_input(add, matmul_output, |_| true);
+        let weight = initializer(initializers, weight_name);
+        let bias = initializer(initializers, bias_name);
+        assert_eq!(weight["dtype"], "float32");
+        assert_eq!(bias["dtype"], "float32");
+        let weight_shape = weight["shape"].as_array().unwrap();
+        let bias_shape = bias["shape"].as_array().unwrap();
+        assert_eq!(weight_shape.len(), 2);
+        assert_eq!(bias_shape.len(), 1);
+        assert_eq!(weight_shape[1], bias_shape[0]);
+    }
+}
+
+#[test]
+fn recognition_graph_keeps_a_private_terminal_classifier_bias() {
+    let graph: Value = serde_json::from_str(RECOGNITION_GRAPH).unwrap();
+    let nodes = graph["nodes"].as_array().unwrap();
+    let [matmul, add, identity, softmax] = &nodes[nodes.len() - 4..] else {
+        panic!("recognition graph lost its four-node terminal classifier");
+    };
+    assert_eq!(
+        [
+            matmul["op"].as_str(),
+            add["op"].as_str(),
+            identity["op"].as_str(),
+            softmax["op"].as_str(),
+        ],
+        [
+            Some("MatMul"),
+            Some("Add"),
+            Some("Identity"),
+            Some("Softmax")
+        ]
+    );
+    let matmul_output = output(matmul);
+    let add_output = output(add);
+    let identity_output = output(identity);
+    assert_eq!(uses_in(add, matmul_output), 1);
+    assert_eq!(identity["inputs"][0].as_str(), Some(add_output));
+    assert_eq!(softmax["inputs"][0].as_str(), Some(identity_output));
+    for value in [matmul_output, add_output, identity_output] {
+        assert_private(&graph, nodes, value, 1);
+    }
+
+    let bias = other_input(add, matmul_output, |_| true);
+    let bias = initializer(graph["initializers"].as_array().unwrap(), bias);
+    assert_eq!(bias["dtype"], "float32");
+    assert_eq!(bias["shape"], serde_json::json!([18_710]));
+    assert_eq!(softmax["attributes"]["axis"], 2);
+}
+
 fn reviewed_windows(graph: &Value, activation: Activation) -> usize {
     let nodes = graph["nodes"].as_array().unwrap();
     let signature: &[&str] = match activation {

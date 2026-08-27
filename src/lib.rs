@@ -49,13 +49,17 @@ pub use a3s_power::inference::{
 pub use assets::{ocr_status, OcrInstallSource, OcrRuntimeStatus};
 pub use batch::{
     OcrBatchRequest, OcrBatchResult, OcrBatchSlotId, OcrBatchSlotRequest, OcrBatchSlotResult,
-    OcrBatchSlotStatus, OcrModelFingerprint, OcrProviderBatchOutput, OcrProviderBatchRequest,
-    OcrProviderBatchSlot, OcrProviderBatchSlotOutput, OcrProviderFingerprint, OcrStage,
-    OcrStageOutcome, OcrStageStatus,
+    OcrBatchSlotStatus, OcrModelFingerprint, OcrNormalizedWindow, OcrProviderBatchOutput,
+    OcrProviderBatchRequest, OcrProviderBatchSlot, OcrProviderBatchSlotOutput,
+    OcrProviderFingerprint, OcrStage, OcrStageOutcome, OcrStageStatus,
+    OCR_NORMALIZED_COORDINATE_BASIS,
 };
 pub use client::OcrClient;
 #[cfg(feature = "ppocr-v6")]
-pub use document_fast::{DocumentFastOcrProvider, DOCUMENT_FAST_PROVIDER_ID};
+pub use document_fast::{
+    DocumentFastInitializationError, DocumentFastInitializationErrorKind, DocumentFastOcrProvider,
+    DOCUMENT_FAST_PROVIDER_ID,
+};
 #[cfg(feature = "ppocr-v6")]
 pub use install::{install_ppocr_v6, repair_ppocr_v6, uninstall_managed_ppocr_v6};
 #[cfg(feature = "mcp")]
@@ -71,9 +75,10 @@ pub use provider::{
     OcrInput, OcrProvider, OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
 };
 pub use structured::{
-    OcrCanvasEdge, OcrEvidenceId, OcrImageCanvas, OcrSealDetectionStatus, OcrSealEvidence,
-    OcrSealKind, OcrSealStageEvidence, OcrStageEvidence, OcrTableCellEvidence, OcrTableEvidence,
-    OcrTableKind, OcrTableStageEvidence, OcrVisualRegion,
+    OcrCanvasEdge, OcrEvidenceId, OcrImageCanvas, OcrLayoutRegionEvidence, OcrLayoutRole,
+    OcrLayoutStageEvidence, OcrSealDetectionStatus, OcrSealEvidence, OcrSealKind,
+    OcrSealStageEvidence, OcrStageEvidence, OcrTableCellEvidence, OcrTableEvidence, OcrTableKind,
+    OcrTableStageEvidence, OcrVisualRegion,
 };
 #[cfg(feature = "unlimited-ocr")]
 pub use unlimited_ocr::{

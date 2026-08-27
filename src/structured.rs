@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{OcrBoundingBox, OcrPoint, OcrStage};
 
+mod layout;
+
+pub use layout::{OcrLayoutRegionEvidence, OcrLayoutRole, OcrLayoutStageEvidence};
+
 const MAX_CANVAS_AXIS: u32 = 100_000;
 const MAX_REGION_POLYGON_POINTS: usize = 64;
 const MAX_TABLES_PER_SLOT: usize = 128;
@@ -14,6 +18,7 @@ const MAX_GRID_SLOTS_PER_TABLE: usize = 16_384;
 const MAX_SEALS_PER_SLOT: usize = 256;
 const MAX_EVIDENCE_TEXT_BYTES: usize = 1_048_576;
 const MAX_ITEM_TEXT_BYTES: usize = 4_096;
+const MAX_TEXT_BLOCK_REFERENCES_PER_CELL: usize = 10_000;
 
 /// Exact source-image canvas used by one structured OCR stage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -112,6 +117,11 @@ pub struct OcrTableCellEvidence {
     pub column_span: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
+    /// Canonical zero-based indices into the text output from the same staged
+    /// slot. These are provider-established source-pixel assignments, not
+    /// downstream text matches.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_text_block_indices: Vec<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<OcrVisualRegion>,
 }
@@ -209,6 +219,7 @@ pub struct OcrSealStageEvidence {
     deny_unknown_fields
 )]
 pub enum OcrStageEvidence {
+    Layout(OcrLayoutStageEvidence),
     Table(OcrTableStageEvidence),
     Seal(OcrSealStageEvidence),
 }
@@ -216,6 +227,7 @@ pub enum OcrStageEvidence {
 impl OcrStageEvidence {
     pub fn stage(&self) -> OcrStage {
         match self {
+            Self::Layout(_) => OcrStage::Layout,
             Self::Table(_) => OcrStage::Table,
             Self::Seal(_) => OcrStage::Seal,
         }
@@ -223,6 +235,7 @@ impl OcrStageEvidence {
 
     pub(crate) fn validate(&self) -> UseResult<()> {
         match self {
+            Self::Layout(evidence) => layout::validate_layout_stage(evidence),
             Self::Table(evidence) => validate_table_stage(evidence),
             Self::Seal(evidence) => validate_seal_stage(evidence),
         }
@@ -324,6 +337,17 @@ fn validate_table_grid<'a>(
         }
         if let Some(text) = &cell.text {
             validate_text(text, "table cell", total_text_bytes)?;
+        }
+        if cell.source_text_block_indices.len() > MAX_TEXT_BLOCK_REFERENCES_PER_CELL
+            || cell
+                .source_text_block_indices
+                .windows(2)
+                .any(|indices| indices[0] >= indices[1])
+            || !cell.source_text_block_indices.is_empty() && cell.region.is_none()
+        {
+            return Err(structured_error(
+                "OCR table-cell text-block references must be bounded, canonical, and backed by exact cell geometry.",
+            ));
         }
         if let Some(region) = &cell.region {
             validate_region(region, canvas)?;

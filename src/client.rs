@@ -197,7 +197,9 @@ mod tests {
     use a3s_use_core::Readiness;
     use async_trait::async_trait;
 
-    use crate::{OcrBlock, OcrBlockCategory, OcrBlockRole, OcrBoundingBox, OcrProviderStatus};
+    use crate::{
+        OcrBlock, OcrBlockCategory, OcrBlockRole, OcrBoundingBox, OcrPoint, OcrProviderStatus,
+    };
 
     use super::*;
 
@@ -231,6 +233,7 @@ mod tests {
                     category: None,
                     confidence: None,
                     detection_confidence: None,
+                    text_rotation_millidegrees: None,
                     polygon: None,
                     bounding_box: None,
                     bounding_boxes: Vec::new(),
@@ -268,6 +271,7 @@ mod tests {
             }),
             confidence: None,
             detection_confidence: None,
+            text_rotation_millidegrees: None,
             polygon: None,
             bounding_box: Some(component),
             bounding_boxes: vec![component],
@@ -295,6 +299,41 @@ mod tests {
         wrong_envelope.bounding_box.as_mut().unwrap().width += 1;
         assert_eq!(
             validate_provider_output(&output(wrong_envelope))
+                .unwrap_err()
+                .code,
+            "use.ocr.provider_output_invalid"
+        );
+
+        let mut oriented = block.clone();
+        oriented.text_rotation_millidegrees = Some(1_000);
+        oriented.polygon = Some([
+            OcrPoint { x: 10, y: 20 },
+            OcrPoint { x: 40, y: 21 },
+            OcrPoint { x: 39, y: 61 },
+            OcrPoint { x: 9, y: 60 },
+        ]);
+        oriented.bounding_box = Some(OcrBoundingBox {
+            x: 9,
+            y: 20,
+            width: 31,
+            height: 41,
+        });
+        oriented.bounding_boxes.clear();
+        assert!(validate_provider_output(&output(oriented.clone())).is_ok());
+
+        let mut missing_polygon = oriented.clone();
+        missing_polygon.polygon = None;
+        assert_eq!(
+            validate_provider_output(&output(missing_polygon))
+                .unwrap_err()
+                .code,
+            "use.ocr.provider_output_invalid"
+        );
+
+        let mut noncanonical_rotation = oriented;
+        noncanonical_rotation.text_rotation_millidegrees = Some(180_000);
+        assert_eq!(
+            validate_provider_output(&output(noncanonical_rotation))
                 .unwrap_err()
                 .code,
             "use.ocr.provider_output_invalid"

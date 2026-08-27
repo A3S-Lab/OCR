@@ -1,144 +1,79 @@
 use a3s_use_core::{UseError, UseResult};
-use image::imageops::FilterType;
 use image::RgbImage;
 
-use crate::OcrCanvasEdge;
-
+use super::super::opencv_cubic::{resize_rgb_crop_cubic_normalized_chw, Crop};
 use super::super::wired::PixelRect;
+use super::profile::PicodetLayoutProfile;
 
-pub(super) const INPUT_SIDE: usize = 640;
 const CHANNEL_MEAN: [f32; 3] = [0.485, 0.456, 0.406];
-const CHANNEL_STD: [f32; 3] = [0.229, 0.224, 0.225];
-const MIN_EDGE_STRIP_WIDTH: u32 = 64;
-const MAX_EDGE_STRIP_WIDTH: u32 = 160;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum SealViewKind {
-    FullPage,
-    Boundary(OcrCanvasEdge),
-}
+const CHANNEL_STANDARD_DEVIATION: [f32; 3] = [0.229, 0.224, 0.225];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct SealView {
     pub(super) region: PixelRect,
-    pub(super) kind: SealViewKind,
 }
 
-pub(super) fn page_views(image: &RgbImage) -> Vec<SealView> {
-    let full = SealView {
+/// Returns the exact full-canvas view from the official model contract.
+pub(super) fn full_page_view(image: &RgbImage) -> SealView {
+    SealView {
         region: PixelRect {
             x: 0,
             y: 0,
             width: image.width(),
             height: image.height(),
         },
-        kind: SealViewKind::FullPage,
-    };
-    if image.width() < MIN_EDGE_STRIP_WIDTH.saturating_mul(2) {
-        return vec![full];
     }
-    let strip_width = image
-        .width()
-        .div_ceil(12)
-        .clamp(MIN_EDGE_STRIP_WIDTH, MAX_EDGE_STRIP_WIDTH)
-        .min(image.width());
-    vec![
-        full,
-        SealView {
-            region: PixelRect {
-                x: 0,
-                y: 0,
-                width: strip_width,
-                height: image.height(),
-            },
-            kind: SealViewKind::Boundary(OcrCanvasEdge::Left),
-        },
-        SealView {
-            region: PixelRect {
-                x: image.width() - strip_width,
-                y: 0,
-                width: strip_width,
-                height: image.height(),
-            },
-            kind: SealViewKind::Boundary(OcrCanvasEdge::Right),
-        },
-    ]
 }
 
-pub(super) fn adjacent_boundary_view(
+/// Returns the official full-page model view for an immutable source canvas.
+///
+/// Admission depends only on immutable canvas dimensions and model topology.
+/// It never reads source pixels, text, filenames, page numbers, or detections.
+pub(super) fn model_contract_views(image: &RgbImage) -> Vec<SealView> {
+    vec![full_page_view(image)]
+}
+
+#[cfg(test)]
+pub(super) fn view_tensor(
     image: &RgbImage,
-    edge: OcrCanvasEdge,
-    predecessor_region: PixelRect,
-    predecessor_height: u32,
-) -> Option<SealView> {
-    if predecessor_height == 0
-        || predecessor_region.height == 0
-        || predecessor_region.height > predecessor_height / 2
-        || !matches!(edge, OcrCanvasEdge::Left | OcrCanvasEdge::Right)
-    {
-        return None;
-    }
-    let strip_width = MIN_EDGE_STRIP_WIDTH.min(image.width());
-    let scaled_center = (u64::from(predecessor_region.y) * 2
-        + u64::from(predecessor_region.height))
-    .saturating_mul(u64::from(image.height()))
-        / (u64::from(predecessor_height) * 2);
-    let scaled_height = u64::from(predecessor_region.height)
-        .saturating_mul(2)
-        .saturating_mul(u64::from(image.height()))
-        / u64::from(predecessor_height);
-    let window_height = u32::try_from(scaled_height)
-        .unwrap_or(u32::MAX)
-        .clamp(320, 512)
-        .min(image.height());
-    let center = u32::try_from(scaled_center)
-        .unwrap_or(u32::MAX)
-        .min(image.height());
-    let y = center
-        .saturating_sub(window_height / 2)
-        .min(image.height().saturating_sub(window_height));
-    let x = match edge {
-        OcrCanvasEdge::Left => 0,
-        OcrCanvasEdge::Right => image.width().saturating_sub(strip_width),
-        OcrCanvasEdge::Top | OcrCanvasEdge::Bottom => return None,
-    };
-    Some(SealView {
-        region: PixelRect {
-            x,
-            y,
-            width: strip_width,
-            height: window_height,
-        },
-        kind: SealViewKind::Boundary(edge),
-    })
+    view: SealView,
+    profile: PicodetLayoutProfile,
+) -> UseResult<Vec<f32>> {
+    let mut tensor = vec![0.0_f32; profile.tensor_elements_per_view()];
+    view_tensor_into(image, view, profile, &mut tensor)?;
+    Ok(tensor)
 }
 
-pub(super) fn view_tensor(image: &RgbImage, view: SealView) -> UseResult<Vec<f32>> {
+pub(super) fn view_tensor_into(
+    image: &RgbImage,
+    view: SealView,
+    profile: PicodetLayoutProfile,
+    tensor: &mut [f32],
+) -> UseResult<()> {
     validate_view(image, view)?;
-    let crop = image::imageops::crop_imm(
-        image,
-        view.region.x,
-        view.region.y,
-        view.region.width,
-        view.region.height,
-    )
-    .to_image();
-    let resized = image::imageops::resize(
-        &crop,
-        INPUT_SIDE as u32,
-        INPUT_SIDE as u32,
-        FilterType::CatmullRom,
-    );
-    let plane = INPUT_SIDE * INPUT_SIDE;
-    let mut tensor = vec![0.0_f32; 3 * plane];
-    for (index, pixel) in resized.pixels().enumerate() {
-        for channel in 0..3 {
-            let value = f32::from(pixel[channel]) / 255.0;
-            tensor[channel * plane + index] =
-                (value - CHANNEL_MEAN[channel]) / CHANNEL_STD[channel];
-        }
+    let tensor_elements = profile.tensor_elements_per_view();
+    if tensor.len() != tensor_elements {
+        return Err(UseError::new(
+            "use.ocr.seal_view_invalid",
+            format!("A PicoDet seal tensor requires exactly {tensor_elements} f32 values."),
+        ));
     }
-    Ok(tensor)
+    let input_side = profile.input_side();
+    resize_rgb_crop_cubic_normalized_chw(
+        image,
+        Crop {
+            x: view.region.x,
+            y: view.region.y,
+            width: view.region.width,
+            height: view.region.height,
+        },
+        input_side,
+        input_side,
+        CHANNEL_MEAN,
+        CHANNEL_STANDARD_DEVIATION,
+        tensor,
+    )
+    .map_err(|message| UseError::new("use.ocr.seal_view_invalid", message))
 }
 
 fn validate_view(image: &RgbImage, view: SealView) -> UseResult<()> {
@@ -164,47 +99,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn page_views_are_full_left_and_right_in_canonical_order() {
+    fn model_admission_is_exactly_the_immutable_source_canvas() {
         let image = RgbImage::new(1_200, 1_600);
-        let views = page_views(&image);
-        assert_eq!(views.len(), 3);
-        assert_eq!(views[0].kind, SealViewKind::FullPage);
-        assert_eq!(views[1].kind, SealViewKind::Boundary(OcrCanvasEdge::Left));
-        assert_eq!(views[2].kind, SealViewKind::Boundary(OcrCanvasEdge::Right));
-        assert_eq!(views[1].region.width, 100);
-        assert_eq!(views[2].region.x, 1_100);
+        assert_eq!(
+            full_page_view(&image).region,
+            PixelRect {
+                x: 0,
+                y: 0,
+                width: 1_200,
+                height: 1_600,
+            }
+        );
     }
 
     #[test]
-    fn tensor_uses_rgb_imagenet_normalization() {
+    fn canvas_admission_is_the_exact_full_page_model_contract() {
+        let portrait = RgbImage::new(1_190, 1_684);
+        let views = model_contract_views(&portrait);
+        assert_eq!(views, vec![full_page_view(&portrait)]);
+    }
+
+    #[test]
+    fn tensor_uses_official_rgb_imagenet_normalization() {
         let image = RgbImage::from_pixel(2, 2, Rgb([255, 0, 0]));
-        let view = page_views(&image)[0];
-        let tensor = view_tensor(&image, view).unwrap();
-        let plane = INPUT_SIDE * INPUT_SIDE;
+        let view = full_page_view(&image);
+        let profile = PicodetLayoutProfile::Large;
+        let tensor = view_tensor(&image, view, profile).unwrap();
+        let plane = profile.input_side() * profile.input_side();
         assert!((tensor[0] - (1.0 - 0.485) / 0.229).abs() < 1e-5);
         assert!((tensor[plane] - (0.0 - 0.456) / 0.224).abs() < 1e-5);
         assert!((tensor[2 * plane] - (0.0 - 0.406) / 0.225).abs() < 1e-5);
-    }
-
-    #[test]
-    fn adjacent_view_maps_the_predecessor_band_without_scanning_the_page() {
-        let image = RgbImage::new(1_190, 1_684);
-        let view = adjacent_boundary_view(
-            &image,
-            OcrCanvasEdge::Right,
-            PixelRect {
-                x: 1_130,
-                y: 790,
-                width: 60,
-                height: 206,
-            },
-            1_684,
-        )
-        .unwrap();
-        assert_eq!(view.region.x, 1_126);
-        assert_eq!(view.region.width, 64);
-        assert_eq!(view.region.height, 412);
-        assert!(view.region.y <= 790);
-        assert!(view.region.y + view.region.height >= 996);
     }
 }

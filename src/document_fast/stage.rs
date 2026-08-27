@@ -6,6 +6,7 @@ use a3s_power::inference::{
 };
 use a3s_use_core::{UseError, UseResult};
 use image::RgbImage;
+use rayon::prelude::*;
 use tokio_util::sync::CancellationToken;
 
 use super::assets::SlanetPlusAssets;
@@ -13,9 +14,10 @@ use super::decoder::{SlanetPlusDecoder, StructureGrid};
 use super::native::{session_spec, NativeSlanetPlus};
 use super::orientation::TableCropOrientation;
 use super::preprocess::crop_tensor;
+use super::shared_decode::{validate_decoded_cardinality, SharedDecodedImage};
+use super::source_grid::derive_source_grid;
 use super::wired::{candidates, PixelRect, WiredCandidate};
 use crate::cancellation::{check_cancelled, run_blocking_with};
-use crate::preprocess::decode_image;
 use crate::receipt::project_receipt;
 use crate::{OcrExecutionReceipt, OcrImageCanvas, OcrProviderBatchSlot};
 
@@ -47,12 +49,35 @@ impl TableStageRunner {
         &self.assets.root
     }
 
-    pub(super) async fn run(
+    pub(super) async fn run_decoded(
         &self,
         slots: Vec<OcrProviderBatchSlot>,
+        images: Vec<SharedDecodedImage>,
         cancellation: CancellationToken,
     ) -> UseResult<TableStageBatch> {
-        let decoded = decode_pages(slots, cancellation.clone()).await?;
+        let trace = std::env::var_os("A3S_OCR_TRACE_STAGE_TIMINGS").is_some();
+        let started = std::time::Instant::now();
+        validate_decoded_cardinality(&slots, &images)?;
+        let decoded = prepare_decoded_pages(slots, images, cancellation.clone()).await?;
+        let prepared_at = started.elapsed();
+        let output = self.run_decoded_pages(decoded, cancellation).await;
+        if trace {
+            let completed = started.elapsed();
+            eprintln!(
+                "A3S_OCR_TABLE_STAGE_TIMING prepare_ms={:.3} execute_ms={:.3} total_ms={:.3}",
+                prepared_at.as_secs_f64() * 1_000.0,
+                (completed - prepared_at).as_secs_f64() * 1_000.0,
+                completed.as_secs_f64() * 1_000.0,
+            );
+        }
+        output
+    }
+
+    async fn run_decoded_pages(
+        &self,
+        decoded: Vec<DecodedPage>,
+        cancellation: CancellationToken,
+    ) -> UseResult<TableStageBatch> {
         let mut pages = Vec::with_capacity(decoded.len());
         let mut crops = Vec::new();
         for decoded in decoded {
@@ -69,9 +94,17 @@ impl TableStageRunner {
                         continue;
                     }
                     let page_index = pages.len();
-                    let image = Arc::new(image);
-                    let page = PageAccumulator::ready(decoded.slot_id, canvas, candidates.len());
-                    for (table_index, candidate) in candidates.into_iter().enumerate() {
+                    let mut page =
+                        PageAccumulator::ready(decoded.slot_id, canvas, candidates.len());
+                    for (table_index, prepared) in candidates.into_iter().enumerate() {
+                        let candidate = prepared.candidate;
+                        if let Some(grid) = prepared.source_grid {
+                            page.tables[table_index] = Some(DetectedTable {
+                                region: candidate.region,
+                                grid,
+                            });
+                            continue;
+                        }
                         crops.push(CropReference {
                             page_index,
                             table_index,
@@ -79,6 +112,8 @@ impl TableStageRunner {
                             region: candidate.inference_region,
                             table_region: candidate.region,
                             orientation: candidate.orientation,
+                            horizontal_lines: candidate.horizontal_lines,
+                            vertical_lines: candidate.vertical_lines,
                         });
                     }
                     pages.push(page);
@@ -217,20 +252,34 @@ async fn load_session(
     })?
 }
 
-async fn decode_pages(
+async fn prepare_decoded_pages(
     slots: Vec<OcrProviderBatchSlot>,
+    images: Vec<SharedDecodedImage>,
     cancellation: CancellationToken,
 ) -> UseResult<Vec<DecodedPage>> {
     run_blocking_with(
-        "document-fast table image decoding",
+        "document-fast table candidate preparation",
         cancellation,
         move |cancellation| {
             slots
-                .into_iter()
-                .map(|slot| {
+                .into_par_iter()
+                .zip(images)
+                .map(|(slot, image)| {
                     check_cancelled(&cancellation)?;
-                    let page = decode_image(slot.input.bytes()).and_then(|image| {
+                    let page = image.and_then(|image| {
                         let candidates = candidates(&image, &cancellation)?;
+                        let candidates = candidates
+                            .into_iter()
+                            .map(|candidate| {
+                                check_cancelled(&cancellation)?;
+                                let source_grid = derive_source_grid(&image, &candidate);
+                                check_cancelled(&cancellation)?;
+                                Ok(PreparedTableCandidate {
+                                    candidate,
+                                    source_grid,
+                                })
+                            })
+                            .collect::<UseResult<Vec<_>>>()?;
                         Ok(DecodedTablePage { image, candidates })
                     });
                     Ok(DecodedPage {
@@ -290,31 +339,71 @@ async fn execute_batch(
             )?;
             let encoded_at = batch_started.elapsed();
             let sample_elements = 256 * 96;
-            let mut results = Vec::with_capacity(prepared.crops.len());
-            for (sample, crop) in prepared.crops.into_iter().enumerate() {
-                let start = sample * sample_elements;
-                let end = start + sample_elements;
-                let grid = engine
-                    .decoder
-                    .decode(
-                        &encoded.tensor.values[start..end],
-                        crop.region,
-                        crop.orientation,
-                        &cancellation,
-                    )
-                    .and_then(|decoded| decoded.into_grid())
-                    .and_then(validate_grid);
-                let region = grid
-                    .as_ref()
-                    .map(|grid| table_evidence_region(crop.table_region, grid))
-                    .unwrap_or(crop.table_region);
-                results.push(CropResult {
-                    page_index: crop.page_index,
-                    table_index: crop.table_index,
-                    region,
-                    grid,
-                });
-            }
+            // Every structure decoder is autoregressive within one crop, but
+            // crops share no mutable state. Decode the bounded encoder batch
+            // in parallel while collecting through the indexed iterator so
+            // page/table ordering remains byte-stable.
+            let results = prepared
+                .crops
+                .into_par_iter()
+                .enumerate()
+                .map(|(sample, crop)| {
+                    let start = sample * sample_elements;
+                    let end = start + sample_elements;
+                    let grid = engine
+                        .decoder
+                        .decode(
+                            &encoded.tensor.values[start..end],
+                            crop.region,
+                            crop.orientation,
+                            &cancellation,
+                        )
+                        .and_then(|decoded| decoded.into_grid())
+                        .and_then(validate_grid)
+                        .map(|mut grid| {
+                            if trace {
+                                let covered_slots = grid.cells.iter().try_fold(
+                                    0_u64,
+                                    |total, cell| {
+                                        total.checked_add(
+                                            u64::from(cell.row_span)
+                                                .checked_mul(u64::from(cell.column_span))?,
+                                        )
+                                    },
+                                );
+                                eprintln!(
+                                    "A3S_OCR_TABLE_GRID page_index={} table_index={} orientation={:?} model_rows={} model_columns={} model_cells={} covered_slots={:?} source_horizontal_lines={} source_vertical_lines={}",
+                                    crop.page_index,
+                                    crop.table_index,
+                                    crop.orientation,
+                                    grid.row_count,
+                                    grid.column_count,
+                                    grid.cells.len(),
+                                    covered_slots,
+                                    crop.horizontal_lines.len(),
+                                    crop.vertical_lines.len(),
+                                );
+                            }
+                            super::wire_geometry::align_grid_to_wires(
+                                &mut grid,
+                                crop.orientation,
+                                &crop.horizontal_lines,
+                                &crop.vertical_lines,
+                            );
+                            grid
+                        });
+                    let region = grid
+                        .as_ref()
+                        .map(|grid| table_evidence_region(crop.table_region, grid))
+                        .unwrap_or(crop.table_region);
+                    CropResult {
+                        page_index: crop.page_index,
+                        table_index: crop.table_index,
+                        region,
+                        grid,
+                    }
+                })
+                .collect::<Vec<_>>();
             if trace {
                 let completed = batch_started.elapsed();
                 eprintln!(
@@ -336,10 +425,13 @@ async fn execute_batch(
 }
 
 fn validate_grid(grid: StructureGrid) -> UseResult<StructureGrid> {
-    if grid.confidence < MIN_STRUCTURE_CONFIDENCE {
+    let confidence = grid.confidence.ok_or_else(|| {
+        runtime_error("SLANet-Plus structure output omitted its model confidence.")
+    })?;
+    if confidence < MIN_STRUCTURE_CONFIDENCE {
         return Err(runtime_error(format!(
             "SLANet-Plus structure confidence {:.3} is below the reviewed {:.3} floor.",
-            grid.confidence, MIN_STRUCTURE_CONFIDENCE
+            confidence, MIN_STRUCTURE_CONFIDENCE
         )));
     }
     Ok(grid)
@@ -381,8 +473,13 @@ struct DecodedPage {
 }
 
 struct DecodedTablePage {
-    image: RgbImage,
-    candidates: Vec<WiredCandidate>,
+    image: Arc<RgbImage>,
+    candidates: Vec<PreparedTableCandidate>,
+}
+
+struct PreparedTableCandidate {
+    candidate: WiredCandidate,
+    source_grid: Option<StructureGrid>,
 }
 
 struct PageAccumulator {
@@ -457,6 +554,8 @@ struct CropReference {
     region: PixelRect,
     table_region: PixelRect,
     orientation: TableCropOrientation,
+    horizontal_lines: Vec<u32>,
+    vertical_lines: Vec<u32>,
 }
 
 struct PreparedBatch {

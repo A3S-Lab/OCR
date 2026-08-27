@@ -17,6 +17,7 @@ fn pp_ocr_v6_is_one_provider_behind_the_public_interface() {
     assert_eq!(descriptor.id, PP_OCR_V6_PROVIDER_ID);
     assert_eq!(descriptor.engine, "a3s-power-native");
     assert!(!descriptor.sends_source_off_device);
+    assert!(descriptor.supports_text_windows);
 }
 
 #[cfg(feature = "unlimited-ocr")]

@@ -106,6 +106,28 @@ The binary writes one self-validating JSON report to stdout. The schema accepts
 smaller sample counts and `modified`/`debug` metadata for development smoke
 runs, but those captures must not be promoted as release baselines.
 
+Operator worktree diagnostics follow the same rule. A production fast path may
+be selected from immutable device/ISA facts, declared operator topology, tensor
+dtype/layout/geometry, and resource bounds, but not from a file name, page
+number, source hash, recognized string, model label, corpus identity, or a
+threshold fitted to observed fixtures. Compare the same semantic output with
+the optimization enabled and disabled, retain exact or reviewed numerical
+parity, and revert neutral or regressing variants instead of adding a
+sample-specific rescue gate.
+
+## Negative experiment retention
+
+Every ineffective, regressing, mixed, inconclusive, reverted, parity-failing,
+misconfigured, or zero-sample optimization and validation attempt must be
+recorded before its source is removed or another hypothesis starts. The
+canonical cross-repository history is the Parser
+[append-before-removal negative-result ledger](https://github.com/contra-sense/agentic-parser/blob/main/docs/ocr-acceleration-plan.md#2026-08-24-onward-performance-negative-result-ledger).
+It records the hypothesis, exact evidence boundary, parity result, local and
+end-to-end measurements when available, missing evidence, decision, and
+retained/reverted state. A later successful implementation does not erase the
+failed attempts that led to it, and an invalid build or diagnostic command is
+never silently converted into absent evidence.
+
 Pure protocol tests do not require model assets:
 
 ```bash
@@ -139,19 +161,21 @@ ASCII-token F1 between each mixed-shape batch slot and its scalar result must be
 at least 0.95, while every polygon and box must remain inside its own source
 image. Letterboxing changes convolution boundary context, so this is a bounded
 quality gate rather than a claim of bit-identical detector tensors.
-It also verifies both branches of the OCR-owned 90% canvas-fill rule: compatible
-mixed shapes share one Power-admitted graph call, while a quality outlier starts
-a distinct Power plan with its own receipt.
+It also verifies both branches of the OCR-owned exact-work rule: a candidate
+shares one Power-admitted detection graph call only when combined canvas-area
+times cardinality does not exceed separate execution work, while any
+work-increasing shape starts a distinct graph call with its own receipt.
 
 Recognition batching has a stricter geometry rule. A CUDA diagnostic that
 mixed different dynamic widths produced 0.933 ASCII-token F1 for the wide slot;
 the same result occurred with the prior pinned Power revision. The checked path
-therefore never performs unbounded width mixing. It admits only crops whose
-recognition canvases differ by at most 16 pixels into one canonical
-at-most-eight-crop cohort. Adjacent canonical cohorts share one at-most-32-crop
-physical call only when their final canvas width is already identical. Since
-the minimum canvas is 320 pixels, the maximum added right padding remains 5%;
-larger differences retain separate dynamic calls. The gate must compare every
+therefore groups only exactly equal recognition tensor widths into one
+canonical at-most-eight-crop cohort. Adjacent canonical cohorts share one
+at-most-128-crop physical call only while that exact width remains equal, and
+the input-plus-classifier reservation against Power's tensor limit derives a
+smaller cap for wider tensors. No
+empirical width delta or corpus-tuned padding threshold is admitted. The gate
+must compare every
 parallelized perspective crop and tensor slot with scalar materialization and
 preserve exact input order and values. SHA-pinned Parser table and rider-seal
 fixtures keep exact text and structured-geometry fingerprints under this
@@ -160,3 +184,60 @@ use a 896-pixel fast bound and preserve original-source crops. Visually
 non-uniform empty results receive one scalar retry at the 4,000-pixel quality
 bound; this does not certify partially detected small text or replace the open
 official-image matrix gate.
+
+Fingerprint review must compare like execution identities. The historical CPU
+rider golden was produced while the planner allowed up to 16 pixels of
+recognition right padding. Re-enabling that allowance on the current binary
+produced neither the historical CPU result nor the exact-width result. The old
+golden is therefore not an operator-tuning oracle, and the current exact-width
+fingerprint is not accepted by self-consistency alone. A replacement requires
+independent transcription truth and A3S Office reconstruction, in addition to
+the existing geometry, table, seal, and cross-page gates. No expected output may
+be expanded merely because a faster candidate repeats it.
+
+The current private-constant-`Reshape` Power experiment follows that rule. Its
+frozen baseline and candidate reproduce the same current full-corpus evidence,
+but the six-page table text fingerprint remains `d2329b...` against the older
+`d675b5...` expectation on both binaries. Exact current parity exonerates the
+executor rewrite; it does not certify the earlier text transition. The first
+unequal-trace A/B and the later zero-sample quiet qualification are invalid
+performance evidence and remain in Parser's append-before-removal ledger.
+
+The following generic private `Sigmoid -> broadcast Mul` candidate is evaluated
+against that retained constant-Reshape binary, not against a moving working
+tree. Its frozen Parser executable has SHA-256
+`62175a47d82eaa920ff2d57be42bbcdaa668268ef563e4277b872b6ab4683cfa`.
+The official PicoDet-L trace removes four Mul execution boundaries per graph
+call. All five 64-page cache wires match after replacing only their single
+`elapsedMillis` value, and 74/74 A3S Office reconstruction artifacts match raw
+bytes. These are correctness and activation gates only. The first resource
+snapshot exceeded the declared 12% clean-GPU limit before either binary ran, so
+no timing from the correctness runs enters the execution baseline.
+
+The combined private `Sigmoid -> broadcast Mul` plus adjacent
+`BatchNormalization -> Sigmoid` Parser executable is frozen separately with
+SHA-256
+`d4b8d347799bc17374c28ea7b94b244b03787ed1f6bfefcda43291907679e698`.
+The additional lowering removes four more official-layout execution boundaries
+per call. Complete graph suites, five normalized cache wires over 64 pages, and
+all 74 raw Office reconstruction artifacts retain exact parity. Its emitted
+6.001-second OCR sum (about 10.665 pages/s) is excluded from this baseline: it
+was a correctness run, not an adjacent guarded comparison, and the following
+strict preflight exceeded the same clean-GPU limit before either frozen binary
+ran.
+
+The scheduler-cap gate must alternate the previous and candidate caps on the
+same named hardware. It requires exact text, block order, source geometry,
+detection confidence, and every non-receipt canonical field. Recognition
+confidence is reported separately as maximum absolute and ULP drift because
+CUDA convolution arithmetic may vary with batch shape; that value must remain
+finite, bounded to `[0,1]`, and must not control a runtime branch. The retained
+RTX 4090 comparison for 32 versus 128 crops measured 6.889 versus 6.472 seconds
+over 29 decoded pages and a maximum confidence difference of
+`1.704692841e-5`.
+
+Likewise, a reduced-precision or smaller-model benchmark must declare a distinct
+model and execution fingerprint. It must run the same bounded, order-independent
+corpus matrix and quality gates as its full-precision reference. Automatic
+quantization or precision selection based on source, page, decoded content, or
+sample identity is not admissible release evidence.

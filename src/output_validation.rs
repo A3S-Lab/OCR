@@ -113,7 +113,11 @@ fn validate_block_category(block: &OcrBlock) -> UseResult<()> {
     let Some(category) = &block.category else {
         return Ok(());
     };
-    let label = category.raw_label.as_bytes();
+    validate_category_label(&category.raw_label)
+}
+
+pub(crate) fn validate_category_label(raw_label: &str) -> UseResult<()> {
+    let label = raw_label.as_bytes();
     if label.is_empty()
         || label.len() > MAX_BLOCK_CATEGORY_LABEL_BYTES
         || !label
@@ -131,6 +135,15 @@ fn validate_block_category(block: &OcrBlock) -> UseResult<()> {
 }
 
 fn validate_block_geometry(block: &OcrBlock) -> UseResult<()> {
+    if block.text_rotation_millidegrees.is_some_and(|rotation| {
+        !(-180_000..180_000).contains(&rotation)
+            || block.polygon.is_none()
+            || !block.bounding_boxes.is_empty()
+    }) {
+        return Err(provider_output_error(
+            "OCR provider text rotation must be canonical millidegrees in [-180000, 180000) and bind one polygon without component boxes.",
+        ));
+    }
     if block.bounding_boxes.len() > MAX_COMPONENT_BOXES_PER_BLOCK {
         return Err(provider_output_error(
             "OCR provider blocks must not contain more than 128 component boxes.",
