@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">快速入门</a> ·
+  <a href="#quick-start">快速开始</a> ·
   <a href="#responsibility-boundary">边界</a> ·
   <a href="#result-contract-ocr-plus-provenance">合同</a> ·
   <a href="#providers">提供商</a> ·
@@ -38,32 +38,32 @@
 A3S Use OCR 路线。其稳定边界为[`OcrProvider`](#the-provider-interface)，
 不是一个单一的模型。
 
-Every extraction starts with the same client-owned work: resolve a bounded
-local image, verify its media type, read it once, and compute canonical source
-evidence. Only then are the bytes passed to an injected provider. A provider
-must declare its source-transfer policy and cannot replace the source path,
+每次提取都从相同的客户端拥有的工作开始：解析有界的
+本地图像，验证其媒体类型，读取一次，并计算规范源
+证据。只有这样，字节才会传递给注入的提供程序。供应商
+必须声明其源传输策略并且不能替换源路径，
 media type, size, or SHA-256 recorded by `OcrClient`. Both built-in providers
 reuse A3S Power's embedded, model-neutral inference substrate; neither enables
 Power's HTTP server or opens its own listener.
 
 ## Responsibility boundary
 
-A3S OCR recognizes one bounded image and returns OCR evidence. It is not a
+A3S OCR 识别一幅有界图像并返回 OCR 证据。它不是一个
 document parser.
 
 | A3S OCR owns | Delegated to A3S Power | Outside this repository |
 | --- | --- | --- |
-| PP-OCRv6 and Unlimited-OCR topology, assets, preprocessing, decoding, labels, confidence, and source-pixel geometry | Typed devices, admission, weight integrity and residency, cancellation, private telemetry, TEE-compatible controls, and execution receipts | Office/PDF page inventory, rendering, cross-page hierarchy, evidence reconciliation, agent planning, and document checkpoints |
+| PP-OCRv6 和 Unlimited-OCR 拓扑、资源、预处理、解码、标签、置信度和源像素几何 |类型设备、准入、权重完整性和驻留、取消、私人遥测、TEE 兼容控制和执行收据 | Office/PDF 页面库存、渲染、跨页面层次结构、证据协调、代理规划和文档检查点 |
 
 PDF rasterization and Office parsing belong to their owning components. A
 document-level consumer such as A3S Parser may preserve `OcrResult` blocks and
-receipts inside a larger graph, but it must not move OCR model ownership into
-the parser. Power remains model-neutral and contains no OCR architecture or
+较大图表内的收据，但不得将 OCR 模型所有权移至
+解析器。 Power 保持模型中立，不包含 OCR 架构或
 asset.
 
 ## Quick start
 
-With A3S Use installed, inspect the configured provider before reading an
+安装A3S Use后，在阅读之前检查配置的提供程序
 image:
 
 ~~~bash
@@ -703,7 +703,7 @@ pub trait OcrProvider: Send + Sync {
   OCR 服务、HTTP 客户端/服务器、浏览器自动化、Python 运行时、
   子进程推理或网络侦听器。
 
-＃＃ 发展
+## 发展
 
 从此crate存储库运行检查，而不是从 A3S monorepo 根运行检查：
 
@@ -747,7 +747,7 @@ crate出版物和平台档案。 A3S Use拥有内置路线，选择
 
 </details>
 
-＃＃ 执照
+## 执照
 
 根据 [MIT License](LICENSE) 获得许可。参见
 [Third-Party Notices](THIRD_PARTY_NOTICES.md) 用于模型和运行时来源。
