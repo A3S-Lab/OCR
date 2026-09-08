@@ -51,7 +51,7 @@ Power's HTTP server or opens its own listener.
 A3S OCR 识别一幅有界图像并返回 OCR 证据。它不是一个
 document parser.
 
-| A3S OCR owns | Delegated to A3S Power | Outside this repository |
+| A3S OCR 负责 | 委托给 A3S Power | 本仓库范围之外 |
 | --- | --- | --- |
 | PP-OCRv6 和 Unlimited-OCR 拓扑、资源、预处理、解码、标签、置信度和源像素几何 |类型设备、准入、权重完整性和驻留、取消、私人遥测、TEE 兼容控制和执行收据 | Office/PDF 页面库存、渲染、跨页面层次结构、证据协调、代理规划和文档检查点 |
 
