@@ -15,6 +15,7 @@ pub struct OcrProviderDescriptor {
     pub engine: String,
     pub sends_source_off_device: bool,
     pub supported_stages: Vec<OcrStage>,
+    pub supports_text_windows: bool,
 }
 
 impl OcrProviderDescriptor {
@@ -28,6 +29,7 @@ impl OcrProviderDescriptor {
             engine: engine.into(),
             sends_source_off_device,
             supported_stages: vec![OcrStage::Text],
+            supports_text_windows: false,
         };
         descriptor.validate()?;
         Ok(descriptor)
@@ -86,6 +88,18 @@ impl OcrProviderDescriptor {
 
     pub fn supports_stage(&self, stage: OcrStage) -> bool {
         self.supported_stages.binary_search(&stage).is_ok()
+    }
+
+    /// Declare support for exhaustive Text selection on normalized source
+    /// geometry. A supporting provider must keep detection on the complete
+    /// immutable source canvas, select every detected block whose source
+    /// bounding box has positive-area intersection with the window, recognize
+    /// the complete selected block, and retain original source coordinates.
+    /// The default is false.
+    pub fn with_text_windows(mut self, supported: bool) -> UseResult<Self> {
+        self.supports_text_windows = supported;
+        self.validate()?;
+        Ok(self)
     }
 
     pub(crate) fn canonical_stages(&self) -> Vec<OcrStage> {
@@ -170,7 +184,12 @@ pub trait OcrProvider: Send + Sync {
     ) -> UseResult<OcrProviderBatchOutput> {
         let mut slots = Vec::with_capacity(request.slots.len());
         for slot in request.slots {
-            let recognition = if request.stages.contains(&OcrStage::Text) {
+            let recognition = if slot.text_window.is_some() {
+                Some(Err(UseError::new(
+                    "use.ocr.text_window_unsupported",
+                    "The default OCR provider adapter cannot consume a Text-stage source window.",
+                )))
+            } else if request.stages.contains(&OcrStage::Text) {
                 Some(self.recognize(slot.input).await)
             } else {
                 None

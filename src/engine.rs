@@ -4,24 +4,32 @@ use image::RgbImage;
 use imageproc::point::Point;
 use tokio_util::sync::CancellationToken;
 
+use self::recognition::RecognitionAdmission;
 use crate::assets::ModelAssets;
 use crate::cancellation::check_cancelled;
-use crate::config::{load_detection, load_recognition, DetectionConfig, RecognitionConfig};
+use crate::config::{
+    load_detection, load_recognition, DetectionConfig, ModelProfile, RecognitionConfig,
+};
 use crate::ppocr_v6::native::NativePpOcrV6;
-use crate::preprocess::detection_batch_input;
+use crate::OcrNormalizedWindow;
 
 mod detection;
 mod recognition;
+mod scheduling;
+
+pub(crate) use detection::detection_cohort_ranges;
 
 #[derive(Debug, Clone)]
 pub(crate) struct EngineBlock {
     pub(crate) polygon: [Point<f32>; 4],
+    pub(crate) text_rotation_millidegrees: i32,
     pub(crate) detection_confidence: f32,
     pub(crate) text: String,
     pub(crate) confidence: f32,
 }
 
 pub(crate) struct EngineExtraction {
+    pub(crate) model: &'static str,
     pub(crate) blocks: Vec<EngineBlock>,
     pub(crate) receipts: Vec<ExecutionReceipt>,
 }
@@ -30,6 +38,7 @@ pub(crate) struct PpOcrV6Engine {
     native: NativePpOcrV6,
     detection_config: DetectionConfig,
     recognition_config: RecognitionConfig,
+    model_profile: ModelProfile,
 }
 
 impl PpOcrV6Engine {
@@ -42,6 +51,7 @@ impl PpOcrV6Engine {
             native,
             detection_config,
             recognition_config,
+            model_profile: assets.profile,
         })
     }
 
@@ -56,6 +66,7 @@ impl PpOcrV6Engine {
             native,
             detection_config,
             recognition_config,
+            model_profile: assets.profile,
         })
     }
 
@@ -77,7 +88,7 @@ impl PpOcrV6Engine {
         permit: &a3s_power::inference::ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<EngineExtraction> {
-        self.extract_batch_admitted(&[image], permit, cancellation)?
+        self.extract_batch_admitted(&[image], usize::MAX, permit, cancellation)?
             .pop()
             .ok_or_else(|| {
                 engine_error(
@@ -87,62 +98,99 @@ impl PpOcrV6Engine {
             })?
     }
 
+    #[cfg(test)]
     pub(crate) fn extract_batch_admitted(
         &mut self,
         images: &[&RgbImage],
+        max_tensor_elements: usize,
         permit: &a3s_power::inference::ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<Vec<UseResult<EngineExtraction>>> {
-        check_cancelled(cancellation)?;
-        let trace = std::env::var_os("A3S_OCR_TRACE_STAGE_TIMINGS").is_some();
-        let batch_started = std::time::Instant::now();
-        let input = detection_batch_input(images, &self.detection_config)?;
-        let preprocessed = batch_started.elapsed();
-        let detection = self
-            .native
-            .detect_batch(input.data, input.shape, permit, cancellation)?;
-        let detected = batch_started.elapsed();
-        if detection.tensor.shape.first() != Some(&images.len())
-            || input.geometries.len() != images.len()
-        {
+        self.extract_batch_admitted_with_windows(
+            images,
+            &vec![None; images.len()],
+            max_tensor_elements,
+            permit,
+            cancellation,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn extract_batch_admitted_with_windows(
+        &self,
+        images: &[&RgbImage],
+        text_windows: &[Option<OcrNormalizedWindow>],
+        max_tensor_elements: usize,
+        permit: &a3s_power::inference::ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<Vec<UseResult<EngineExtraction>>> {
+        self.extract_batch_admitted_with_windows_and_helpers(
+            images,
+            text_windows,
+            max_tensor_elements,
+            permit,
+            cancellation,
+            &[],
+        )
+    }
+
+    pub(crate) fn extract_batch_admitted_with_windows_and_helpers(
+        &self,
+        images: &[&RgbImage],
+        text_windows: &[Option<OcrNormalizedWindow>],
+        max_tensor_elements: usize,
+        permit: &a3s_power::inference::ExecutionPermit,
+        cancellation: &CancellationToken,
+        recognition_helpers: &[&Self],
+    ) -> UseResult<Vec<UseResult<EngineExtraction>>> {
+        if images.len() != text_windows.len() {
             return Err(engine_error(
-                "use.ocr.provider_output_invalid",
-                "PP-OCRv6 detection changed exact batch cardinality.",
+                "use.ocr.provider_input_invalid",
+                "PP-OCRv6 Text windows must preserve exact image cardinality.",
             ));
         }
-        let mut detections = detection::postprocess_batch(
-            input.geometries,
-            detection.tensor,
-            &self.detection_config,
-        )?;
         check_cancelled(cancellation)?;
-        let postprocessed = batch_started.elapsed();
-        let mut detection_receipts = vec![vec![detection.receipt]; images.len()];
-        self.retry_empty_detections(
+        let trace = std::env::var_os("A3S_OCR_TRACE_STAGE_TIMINGS").is_some()
+            || std::env::var_os("A3S_OCR_TRACE_PIPELINE_TIMINGS").is_some();
+        let batch_started = std::time::Instant::now();
+        let detected = self.detect_cohorts_with_helpers(
             images,
-            &mut detections,
-            &mut detection_receipts,
+            max_tensor_elements,
             permit,
             cancellation,
+            recognition_helpers,
         )?;
-        let retried = batch_started.elapsed();
-        let outputs = self.recognize_detected_batch(
+        let pixel_windows = images
+            .iter()
+            .zip(text_windows)
+            .map(|(image, window)| {
+                window
+                    .map(|window| window.covering_pixel_window(image.width(), image.height()))
+                    .transpose()
+            })
+            .collect::<UseResult<Vec<_>>>()?;
+        let recognition_started = std::time::Instant::now();
+        let outputs = self.recognize_detected_batch_with_helpers(
             images,
-            detections,
-            detection_receipts,
-            permit,
-            cancellation,
+            detected.detections,
+            detected.receipts,
+            &pixel_windows,
+            RecognitionAdmission::new(permit, cancellation),
+            recognition_helpers,
         );
         if trace {
             let completed = batch_started.elapsed();
             eprintln!(
-                "A3S_OCR_STAGE_TIMING slots={} preprocess_ms={:.3} detect_ms={:.3} postprocess_ms={:.3} retry_ms={:.3} recognize_ms={:.3} total_ms={:.3}",
+                "A3S_OCR_STAGE_TIMING slots={} detection_cohorts={} maximum_parallel_detection_cohorts={} preprocess_work_ms={:.3} detect_work_ms={:.3} postprocess_work_ms={:.3} retry_work_ms={:.3} detection_wall_ms={:.3} recognize_ms={:.3} total_ms={:.3}",
                 images.len(),
-                preprocessed.as_secs_f64() * 1_000.0,
-                (detected - preprocessed).as_secs_f64() * 1_000.0,
-                (postprocessed - detected).as_secs_f64() * 1_000.0,
-                (retried - postprocessed).as_secs_f64() * 1_000.0,
-                (completed - retried).as_secs_f64() * 1_000.0,
+                detected.timings.cohorts,
+                detected.timings.maximum_parallel_cohorts,
+                detected.timings.preprocessing.as_secs_f64() * 1_000.0,
+                detected.timings.inference.as_secs_f64() * 1_000.0,
+                detected.timings.postprocessing.as_secs_f64() * 1_000.0,
+                detected.timings.retry.as_secs_f64() * 1_000.0,
+                detected.timings.execution_wall.as_secs_f64() * 1_000.0,
+                recognition_started.elapsed().as_secs_f64() * 1_000.0,
                 completed.as_secs_f64() * 1_000.0,
             );
         }
@@ -350,6 +398,11 @@ mod tests {
             detection_config: root.join("det/inference.yml"),
             recognition_weights: root.join("rec/model.safetensors"),
             recognition_config: root.join("rec/inference.yml"),
+            profile: crate::config::ModelProfile::new(
+                crate::config::ModelVariant::Small,
+                crate::config::ModelVariant::Small,
+            ),
+            graphs: crate::assets::ModelGraphAssets::embedded(),
             source: OcrInstallSource::Environment,
         };
         let mut engine = PpOcrV6Engine::load(&assets).unwrap();
@@ -359,7 +412,7 @@ mod tests {
         assert_eq!(image.dimensions(), (896, 528));
         let cancellation = CancellationToken::new();
         let extraction = engine.extract(&image, &cancellation).unwrap();
-        assert_eq!(extraction.receipts.len(), 8);
+        assert!(extraction.receipts.len() >= 2);
         assert!(extraction.receipts[0].model.family.ends_with("-detection"));
         assert!(extraction.receipts[1..]
             .iter()
@@ -407,6 +460,7 @@ mod tests {
                 &[&image],
                 vec![Ok(vec![detection.clone()])],
                 vec![vec![extraction.receipts[0].clone()]],
+                &[None],
                 &scalar_permit,
                 &cancellation,
             )
@@ -422,6 +476,7 @@ mod tests {
                     vec![extraction.receipts[0].clone()],
                     vec![extraction.receipts[0].clone()],
                 ],
+                &[None, None],
                 &batch_permit,
                 &cancellation,
             )

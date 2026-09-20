@@ -395,6 +395,7 @@ mod tests {
 
     fn detection_config() -> DetectionConfig {
         DetectionConfig {
+            model_variant: crate::config::ModelVariant::Small,
             scale: 1.0 / 255.0,
             mean: [0.485, 0.456, 0.406],
             std: [0.229, 0.224, 0.225],
@@ -408,6 +409,7 @@ mod tests {
     #[test]
     fn ctc_decoder_removes_blanks_and_repeated_classes() {
         let config = RecognitionConfig {
+            model_variant: crate::config::ModelVariant::Small,
             channels: 3,
             height: 48,
             default_width: 320,
@@ -438,6 +440,7 @@ mod tests {
     #[test]
     fn projected_ctc_decoder_rejects_nonfinite_source_markers_and_class_indices() {
         let config = RecognitionConfig {
+            model_variant: crate::config::ModelVariant::Small,
             channels: 3,
             height: 48,
             default_width: 320,

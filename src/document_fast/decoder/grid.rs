@@ -2,17 +2,16 @@ use std::collections::BTreeSet;
 
 use a3s_use_core::{UseError, UseResult};
 
-use super::{DecodedCell, DecodedStructure};
+use super::{DecodedCell, DecodedStructure, StructureToken};
 
 const MAX_CELLS: usize = 4_096;
-const MAX_SPAN: u32 = 20;
 
 #[derive(Debug, Clone)]
 pub(crate) struct StructureGrid {
     pub(crate) row_count: u32,
     pub(crate) column_count: u32,
     pub(crate) cells: Vec<GridCell>,
-    pub(crate) confidence: f32,
+    pub(crate) confidence: Option<f32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,11 +81,11 @@ pub(super) fn project(decoded: DecodedStructure) -> UseResult<StructureGrid> {
         row_count,
         column_count,
         cells,
-        confidence: decoded.confidence,
+        confidence: Some(decoded.confidence),
     })
 }
 
-fn parse_rows(tokens: &[String], cells: &[DecodedCell]) -> UseResult<Vec<Vec<RawCell>>> {
+fn parse_rows(tokens: &[StructureToken], cells: &[DecodedCell]) -> UseResult<Vec<Vec<RawCell>>> {
     let mut rows = Vec::new();
     let mut current_row: Option<Vec<RawCell>> = None;
     let mut pending: Option<RawCell> = None;
@@ -101,15 +100,15 @@ fn parse_rows(tokens: &[String], cells: &[DecodedCell]) -> UseResult<Vec<Vec<Raw
         ));
     }
 
-    for (position, token) in tokens.iter().enumerate() {
-        match token.as_str() {
-            "<tr>" => {
+    for (position, token) in tokens.iter().copied().enumerate() {
+        match token {
+            StructureToken::RowStart => {
                 if current_row.is_some() || pending.is_some() {
                     return Err(grid_error("SLANet-Plus produced nested table rows."));
                 }
                 current_row = Some(Vec::new());
             }
-            "</tr>" => {
+            StructureToken::RowEnd => {
                 if pending.is_some() {
                     return Err(grid_error(
                         "SLANet-Plus ended a row inside a spanning cell token.",
@@ -120,7 +119,7 @@ fn parse_rows(tokens: &[String], cells: &[DecodedCell]) -> UseResult<Vec<Vec<Raw
                     .ok_or_else(|| grid_error("SLANet-Plus ended an unopened table row."))?;
                 rows.push(row);
             }
-            "<td></td>" => {
+            StructureToken::EmptyCell => {
                 let row = current_row
                     .as_mut()
                     .ok_or_else(|| grid_error("SLANet-Plus emitted a cell outside a table row."))?;
@@ -130,7 +129,7 @@ fn parse_rows(tokens: &[String], cells: &[DecodedCell]) -> UseResult<Vec<Vec<Raw
                     quad: take_quad(cells, &mut cell_cursor, position)?,
                 });
             }
-            "<td" => {
+            StructureToken::CellStart => {
                 if current_row.is_none() || pending.is_some() {
                     return Err(grid_error(
                         "SLANet-Plus emitted an invalid spanning-cell start.",
@@ -142,14 +141,14 @@ fn parse_rows(tokens: &[String], cells: &[DecodedCell]) -> UseResult<Vec<Vec<Raw
                     quad: take_quad(cells, &mut cell_cursor, position)?,
                 });
             }
-            ">" => {
+            StructureToken::CellDelimiter => {
                 if pending.is_none() {
                     return Err(grid_error(
                         "SLANet-Plus emitted a cell delimiter without a cell.",
                     ));
                 }
             }
-            "</td>" => {
+            StructureToken::CellEnd => {
                 let cell = pending
                     .take()
                     .ok_or_else(|| grid_error("SLANet-Plus ended an unopened spanning cell."))?;
@@ -158,18 +157,26 @@ fn parse_rows(tokens: &[String], cells: &[DecodedCell]) -> UseResult<Vec<Vec<Raw
                     .ok_or_else(|| grid_error("SLANet-Plus cell lost its table row."))?
                     .push(cell);
             }
-            _ => {
-                if let Some(span) = parse_span(token, " colspan=\"")? {
-                    let cell = pending
-                        .as_mut()
-                        .ok_or_else(|| grid_error("SLANet-Plus emitted colspan outside a cell."))?;
-                    cell.column_span = span;
-                } else if let Some(span) = parse_span(token, " rowspan=\"")? {
-                    let cell = pending
-                        .as_mut()
-                        .ok_or_else(|| grid_error("SLANet-Plus emitted rowspan outside a cell."))?;
-                    cell.row_span = span;
-                }
+            StructureToken::ColumnSpan(span) => {
+                let cell = pending
+                    .as_mut()
+                    .ok_or_else(|| grid_error("SLANet-Plus emitted colspan outside a cell."))?;
+                cell.column_span = span;
+            }
+            StructureToken::RowSpan(span) => {
+                let cell = pending
+                    .as_mut()
+                    .ok_or_else(|| grid_error("SLANet-Plus emitted rowspan outside a cell."))?;
+                cell.row_span = span;
+            }
+            StructureToken::TableHeadStart
+            | StructureToken::TableHeadEnd
+            | StructureToken::TableBodyStart
+            | StructureToken::TableBodyEnd => {}
+            StructureToken::StartOfSequence | StructureToken::EndOfSequence => {
+                return Err(grid_error(
+                    "SLANet-Plus emitted a control token inside its decoded structure.",
+                ));
             }
         }
     }
@@ -196,24 +203,6 @@ fn take_quad(
     }
     *cursor += 1;
     Ok(cell.quad)
-}
-
-fn parse_span(token: &str, prefix: &str) -> UseResult<Option<u32>> {
-    let Some(value) = token
-        .strip_prefix(prefix)
-        .and_then(|value| value.strip_suffix('"'))
-    else {
-        return Ok(None);
-    };
-    let span = value
-        .parse::<u32>()
-        .map_err(|_| grid_error("SLANet-Plus emitted a non-numeric table span."))?;
-    if !(1..=MAX_SPAN).contains(&span) {
-        return Err(grid_error(format!(
-            "SLANet-Plus table spans must be between 1 and {MAX_SPAN}."
-        )));
-    }
-    Ok(Some(span))
 }
 
 fn occupied(cells: &[GridCell], row: u32, column: u32) -> bool {
@@ -245,25 +234,25 @@ fn grid_error(message: impl Into<String>) -> UseError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::document_fast::decoder::dictionary::StructureToken;
 
     #[test]
     fn merged_cells_reserve_future_grid_slots() {
         let decoded = DecodedStructure {
             tokens: [
-                "<tbody>",
-                "<tr>",
-                "<td",
-                " rowspan=\"2\"",
-                ">",
-                "</td>",
-                "<td></td>",
-                "</tr>",
-                "<tr>",
-                "<td></td>",
-                "</tr>",
-                "</tbody>",
+                StructureToken::TableBodyStart,
+                StructureToken::RowStart,
+                StructureToken::CellStart,
+                StructureToken::RowSpan(2),
+                StructureToken::CellDelimiter,
+                StructureToken::CellEnd,
+                StructureToken::EmptyCell,
+                StructureToken::RowEnd,
+                StructureToken::RowStart,
+                StructureToken::EmptyCell,
+                StructureToken::RowEnd,
+                StructureToken::TableBodyEnd,
             ]
-            .map(str::to_string)
             .to_vec(),
             cells: vec![
                 DecodedCell {
@@ -296,7 +285,7 @@ mod tests {
     #[test]
     fn malformed_cell_stream_is_not_publishable() {
         let decoded = DecodedStructure {
-            tokens: vec!["<tr>".to_string(), "<td".to_string()],
+            tokens: vec![StructureToken::RowStart, StructureToken::CellStart],
             cells: vec![DecodedCell {
                 token_position: 1,
                 quad: None,

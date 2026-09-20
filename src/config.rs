@@ -8,9 +8,74 @@ use serde_yaml::Value;
 pub(crate) const MODEL_FAMILY: &str = "PP-OCRv6_small";
 pub(crate) const DETECTION_MODEL: &str = "PP-OCRv6_small_det";
 pub(crate) const RECOGNITION_MODEL: &str = "PP-OCRv6_small_rec";
+const TINY_MODEL_FAMILY: &str = "PP-OCRv6_tiny";
+const TINY_DETECTION_MODEL: &str = "PP-OCRv6_tiny_det";
+const TINY_RECOGNITION_MODEL: &str = "PP-OCRv6_tiny_rec";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ModelVariant {
+    Small,
+    Tiny,
+}
+
+impl ModelVariant {
+    fn from_detection_model(value: &str) -> Option<Self> {
+        match value {
+            DETECTION_MODEL => Some(Self::Small),
+            TINY_DETECTION_MODEL => Some(Self::Tiny),
+            _ => None,
+        }
+    }
+
+    fn from_recognition_model(value: &str) -> Option<Self> {
+        match value {
+            RECOGNITION_MODEL => Some(Self::Small),
+            TINY_RECOGNITION_MODEL => Some(Self::Tiny),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ModelProfile {
+    pub(crate) detection: ModelVariant,
+    pub(crate) recognition: ModelVariant,
+}
+
+impl ModelProfile {
+    pub(crate) const fn new(detection: ModelVariant, recognition: ModelVariant) -> Self {
+        Self {
+            detection,
+            recognition,
+        }
+    }
+
+    pub(crate) const fn family(self) -> &'static str {
+        match (self.detection, self.recognition) {
+            (ModelVariant::Small, ModelVariant::Small) => MODEL_FAMILY,
+            (ModelVariant::Tiny, ModelVariant::Tiny) => TINY_MODEL_FAMILY,
+            (ModelVariant::Small, ModelVariant::Tiny) => "PP-OCRv6_small_det+tiny_rec",
+            (ModelVariant::Tiny, ModelVariant::Small) => "PP-OCRv6_tiny_det+small_rec",
+        }
+    }
+
+    pub(crate) const fn execution_family(self) -> &'static str {
+        match (self.detection, self.recognition) {
+            (ModelVariant::Small, ModelVariant::Small) => "pp-ocr-v6-small",
+            (ModelVariant::Tiny, ModelVariant::Tiny) => "pp-ocr-v6-tiny",
+            (ModelVariant::Small, ModelVariant::Tiny) => {
+                "pp-ocr-v6-small-detection-tiny-recognition"
+            }
+            (ModelVariant::Tiny, ModelVariant::Small) => {
+                "pp-ocr-v6-tiny-detection-small-recognition"
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct DetectionConfig {
+    pub(crate) model_variant: ModelVariant,
     pub(crate) scale: f32,
     pub(crate) mean: [f32; 3],
     pub(crate) std: [f32; 3],
@@ -22,6 +87,7 @@ pub(crate) struct DetectionConfig {
 
 #[derive(Debug, Clone)]
 pub(crate) struct RecognitionConfig {
+    pub(crate) model_variant: ModelVariant,
     pub(crate) channels: usize,
     pub(crate) height: usize,
     pub(crate) default_width: usize,
@@ -66,12 +132,13 @@ struct RawPostProcess {
 
 pub(crate) fn load_detection(path: &Path) -> UseResult<DetectionConfig> {
     let raw = load(path)?;
-    if raw.global.model_name != DETECTION_MODEL {
-        return Err(config_error(format!(
-            "Expected detection model '{DETECTION_MODEL}', found '{}'.",
-            raw.global.model_name
-        )));
-    }
+    let model_variant =
+        ModelVariant::from_detection_model(&raw.global.model_name).ok_or_else(|| {
+            config_error(format!(
+                "Unsupported PP-OCRv6 detection model '{}'.",
+                raw.global.model_name
+            ))
+        })?;
     if raw.post_process.name != "DBPostProcess" {
         return Err(config_error(format!(
             "Expected DBPostProcess, found '{}'.",
@@ -92,6 +159,7 @@ pub(crate) fn load_detection(path: &Path) -> UseResult<DetectionConfig> {
         ));
     }
     Ok(DetectionConfig {
+        model_variant,
         scale,
         mean,
         std,
@@ -104,12 +172,13 @@ pub(crate) fn load_detection(path: &Path) -> UseResult<DetectionConfig> {
 
 pub(crate) fn load_recognition(path: &Path) -> UseResult<RecognitionConfig> {
     let raw = load(path)?;
-    if raw.global.model_name != RECOGNITION_MODEL {
-        return Err(config_error(format!(
-            "Expected recognition model '{RECOGNITION_MODEL}', found '{}'.",
-            raw.global.model_name
-        )));
-    }
+    let model_variant =
+        ModelVariant::from_recognition_model(&raw.global.model_name).ok_or_else(|| {
+            config_error(format!(
+                "Unsupported PP-OCRv6 recognition model '{}'.",
+                raw.global.model_name
+            ))
+        })?;
     if raw.post_process.name != "CTCLabelDecode" {
         return Err(config_error(format!(
             "Expected CTCLabelDecode, found '{}'.",
@@ -147,6 +216,7 @@ pub(crate) fn load_recognition(path: &Path) -> UseResult<RecognitionConfig> {
         )));
     }
     Ok(RecognitionConfig {
+        model_variant,
         channels: dimensions[0],
         height: dimensions[1],
         default_width: dimensions[2],
@@ -256,5 +326,21 @@ mod tests {
     fn parses_fractional_detection_scale() {
         let value = Value::String("1./255.".to_string());
         assert!((parse_scale(&value).unwrap() - 1.0 / 255.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn model_profile_identity_binds_each_independent_model_role() {
+        assert_eq!(
+            ModelProfile::new(ModelVariant::Small, ModelVariant::Tiny).family(),
+            "PP-OCRv6_small_det+tiny_rec"
+        );
+        assert_eq!(
+            ModelProfile::new(ModelVariant::Tiny, ModelVariant::Small).execution_family(),
+            "pp-ocr-v6-tiny-detection-small-recognition"
+        );
+        assert_ne!(
+            ModelProfile::new(ModelVariant::Small, ModelVariant::Tiny).execution_family(),
+            ModelProfile::new(ModelVariant::Tiny, ModelVariant::Small).execution_family()
+        );
     }
 }

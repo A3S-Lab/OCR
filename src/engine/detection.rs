@@ -1,17 +1,72 @@
-use a3s_power::inference::{ExecutionPermit, ExecutionReceipt, TensorOutput};
+use std::ops::Range;
+use std::time::{Duration, Instant};
+
+use a3s_power::inference::{ExecutionPermit, ExecutionReceipt, RuntimeDeviceKind, TensorOutput};
 use a3s_use_core::UseResult;
 use image::RgbImage;
+use rayon::prelude::*;
 use tokio_util::sync::CancellationToken;
 
+use super::scheduling::{
+    available_execution_workers, can_append_execution_job, cpu_execution_window_policy,
+};
 use super::{engine_error, PpOcrV6Engine};
 use crate::cancellation::check_cancelled;
 use crate::config::DetectionConfig;
 use crate::postprocess::{detection_boxes_in_content, Detection};
 use crate::preprocess::{
-    detection_input_with_max_side, DetectionGeometry, DETECTION_QUALITY_MAX_SIDE,
+    detection_batch_input, detection_input_with_max_side, DetectionGeometry,
+    DETECTION_QUALITY_MAX_SIDE,
 };
 
 const QUALITY_RETRY_MIN_CHANNEL_RANGE: u8 = 32;
+
+mod planning;
+
+use planning::detection_cohort_peak_elements;
+pub(crate) use planning::detection_cohort_ranges;
+
+pub(super) struct DetectedBatch {
+    pub(super) detections: Vec<UseResult<Vec<Detection>>>,
+    pub(super) receipts: Vec<Vec<ExecutionReceipt>>,
+    pub(super) timings: DetectionTimings,
+}
+
+#[derive(Default)]
+pub(super) struct DetectionTimings {
+    pub(super) cohorts: usize,
+    pub(super) preprocessing: Duration,
+    pub(super) inference: Duration,
+    pub(super) postprocessing: Duration,
+    pub(super) retry: Duration,
+    pub(super) execution_wall: Duration,
+    pub(super) maximum_parallel_cohorts: usize,
+}
+
+struct DetectedCohort {
+    detections: Vec<UseResult<Vec<Detection>>>,
+    receipts: Vec<Vec<ExecutionReceipt>>,
+    timings: DetectionTimings,
+}
+
+enum DetectionLanePermit<'a> {
+    Primary(&'a ExecutionPermit),
+    Helper(ExecutionPermit),
+}
+
+impl DetectionLanePermit<'_> {
+    fn as_ref(&self) -> &ExecutionPermit {
+        match self {
+            Self::Primary(permit) => permit,
+            Self::Helper(permit) => permit,
+        }
+    }
+}
+
+struct DetectionLane<'a> {
+    engine: &'a PpOcrV6Engine,
+    permit: DetectionLanePermit<'a>,
+}
 
 pub(super) fn postprocess_batch(
     inputs: Vec<DetectionGeometry>,
@@ -105,6 +160,198 @@ fn postprocess_one(
 }
 
 impl PpOcrV6Engine {
+    #[cfg(test)]
+    pub(super) fn detect_cohorts(
+        &self,
+        images: &[&RgbImage],
+        max_tensor_elements: usize,
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<DetectedBatch> {
+        self.detect_cohorts_with_helpers(images, max_tensor_elements, permit, cancellation, &[])
+    }
+
+    pub(super) fn detect_cohorts_with_helpers(
+        &self,
+        images: &[&RgbImage],
+        max_tensor_elements: usize,
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+        helpers: &[&Self],
+    ) -> UseResult<DetectedBatch> {
+        let ranges = execution_cohort_ranges(
+            detection_cohort_ranges(images, max_tensor_elements)?,
+            self.native.runtime_device_kind(),
+        );
+        let jobs = ranges
+            .into_iter()
+            .map(|range| {
+                let reservation = detection_cohort_peak_elements(&images[range.clone()])?;
+                Ok((range, reservation))
+            })
+            .collect::<UseResult<Vec<_>>>()?;
+        let base_policy = cpu_execution_window_policy(
+            self.native.runtime_device_kind(),
+            available_execution_workers(),
+            self.native.maximum_tensor_elements(),
+        );
+        let mut detections = Vec::with_capacity(images.len());
+        let mut receipts = Vec::with_capacity(images.len());
+        let mut timings = DetectionTimings::default();
+        let mut start = 0_usize;
+        while start < jobs.len() {
+            check_cancelled(cancellation)?;
+            let lanes = self.detection_lanes(
+                permit,
+                helpers,
+                jobs.len().saturating_sub(start),
+                cancellation,
+            );
+            let mut policy = base_policy;
+            if self.native.runtime_device_kind() != RuntimeDeviceKind::Cpu {
+                policy.maximum_parallel_jobs = lanes.len().max(1);
+            }
+            let mut end = start;
+            let mut reserved_elements = 0_usize;
+            while let Some((_, next_reservation)) = jobs.get(end) {
+                if !can_append_execution_job(
+                    end - start,
+                    reserved_elements,
+                    *next_reservation,
+                    policy,
+                ) {
+                    break;
+                }
+                reserved_elements = reserved_elements.saturating_add(*next_reservation);
+                end += 1;
+            }
+            let window = &jobs[start..end];
+            let execution_started = Instant::now();
+            let completed = if window.len() == 1 {
+                vec![self.detect_cohort(&images[window[0].0.clone()], permit, cancellation)]
+            } else if self.native.runtime_device_kind() != RuntimeDeviceKind::Cpu {
+                lanes
+                    .into_par_iter()
+                    .zip(window.par_iter())
+                    .map(|(lane, (range, _))| {
+                        lane.engine.detect_cohort(
+                            &images[range.clone()],
+                            lane.permit.as_ref(),
+                            cancellation,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                window
+                    .par_iter()
+                    .map(|(range, _)| {
+                        self.detect_cohort(&images[range.clone()], permit, cancellation)
+                    })
+                    .collect::<Vec<_>>()
+            };
+            timings.execution_wall += execution_started.elapsed();
+            timings.maximum_parallel_cohorts = timings.maximum_parallel_cohorts.max(window.len());
+            check_cancelled(cancellation)?;
+            for ((range, _), completed) in window.iter().zip(completed) {
+                match completed {
+                    Ok(detected) => {
+                        timings.include(&detected.timings);
+                        detections.extend(detected.detections);
+                        receipts.extend(detected.receipts);
+                    }
+                    Err(error) => {
+                        timings.cohorts += 1;
+                        detections.extend((0..range.len()).map(|_| Err(error.clone())));
+                        receipts.extend((0..range.len()).map(|_| Vec::new()));
+                    }
+                }
+            }
+            start = end;
+        }
+        if detections.len() != images.len() || receipts.len() != images.len() {
+            return Err(engine_error(
+                "use.ocr.provider_output_invalid",
+                "PP-OCRv6 detection cohorts changed exact batch cardinality.",
+            ));
+        }
+        Ok(DetectedBatch {
+            detections,
+            receipts,
+            timings,
+        })
+    }
+
+    fn detection_lanes<'a>(
+        &'a self,
+        permit: &'a ExecutionPermit,
+        helpers: &[&'a Self],
+        remaining_jobs: usize,
+        cancellation: &CancellationToken,
+    ) -> Vec<DetectionLane<'a>> {
+        let mut lanes = vec![DetectionLane {
+            engine: self,
+            permit: DetectionLanePermit::Primary(permit),
+        }];
+        if self.native.runtime_device_kind() == RuntimeDeviceKind::Cpu || remaining_jobs < 2 {
+            return lanes;
+        }
+        for helper in helpers {
+            if lanes.iter().any(|lane| std::ptr::eq(lane.engine, *helper)) {
+                continue;
+            }
+            if let Ok(helper_permit) = helper.native.begin(cancellation) {
+                lanes.push(DetectionLane {
+                    engine: helper,
+                    permit: DetectionLanePermit::Helper(helper_permit),
+                });
+            }
+        }
+        lanes
+    }
+
+    fn detect_cohort(
+        &self,
+        images: &[&RgbImage],
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<DetectedCohort> {
+        let started = Instant::now();
+        let input = detection_batch_input(images, &self.detection_config)?;
+        let preprocessed = started.elapsed();
+        let detection = self
+            .native
+            .detect_batch(input.data, input.shape, permit, cancellation)?;
+        let inferred = started.elapsed();
+        if detection.tensor.shape.first() != Some(&images.len())
+            || input.geometries.len() != images.len()
+        {
+            return Err(engine_error(
+                "use.ocr.provider_output_invalid",
+                "PP-OCRv6 detection changed exact cohort cardinality.",
+            ));
+        }
+        let mut detections =
+            postprocess_batch(input.geometries, detection.tensor, &self.detection_config)?;
+        check_cancelled(cancellation)?;
+        let postprocessed = started.elapsed();
+        let mut receipts = vec![vec![detection.receipt]; images.len()];
+        self.retry_empty_detections(images, &mut detections, &mut receipts, permit, cancellation)?;
+        let retried = started.elapsed();
+        Ok(DetectedCohort {
+            detections,
+            receipts,
+            timings: DetectionTimings {
+                cohorts: 1,
+                preprocessing: preprocessed,
+                inference: inferred - preprocessed,
+                postprocessing: postprocessed - inferred,
+                retry: retried - postprocessed,
+                execution_wall: Duration::ZERO,
+                maximum_parallel_cohorts: 0,
+            },
+        })
+    }
+
     pub(super) fn retry_empty_detections(
         &self,
         images: &[&RgbImage],
@@ -162,6 +409,29 @@ impl PpOcrV6Engine {
     }
 }
 
+fn execution_cohort_ranges(
+    ranges: Vec<Range<usize>>,
+    device: RuntimeDeviceKind,
+) -> Vec<Range<usize>> {
+    if device != RuntimeDeviceKind::Cpu {
+        return ranges;
+    }
+    ranges
+        .into_iter()
+        .flat_map(|range| range.map(|index| index..index + 1))
+        .collect()
+}
+
+impl DetectionTimings {
+    fn include(&mut self, other: &Self) {
+        self.cohorts += other.cohorts;
+        self.preprocessing += other.preprocessing;
+        self.inference += other.inference;
+        self.postprocessing += other.postprocessing;
+        self.retry += other.retry;
+    }
+}
+
 fn should_retry_for_quality(image: &RgbImage, detections: &UseResult<Vec<Detection>>) -> bool {
     detections.as_ref().is_ok_and(Vec::is_empty) && image_has_visual_variation(image)
 }
@@ -189,6 +459,7 @@ mod tests {
 
     fn config() -> DetectionConfig {
         DetectionConfig {
+            model_variant: crate::config::ModelVariant::Small,
             scale: 1.0 / 255.0,
             mean: [0.485, 0.456, 0.406],
             std: [0.229, 0.224, 0.225],
@@ -197,6 +468,20 @@ mod tests {
             max_candidates: 1_000,
             unclip_ratio: 1.5,
         }
+    }
+
+    #[test]
+    fn cpu_detection_executes_independent_pages_while_accelerators_keep_batches() {
+        let planned = vec![0..4, 4..6];
+
+        assert_eq!(
+            execution_cohort_ranges(planned.clone(), RuntimeDeviceKind::Cpu),
+            vec![0..1, 1..2, 2..3, 3..4, 4..5, 5..6]
+        );
+        assert_eq!(
+            execution_cohort_ranges(planned.clone(), RuntimeDeviceKind::Cuda),
+            planned
+        );
     }
 
     fn detection_geometry(side: usize) -> DetectionGeometry {

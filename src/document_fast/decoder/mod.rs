@@ -5,12 +5,14 @@ mod weights;
 use a3s_use_core::{UseError, UseResult};
 use tokio_util::sync::CancellationToken;
 
-use self::dictionary::StructureDictionary;
+use self::dictionary::{StructureDictionary, StructureToken};
+pub(super) use self::grid::GridCell;
 pub(super) use self::grid::StructureGrid;
 use self::weights::{
     DecoderWeights, CONTEXT_WIDTH, ENCODER_STEPS, HIDDEN_WIDTH, LOCATION_WIDTH, MAX_TOKENS,
     VOCABULARY_SIZE,
 };
+use super::orientation::TableCropOrientation;
 use super::wired::PixelRect;
 
 const MAX_REPEATED_TOKEN_RUN: usize = 96;
@@ -35,6 +37,7 @@ impl SlanetPlusDecoder {
         &self,
         features: &[f32],
         crop: PixelRect,
+        orientation: TableCropOrientation,
         cancellation: &CancellationToken,
     ) -> UseResult<DecodedStructure> {
         if features.len() != ENCODER_STEPS * CONTEXT_WIDTH
@@ -126,9 +129,10 @@ impl SlanetPlusDecoder {
 
             if best != self.dictionary.sos() {
                 let token_position = tokens.len();
-                tokens.push(self.dictionary.token(best)?.to_string());
+                let token = self.dictionary.token(best)?;
+                tokens.push(token);
                 confidence_sum += confidence;
-                if self.dictionary.is_cell(best) {
+                if token.carries_cell_geometry() {
                     matrix_vector_input_output(
                         &scratch.hidden,
                         &self.weights.location_hidden,
@@ -147,7 +151,7 @@ impl SlanetPlusDecoder {
                     );
                     cells.push(DecodedCell {
                         token_position,
-                        quad: project_quad(&scratch.location_logits, crop),
+                        quad: project_quad(&scratch.location_logits, crop, orientation),
                     });
                 }
             }
@@ -169,7 +173,7 @@ impl SlanetPlusDecoder {
 }
 
 pub(super) struct DecodedStructure {
-    pub(super) tokens: Vec<String>,
+    pub(super) tokens: Vec<StructureToken>,
     pub(super) cells: Vec<DecodedCell>,
     pub(super) confidence: f32,
 }
@@ -387,17 +391,24 @@ fn top_probability(logits: &[f32]) -> UseResult<(usize, f32)> {
     Ok((best, 1.0 / denominator))
 }
 
-fn project_quad(logits: &[f32], crop: PixelRect) -> Option<[u32; 8]> {
-    let scale = crop.width.max(crop.height) as f32;
+fn project_quad(
+    logits: &[f32],
+    crop: PixelRect,
+    orientation: TableCropOrientation,
+) -> Option<[u32; 8]> {
+    let (oriented_width, oriented_height) = orientation.oriented_dimensions(crop);
+    let scale = oriented_width.max(oriented_height) as f32;
     let mut quad = [0_u32; 8];
-    for (index, logit) in logits.iter().enumerate() {
-        let limit = if index % 2 == 0 {
-            crop.width
-        } else {
-            crop.height
-        };
-        let local = (sigmoid(*logit) * scale).trunc().clamp(0.0, limit as f32) as u32;
-        quad[index] = local + if index % 2 == 0 { crop.x } else { crop.y };
+    for (point_index, point_logits) in logits.chunks_exact(2).enumerate() {
+        let oriented_x = (sigmoid(point_logits[0]) * scale)
+            .trunc()
+            .clamp(0.0, oriented_width as f32) as u32;
+        let oriented_y = (sigmoid(point_logits[1]) * scale)
+            .trunc()
+            .clamp(0.0, oriented_height as f32) as u32;
+        let (source_x, source_y) = orientation.source_boundary_point(crop, oriented_x, oriented_y);
+        quad[point_index * 2] = source_x;
+        quad[point_index * 2 + 1] = source_y;
     }
     let left = quad.iter().step_by(2).copied().min()?;
     let right = quad.iter().step_by(2).copied().max()?;
@@ -438,8 +449,25 @@ mod tests {
                 width: 200,
                 height: 100,
             },
+            TableCropOrientation::Upright,
         )
         .unwrap();
         assert_eq!(projected, [210, 120, 210, 20, 10, 20, 10, 120]);
+    }
+
+    #[test]
+    fn rotated_quad_is_mapped_back_to_the_exact_source_crop() {
+        let projected = project_quad(
+            &[100.0, 100.0, 100.0, -100.0, -100.0, -100.0, -100.0, 100.0],
+            PixelRect {
+                x: 10,
+                y: 20,
+                width: 200,
+                height: 100,
+            },
+            TableCropOrientation::Rotate90,
+        )
+        .unwrap();
+        assert_eq!(projected, [210, 20, 10, 20, 10, 120, 210, 120]);
     }
 }

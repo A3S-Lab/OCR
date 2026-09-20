@@ -1,27 +1,20 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use a3s_use_core::{UseError, UseResult};
 use sha2::{Digest, Sha256};
 
-pub(super) const MODEL_FAMILY: &str = "picodet-l-layout-3cls";
-pub(super) const MODEL_REVISION: &str = "paddleocr-paddle3-reviewed-v1";
-pub(super) const SOURCE_GRAPH_SHA256: &str =
-    "9df09659ed993444d068cc41b8b3e69306890b79c2af6f674d4111ab86e845da";
-pub(super) const GRAPH_SHA256: &str =
-    "6903f703d263e965d82bd0327f51dceb3f787ffff0b9411960a551f1f8119bd5";
-pub(super) const WEIGHTS_FILE_SHA256: &str =
-    "88c2d62f5ad48ff0487d0dc86e347f45ca369746cb8e0c8693ed9ecf1cb7fc9e";
-pub(super) const WEIGHTS_COLLECTION_SHA256: &str =
-    "361452be560223a2a4799026f92bf6ed2612f7a6d9abf8db4679a806e5eab965";
+use super::profile::PicodetLayoutProfile;
 
-const WEIGHTS_BYTES: u64 = 23_361_700;
 const MODEL_ENV: &str = "A3S_OCR_PICODET_LAYOUT_MODEL_DIR";
 
 #[derive(Debug, Clone)]
 pub(super) struct PicodetLayoutAssets {
+    pub(super) profile: PicodetLayoutProfile,
     pub(super) root: PathBuf,
     pub(super) weights: PathBuf,
+    pub(super) graph: Arc<str>,
 }
 
 impl PicodetLayoutAssets {
@@ -52,22 +45,34 @@ impl PicodetLayoutAssets {
                 root.display()
             ))
         })?;
-        let weights = checked_asset(
-            &root,
-            "model.safetensors",
-            WEIGHTS_BYTES,
-            WEIGHTS_FILE_SHA256,
-        )?;
-        Ok(Self { root, weights })
+        let weights = resolved_asset(&root, "model.safetensors")?;
+        let metadata = std::fs::metadata(&weights).map_err(|error| {
+            model_error(format!(
+                "Failed to inspect PicoDet layout asset '{}': {error}",
+                weights.display()
+            ))
+        })?;
+        let actual_sha256 = file_sha256(&weights)?;
+        let profile = PicodetLayoutProfile::from_weight_identity(metadata.len(), &actual_sha256)
+            .ok_or_else(|| {
+                model_error(format!(
+                    "PicoDet layout asset '{}' is not an exact reviewed model artifact.",
+                    weights.display()
+                ))
+                .with_detail("actualBytes", metadata.len())
+                .with_detail("actualSha256", actual_sha256)
+            })?;
+        let graph = Arc::<str>::from(profile.embedded_graph());
+        Ok(Self {
+            profile,
+            root,
+            weights,
+            graph,
+        })
     }
 }
 
-fn checked_asset(
-    root: &Path,
-    relative: &str,
-    expected_bytes: u64,
-    expected_sha256: &str,
-) -> UseResult<PathBuf> {
+fn resolved_asset(root: &Path, relative: &str) -> UseResult<PathBuf> {
     let requested = root.join(relative);
     let canonical = std::fs::canonicalize(&requested).map_err(|error| {
         model_error(format!(
@@ -87,20 +92,11 @@ fn checked_asset(
             canonical.display()
         ))
     })?;
-    if !metadata.is_file() || metadata.len() != expected_bytes {
+    if !metadata.is_file() || metadata.len() == 0 {
         return Err(model_error(format!(
-            "PicoDet layout asset '{}' must be a regular file of exactly {expected_bytes} bytes.",
+            "PicoDet layout asset '{}' must be a non-empty regular file.",
             canonical.display()
         )));
-    }
-    let actual_sha256 = file_sha256(&canonical)?;
-    if actual_sha256 != expected_sha256 {
-        return Err(model_error(format!(
-            "PicoDet layout asset '{}' failed its pinned SHA-256 check.",
-            canonical.display()
-        ))
-        .with_detail("expectedSha256", expected_sha256)
-        .with_detail("actualSha256", actual_sha256));
     }
     Ok(canonical)
 }
@@ -145,11 +141,20 @@ mod tests {
         };
         let assets = PicodetLayoutAssets::from_root(Path::new(&root)).unwrap();
         assert!(assets.weights.ends_with("model.safetensors"));
+        assert!(PicodetLayoutProfile::ALL.contains(&assets.profile));
     }
 
     #[test]
     fn incomplete_bundle_is_rejected() {
         let directory = tempfile::tempdir().unwrap();
+        let error = PicodetLayoutAssets::from_root(directory.path()).unwrap_err();
+        assert_eq!(error.code, "use.ocr.seal_model_invalid");
+    }
+
+    #[test]
+    fn unreviewed_weight_identity_is_rejected() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("model.safetensors"), b"unreviewed").unwrap();
         let error = PicodetLayoutAssets::from_root(directory.path()).unwrap_err();
         assert_eq!(error.code, "use.ocr.seal_model_invalid");
     }

@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use a3s_use_core::{UseError, UseResult};
 use sha2::{Digest, Sha256};
 
+use super::initialization::DocumentFastInitializationError;
+
 pub(super) const MODEL_FAMILY: &str = "slanet-plus-wired";
 pub(super) const MODEL_REVISION: &str = "turboocr-models-v3.0.0-ppocrv6";
 pub(super) const ENCODER_SOURCE_SHA256: &str =
@@ -30,20 +32,27 @@ pub(super) struct SlanetPlusAssets {
 }
 
 impl SlanetPlusAssets {
+    #[cfg(test)]
     pub(super) fn from_env() -> UseResult<Self> {
+        Self::from_env_typed().map_err(DocumentFastInitializationError::into_use_error)
+    }
+
+    pub(super) fn from_env_typed() -> Result<Self, DocumentFastInitializationError> {
         let root = std::env::var_os("A3S_OCR_SLANET_PLUS_MODEL_DIR")
             .filter(|value| !value.is_empty())
             .map(PathBuf::from)
             .ok_or_else(|| {
-                UseError::new(
-                    "use.ocr.table_model_missing",
-                    "The pinned SLANet-Plus wired-table model directory is not configured.",
-                )
-                .with_suggestion(
-                    "Set A3S_OCR_SLANET_PLUS_MODEL_DIR to the reviewed local model bundle.",
+                DocumentFastInitializationError::required_model_missing(
+                    UseError::new(
+                        "use.ocr.table_model_missing",
+                        "The pinned SLANet-Plus wired-table model directory is not configured.",
+                    )
+                    .with_suggestion(
+                        "Set A3S_OCR_SLANET_PLUS_MODEL_DIR to the reviewed local model bundle.",
+                    ),
                 )
             })?;
-        Self::from_root(&root)
+        Self::from_root(&root).map_err(DocumentFastInitializationError::configuration_invalid)
     }
 
     pub(super) fn from_root(root: &Path) -> UseResult<Self> {

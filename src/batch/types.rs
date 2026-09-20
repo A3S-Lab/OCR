@@ -10,8 +10,101 @@ use crate::{
     OcrResult, OcrStageEvidence,
 };
 
-pub(super) const MAX_BATCH_SLOTS: usize = 256;
+pub(crate) const MAX_BATCH_SLOTS: usize = 256;
 pub(super) const MAX_BATCH_INPUT_BYTES: u64 = 256 * 1024 * 1024;
+pub const OCR_NORMALIZED_COORDINATE_BASIS: u32 = 1_000_000;
+
+/// One exhaustive Text-stage selection window on the immutable source image.
+/// Coordinates use a fixed 0 through 1,000,000 basis and remain independent
+/// of encoded raster dimensions. A supporting provider must preserve full-
+/// canvas detection, select every detected block whose source bounding box has
+/// positive-area intersection with this window, recognize the whole selected
+/// block, and return its original source-canvas geometry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OcrNormalizedWindow {
+    pub left: u32,
+    pub top: u32,
+    pub right: u32,
+    pub bottom: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct OcrPixelWindow {
+    pub(crate) left: u32,
+    pub(crate) top: u32,
+    pub(crate) right: u32,
+    pub(crate) bottom: u32,
+}
+
+impl OcrNormalizedWindow {
+    pub fn new(left: u32, top: u32, right: u32, bottom: u32) -> UseResult<Self> {
+        let window = Self {
+            left,
+            top,
+            right,
+            bottom,
+        };
+        window.validate()?;
+        Ok(window)
+    }
+
+    pub(crate) fn validate(self) -> UseResult<()> {
+        if self.left >= self.right
+            || self.top >= self.bottom
+            || self.right > OCR_NORMALIZED_COORDINATE_BASIS
+            || self.bottom > OCR_NORMALIZED_COORDINATE_BASIS
+        {
+            return Err(batch_error(
+                "An OCR Text window must cover positive area inside the normalized source canvas.",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn covering_pixel_window(
+        self,
+        width: u32,
+        height: u32,
+    ) -> UseResult<OcrPixelWindow> {
+        self.validate()?;
+        if width == 0 || height == 0 {
+            return Err(batch_error(
+                "An OCR Text window requires a positive source canvas.",
+            ));
+        }
+        let left = scale_floor(self.left, width);
+        let top = scale_floor(self.top, height);
+        let right = scale_ceil(self.right, width)?;
+        let bottom = scale_ceil(self.bottom, height)?;
+        if left >= right || top >= bottom || right > width || bottom > height {
+            return Err(batch_error(
+                "An OCR Text window became invalid on its source canvas.",
+            ));
+        }
+        Ok(OcrPixelWindow {
+            left,
+            top,
+            right,
+            bottom,
+        })
+    }
+}
+
+fn scale_floor(normalized: u32, dimension: u32) -> u32 {
+    let scaled = u64::from(normalized) * u64::from(dimension);
+    u32::try_from(scaled / u64::from(OCR_NORMALIZED_COORDINATE_BASIS)).unwrap_or(dimension)
+}
+
+fn scale_ceil(normalized: u32, dimension: u32) -> UseResult<u32> {
+    let basis = u64::from(OCR_NORMALIZED_COORDINATE_BASIS);
+    let scaled = u64::from(normalized)
+        .checked_mul(u64::from(dimension))
+        .and_then(|value| value.checked_add(basis - 1))
+        .ok_or_else(|| batch_error("An OCR Text-window coordinate overflowed."))?;
+    u32::try_from(scaled / basis)
+        .map_err(|_| batch_error("An OCR Text-window coordinate cannot be represented."))
+}
 
 /// Provider-neutral stages in their canonical execution and evidence order.
 #[derive(
@@ -78,6 +171,11 @@ pub struct OcrBatchSlotRequest {
     pub path: PathBuf,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub adjacent_predecessor_slot_id: Option<OcrBatchSlotId>,
+    /// Optional exhaustive Text selection on the immutable source canvas.
+    /// This does not authorize cropping detection input or clipping a detected
+    /// text block before recognition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_window: Option<OcrNormalizedWindow>,
 }
 
 impl OcrBatchSlotRequest {
@@ -86,6 +184,7 @@ impl OcrBatchSlotRequest {
             slot_id,
             path: path.into(),
             adjacent_predecessor_slot_id: None,
+            text_window: None,
         }
     }
 
@@ -95,6 +194,13 @@ impl OcrBatchSlotRequest {
     /// reconcile the units.
     pub fn with_adjacent_predecessor(mut self, predecessor: OcrBatchSlotId) -> Self {
         self.adjacent_predecessor_slot_id = Some(predecessor);
+        self
+    }
+
+    /// Restrict Text recognition through the provider's declared exhaustive
+    /// source-geometry selection contract.
+    pub fn with_text_window(mut self, window: OcrNormalizedWindow) -> Self {
+        self.text_window = Some(window);
         self
     }
 }
@@ -131,6 +237,14 @@ impl OcrBatchRequest {
         let mut slots = BTreeSet::new();
         for (index, slot) in self.slots.iter().enumerate() {
             slot.slot_id.validate()?;
+            if let Some(window) = slot.text_window {
+                window.validate()?;
+                if !self.stages.contains(&OcrStage::Text) {
+                    return Err(batch_error(
+                        "An OCR Text window requires the Text stage in the same request.",
+                    ));
+                }
+            }
             if !slots.insert(slot.slot_id.as_str()) {
                 return Err(batch_error("OCR batch slot IDs must be unique."));
             }
@@ -230,10 +344,13 @@ impl OcrStageOutcome {
             ));
         }
         let expects_evidence = self.status == OcrStageStatus::Completed
-            && matches!(self.stage, OcrStage::Table | OcrStage::Seal);
+            && matches!(
+                self.stage,
+                OcrStage::Layout | OcrStage::Table | OcrStage::Seal
+            );
         if expects_evidence != self.evidence.is_some() {
             return Err(provider_batch_error(
-                "Completed table or seal stages require typed evidence, while every other stage outcome must not carry it.",
+                "Completed layout, table, or seal stages require typed evidence, while every other stage outcome must not carry it.",
             ));
         }
         if let Some(evidence) = &self.evidence {
@@ -254,6 +371,7 @@ pub struct OcrProviderBatchSlot {
     pub slot_id: OcrBatchSlotId,
     pub input: OcrInput,
     pub adjacent_predecessor_slot_id: Option<OcrBatchSlotId>,
+    pub text_window: Option<OcrNormalizedWindow>,
 }
 
 impl std::fmt::Debug for OcrProviderBatchSlot {
@@ -266,6 +384,7 @@ impl std::fmt::Debug for OcrProviderBatchSlot {
                 "has_adjacent_predecessor",
                 &self.adjacent_predecessor_slot_id.is_some(),
             )
+            .field("has_text_window", &self.text_window.is_some())
             .finish()
     }
 }
@@ -327,6 +446,7 @@ pub struct OcrProviderFingerprint {
     pub engine: String,
     pub sends_source_off_device: bool,
     pub supported_stages: Vec<OcrStage>,
+    pub supports_text_windows: bool,
     pub declaration_sha256: String,
 }
 
@@ -335,7 +455,7 @@ impl OcrProviderFingerprint {
         descriptor.validate()?;
         let supported_stages = descriptor.canonical_stages();
         let mut digest = Sha256::new();
-        digest.update(b"a3s-ocr-provider-fingerprint-v1\0");
+        digest.update(b"a3s-ocr-provider-fingerprint-v2\0");
         update_text(&mut digest, &descriptor.id)?;
         update_text(&mut digest, &descriptor.engine)?;
         digest.update([u8::from(descriptor.sends_source_off_device)]);
@@ -343,11 +463,13 @@ impl OcrProviderFingerprint {
         for stage in &supported_stages {
             digest.update([stage_tag(*stage)]);
         }
+        digest.update([u8::from(descriptor.supports_text_windows)]);
         Ok(Self {
             id: descriptor.id.clone(),
             engine: descriptor.engine.clone(),
             sends_source_off_device: descriptor.sends_source_off_device,
             supported_stages,
+            supports_text_windows: descriptor.supports_text_windows,
             declaration_sha256: format!("{:x}", digest.finalize()),
         })
     }
@@ -435,7 +557,7 @@ pub struct OcrBatchResult {
 }
 
 impl OcrBatchResult {
-    pub const SCHEMA: &'static str = "a3s.ocr.staged-batch.v2";
+    pub const SCHEMA: &'static str = "a3s.ocr.staged-batch.v3";
 }
 
 pub(super) fn slot_status(stages: &[OcrStageOutcome]) -> OcrBatchSlotStatus {
@@ -482,5 +604,41 @@ const fn stage_tag(stage: OcrStage) -> u8 {
         OcrStage::Table => 4,
         OcrStage::Formula => 5,
         OcrStage::Seal => 6,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalized_windows_use_covering_integer_rounding() {
+        let pixels = OcrNormalizedWindow::new(1, 1, 999_999, 999_999)
+            .unwrap()
+            .covering_pixel_window(7, 11)
+            .unwrap();
+        assert_eq!(
+            pixels,
+            OcrPixelWindow {
+                left: 0,
+                top: 0,
+                right: 7,
+                bottom: 11,
+            }
+        );
+
+        let pixels = OcrNormalizedWindow::new(500_000, 500_000, 600_000, 600_000)
+            .unwrap()
+            .covering_pixel_window(7, 11)
+            .unwrap();
+        assert_eq!(
+            pixels,
+            OcrPixelWindow {
+                left: 3,
+                top: 5,
+                right: 5,
+                bottom: 7,
+            }
+        );
     }
 }

@@ -83,12 +83,12 @@ pub(super) fn parse_model_output(
                 "Unlimited-OCR grounding text boundaries are invalid.",
             ));
         };
-        let text = normalize_text(segment);
+        let text = unframed_text(segment);
         let Some(label) = marker.label.as_deref() else {
             malformed = true;
             continue;
         };
-        if label.eq_ignore_ascii_case("image") {
+        if label == "image" {
             malformed = true;
             continue;
         }
@@ -133,6 +133,7 @@ pub(super) fn parse_model_output(
             }),
             confidence: None,
             detection_confidence: None,
+            text_rotation_millidegrees: None,
             polygon: None,
             bounding_box: Some(bounding_box),
             bounding_boxes,
@@ -140,7 +141,7 @@ pub(super) fn parse_model_output(
     }
 
     Ok(ParsedModelOutput {
-        text: normalize_text(&scanned.text),
+        text: unframed_text(&scanned.text),
         blocks,
         warnings: malformed
             .then(|| INVALID_GROUNDING_WARNING.to_string())
@@ -324,8 +325,7 @@ fn parse_label(raw: &str) -> Option<String> {
 }
 
 fn canonical_role(label: &str) -> OcrBlockRole {
-    let normalized = label.to_ascii_lowercase().replace('-', "_");
-    match normalized.as_str() {
+    match label {
         "text" | "text_line" => OcrBlockRole::Text,
         "title" | "document_title" => OcrBlockRole::Title,
         "heading" | "section_title" => OcrBlockRole::Heading,
@@ -385,13 +385,13 @@ fn next_marker(raw: &str, cursor: usize) -> Option<(usize, MarkerKind)> {
     }
 }
 
-fn normalize_text(raw: &str) -> String {
+fn unframed_text(raw: &str) -> String {
     let mut text = raw.trim().to_string();
     while text.ends_with(STOP_TOKEN) {
         text.truncate(text.len() - STOP_TOKEN.len());
         text = text.trim_end().to_string();
     }
-    text.replace("\\coloneqq", ":=").replace("\\eqqcolon", "=:")
+    text
 }
 
 fn grounding_limit_error() -> a3s_use_core::UseError {

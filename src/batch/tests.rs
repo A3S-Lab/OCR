@@ -10,6 +10,9 @@ use crate::{
     OcrProviderDescriptor, OcrProviderOutput, OcrProviderStatus,
 };
 
+mod layout_references;
+mod table_references;
+
 #[derive(Clone, Copy)]
 enum BatchMode {
     Exact,
@@ -244,6 +247,27 @@ async fn default_provider_adapter_is_text_only_and_deterministic() {
     );
 }
 
+#[tokio::test]
+async fn providers_must_explicitly_declare_text_window_support() {
+    let directory = tempfile::tempdir().unwrap();
+    let image = directory.path().join("image.bmp");
+    write(&image, b"BMfixture");
+    let client = crate::OcrClient::with_provider(TextProvider).unwrap();
+    let error = client
+        .extract_batch(
+            OcrBatchRequest::new(
+                vec![OcrStage::Text],
+                vec![slot("slot-a", image).with_text_window(
+                    OcrNormalizedWindow::new(100_000, 200_000, 900_000, 800_000).unwrap(),
+                )],
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, "use.ocr.provider_batch_invalid");
+}
+
 #[test]
 fn batch_shape_and_slot_identity_are_bounded() {
     assert!(OcrBatchSlotId::new("target-a:surface-1").is_ok());
@@ -258,6 +282,16 @@ fn batch_shape_and_slot_identity_are_bounded() {
     assert!(OcrBatchRequest::new(
         vec![OcrStage::Text],
         vec![slot("slot-a", path), slot("slot-a", path)]
+    )
+    .is_err());
+    assert!(OcrNormalizedWindow::new(0, 0, OCR_NORMALIZED_COORDINATE_BASIS, 1).is_ok());
+    assert!(OcrNormalizedWindow::new(1, 0, 1, 1).is_err());
+    assert!(OcrNormalizedWindow::new(0, 0, OCR_NORMALIZED_COORDINATE_BASIS + 1, 1).is_err());
+    assert!(OcrBatchRequest::new(
+        vec![OcrStage::Table],
+        vec![slot("slot-a", path).with_text_window(
+            OcrNormalizedWindow::new(0, 0, OCR_NORMALIZED_COORDINATE_BASIS, 1).unwrap(),
+        )]
     )
     .is_err());
 }

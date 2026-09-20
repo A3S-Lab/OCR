@@ -8,31 +8,51 @@ use a3s_power::inference::graph::{GraphExecutor, GraphIdentity, GraphPlan};
 use a3s_power::inference::DevicePreference;
 use a3s_power::inference::{
     EmbeddedRuntime, ExecutionBatchBinding, ExecutionDigest, ExecutionPermit, ExecutionReceipt,
-    InferenceLimits, ModelIdentity, ModelSessionBinding, ModelSessionSpec, TensorInput,
-    TensorOutput, WeightStore,
+    InferenceLimits, ModelIdentity, ModelSessionBinding, ModelSessionSpec, RuntimeDeviceKind,
+    TensorInput, TensorOutput, WeightStore,
 };
 use a3s_use_core::{UseError, UseResult};
 use sha2::{Digest, Sha256};
 use tokio_util::sync::CancellationToken;
 
-use crate::assets::ModelAssets;
+use crate::assets::{ModelAssets, ModelGraphAsset};
+use crate::config::{ModelProfile, ModelVariant};
+use crate::preprocess::RecognitionInput;
 
 mod projection;
 #[cfg(test)]
 mod topology_tests;
+mod window;
 
-const FAMILY: &str = "pp-ocr-v6-small";
+const SMALL_FAMILY: &str = "pp-ocr-v6-small";
+const TINY_FAMILY: &str = "pp-ocr-v6-tiny";
 const REVISION: &str = "paddlex-paddle3.0.0";
-const DETECTION_GRAPH: &str = include_str!("graphs/detection.json");
-const RECOGNITION_GRAPH: &str = include_str!("graphs/recognition.json");
-const DETECTION_SOURCE_SHA256: &str =
+const SMALL_DETECTION_GRAPH: &str = include_str!("graphs/detection.json");
+const SMALL_RECOGNITION_GRAPH: &str = include_str!("graphs/recognition.json");
+#[cfg(test)]
+const RECOGNITION_GRAPH: &str = SMALL_RECOGNITION_GRAPH;
+const SMALL_DETECTION_SOURCE_SHA256: &str =
     "d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e";
-const RECOGNITION_SOURCE_SHA256: &str =
+const SMALL_RECOGNITION_SOURCE_SHA256: &str =
     "5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634";
-pub(crate) const DETECTION_WEIGHTS_SHA256: &str =
+pub(crate) const SMALL_DETECTION_WEIGHTS_SHA256: &str =
     "0439824a102e0b365ca905355553985a885773ca0ea9f6a526e5f7317fc15592";
-pub(crate) const RECOGNITION_WEIGHTS_SHA256: &str =
+pub(crate) const SMALL_RECOGNITION_WEIGHTS_SHA256: &str =
     "e8bf34a6900addc8cd9ec1d1ea73ea56e97cb0d668c8c45508a885924078761f";
+pub(crate) const DETECTION_WEIGHTS_SHA256: &str = SMALL_DETECTION_WEIGHTS_SHA256;
+pub(crate) const RECOGNITION_WEIGHTS_SHA256: &str = SMALL_RECOGNITION_WEIGHTS_SHA256;
+const TINY_DETECTION_SOURCE_SHA256: &str =
+    "193bab7a04fca699a6c82e6abb5b81bdb28177f0abd4062552b04908dafb19f8";
+const TINY_RECOGNITION_SOURCE_SHA256: &str =
+    "9ef676d6ed3c88256a2d92c640c44f25b0c40947e111b14b8be8f594091563e6";
+pub(crate) const TINY_DETECTION_WEIGHTS_SHA256: &str =
+    "565ed7331e7ceceb921ec15b0ffae5dcb6b392474bdc76a841750fcf75ef9550";
+pub(crate) const TINY_RECOGNITION_WEIGHTS_SHA256: &str =
+    "738a0bcb5ce1a48ef795c70956497b821ee7dfb231c59a1aefdc52ccdf73c947";
+const TINY_DETECTION_GRAPH_SHA256: &str =
+    "0348134a461266ecfc51293afaebc36e08efafdde15296d58e7f9fa8fb85b432";
+const TINY_RECOGNITION_GRAPH_SHA256: &str =
+    "b8c45305d5902983e84ae4edf869768444a23a2b8b3ba7a155913be5ca83dcce";
 
 pub(crate) struct NativeGraphOutput {
     pub(crate) tensor: TensorOutput,
@@ -63,28 +83,33 @@ impl NativePpOcrV6 {
         runtime: EmbeddedRuntime,
     ) -> UseResult<Self> {
         let limits = runtime.limits().clone();
+        let detection_spec = GraphSpec::detection(assets.profile.detection);
+        let recognition_spec = GraphSpec::recognition(assets.profile.recognition);
+        let detection_graph = reviewed_graph_source(assets, GraphRole::Detection)?;
+        let recognition_graph = reviewed_graph_source(assets, GraphRole::Recognition)?;
         let detection = load_graph(
             &runtime,
             &limits,
             &assets.detection_weights,
-            GraphSpec::detection(),
+            &detection_graph,
+            detection_spec,
         )?;
         let recognition = load_graph(
             &runtime,
             &limits,
             &assets.recognition_weights,
-            GraphSpec::recognition(),
+            &recognition_graph,
+            recognition_spec,
         )?;
         Ok(Self {
             runtime,
             detection,
             recognition,
-            detection_identity: GraphSpec::detection().model_identity(),
-            recognition_identity: GraphSpec::recognition().model_identity(),
+            detection_identity: detection_spec.model_identity(),
+            recognition_identity: recognition_spec.model_identity(),
         })
     }
 
-    #[cfg(test)]
     pub(crate) fn begin(&self, cancellation: &CancellationToken) -> UseResult<ExecutionPermit> {
         self.runtime
             .begin(cancellation)
@@ -146,6 +171,7 @@ impl NativePpOcrV6 {
         Ok(output)
     }
 
+    #[cfg(test)]
     pub(crate) fn recognize(
         &self,
         data: Vec<f32>,
@@ -159,9 +185,72 @@ impl NativePpOcrV6 {
                 "PP-OCRv6 recognition input must be NCHW with three channels and height 48.",
             ));
         }
+        let digest_started = std::time::Instant::now();
+        let input_digest = ExecutionDigest::f32_tensor(&shape, &data);
+        let digest_elapsed = digest_started.elapsed();
         let input = TensorInput::new(shape.to_vec(), data, self.runtime.limits())
             .map_err(|error| power_error("validate the OCR input tensor", error))?;
-        self.execute_recognition_input(input, permit, cancellation)
+        self.execute_recognition_input(input, input_digest, digest_elapsed, permit, cancellation)
+    }
+
+    pub(crate) fn recognize_prepared(
+        &self,
+        input: RecognitionInput,
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<NativeGraphOutput> {
+        if input.shape[1] != 3 || input.shape[2] != 48 {
+            return Err(UseError::new(
+                "use.ocr.provider_input_invalid",
+                "PP-OCRv6 recognition input must be NCHW with three channels and height 48.",
+            ));
+        }
+        let tensor = TensorInput::new(input.shape.to_vec(), input.data, self.runtime.limits())
+            .map_err(|error| power_error("validate the prepared OCR input tensor", error))?;
+        self.execute_recognition_input(
+            tensor,
+            input.digest,
+            std::time::Duration::ZERO,
+            permit,
+            cancellation,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn recognize_prepared_features(
+        &self,
+        input: RecognitionInput,
+        permit: &ExecutionPermit,
+        cancellation: &CancellationToken,
+    ) -> UseResult<TensorOutput> {
+        if input.shape[1] != 3 || input.shape[2] != 48 {
+            return Err(UseError::new(
+                "use.ocr.provider_input_invalid",
+                "PP-OCRv6 recognition input must be NCHW with three channels and height 48.",
+            ));
+        }
+        let tensor = TensorInput::new(input.shape.to_vec(), input.data, self.runtime.limits())
+            .map_err(|error| power_error("validate the prepared OCR feature tensor", error))?;
+        self.recognition
+            .run_with_terminal_matmul_bias_softmax_projection(
+                tensor,
+                permit,
+                cancellation,
+                |features, _weights, _bias| Ok(features.clone()),
+            )
+            .map_err(|error| power_error("execute the OCR recognition feature prefix", error))
+    }
+
+    pub(crate) fn runtime_device_kind(&self) -> RuntimeDeviceKind {
+        self.runtime.device().kind()
+    }
+
+    pub(crate) fn maximum_tensor_elements(&self) -> usize {
+        self.runtime.limits().max_tensor_elements
+    }
+
+    pub(crate) fn maximum_input_bytes(&self) -> usize {
+        self.runtime.limits().max_input_bytes
     }
 
     fn execute_input(
@@ -186,20 +275,41 @@ impl NativePpOcrV6 {
     fn execute_recognition_input(
         &self,
         input: TensorInput,
+        input_digest: ExecutionDigest,
+        input_digest_elapsed: std::time::Duration,
         permit: &ExecutionPermit,
         cancellation: &CancellationToken,
     ) -> UseResult<NativeGraphOutput> {
-        let input_digest = ExecutionDigest::f32_tensor(&input.shape, &input.values);
+        let trace = std::env::var_os("A3S_OCR_TRACE_STAGE_TIMINGS").is_some();
+        let started = std::time::Instant::now();
         let tensor = self
             .recognition
-            .run_with_output_projection(input, permit, cancellation, projection::ctc_top1)
+            .run_with_terminal_matmul_bias_softmax_projection(
+                input,
+                permit,
+                cancellation,
+                projection::ctc_top1_from_classifier,
+            )
             .map_err(|error| power_error("execute the projected OCR recognition graph", error))?;
+        let executed = started.elapsed();
         let output_digest = ExecutionDigest::f32_tensor(&tensor.shape, &tensor.values);
+        let output_digested = started.elapsed();
         let receipt = self.runtime.receipt(
             self.recognition_identity.clone(),
             input_digest,
             output_digest,
         );
+        if trace {
+            let completed = started.elapsed();
+            eprintln!(
+                "A3S_OCR_NATIVE_RECOGNITION_TIMING input_digest_ms={:.3} graph_ms={:.3} output_digest_ms={:.3} receipt_ms={:.3} total_ms={:.3}",
+                input_digest_elapsed.as_secs_f64() * 1_000.0,
+                executed.as_secs_f64() * 1_000.0,
+                (output_digested - executed).as_secs_f64() * 1_000.0,
+                (completed - output_digested).as_secs_f64() * 1_000.0,
+                completed.as_secs_f64() * 1_000.0,
+            );
+        }
         Ok(NativeGraphOutput { tensor, receipt })
     }
 }
@@ -217,39 +327,46 @@ pub(crate) fn session_spec(assets: &ModelAssets) -> UseResult<ModelSessionSpec> 
         .checked_add(file_size(&assets.recognition_weights)?)
         .ok_or_else(|| model_error("PP-OCRv6 resident model bytes overflowed."))?;
     ModelSessionSpec::new(
-        ModelSessionBinding::new(bundle_model_identity(), session_execution_sha256(assets)?),
+        ModelSessionBinding::new(
+            bundle_model_identity(assets.profile),
+            session_execution_sha256(assets)?,
+        ),
         session_limits(),
         resident_bytes,
     )
     .map_err(|error| power_error("declare the PP-OCRv6 model session", error))
 }
 
-pub(crate) fn batch_binding() -> UseResult<ExecutionBatchBinding> {
+pub(crate) fn batch_binding(weights_sha256: &str) -> UseResult<ExecutionBatchBinding> {
     ExecutionBatchBinding::new(
-        bundle_weights_sha256(),
+        weights_sha256,
         named_sha256(b"a3s-ocr-ppocr-v6-staged-slot-layout-v2\0"),
-        named_sha256(b"a3s-ocr-ppocr-v6-shape-cohort-scheduler-v7\0"),
+        named_sha256(b"a3s-ocr-ppocr-v6-shape-cohort-scheduler-v10\0"),
     )
     .map_err(|error| power_error("bind the PP-OCRv6 staged batch", error))
 }
 
-pub(crate) fn bundle_model_identity() -> ModelIdentity {
+pub(crate) fn bundle_model_identity(profile: ModelProfile) -> ModelIdentity {
     ModelIdentity::new(
-        format!("{FAMILY}-bundle"),
+        format!("{}-bundle", profile.execution_family()),
         REVISION,
-        bundle_weights_sha256(),
+        bundle_weights_sha256(profile),
     )
 }
 
-fn bundle_weights_sha256() -> String {
+fn bundle_weights_sha256(profile: ModelProfile) -> String {
+    let detection = GraphSpec::detection(profile.detection);
+    let recognition = GraphSpec::recognition(profile.recognition);
     let mut digest = Sha256::new();
     digest.update(b"a3s-ocr-ppocr-v6-bundle-weights-v1\0");
-    digest.update(DETECTION_WEIGHTS_SHA256.as_bytes());
-    digest.update(RECOGNITION_WEIGHTS_SHA256.as_bytes());
+    digest.update(detection.weights_sha256.as_bytes());
+    digest.update(recognition.weights_sha256.as_bytes());
     format!("{:x}", digest.finalize())
 }
 
 fn session_execution_sha256(assets: &ModelAssets) -> UseResult<String> {
+    let detection_graph = reviewed_graph_source(assets, GraphRole::Detection)?;
+    let recognition_graph = reviewed_graph_source(assets, GraphRole::Recognition)?;
     let detection_config = std::fs::read(&assets.detection_config).map_err(|error| {
         model_error(format!(
             "Failed to read the PP-OCRv6 detection configuration: {error}"
@@ -262,8 +379,8 @@ fn session_execution_sha256(assets: &ModelAssets) -> UseResult<String> {
     })?;
     let mut digest = Sha256::new();
     digest.update(b"a3s-ocr-ppocr-v6-session-execution-v3\0");
-    update_bytes(&mut digest, DETECTION_GRAPH.as_bytes())?;
-    update_bytes(&mut digest, RECOGNITION_GRAPH.as_bytes())?;
+    update_bytes(&mut digest, detection_graph.as_bytes())?;
+    update_bytes(&mut digest, recognition_graph.as_bytes())?;
     update_bytes(&mut digest, projection::IDENTITY)?;
     update_bytes(&mut digest, &detection_config)?;
     update_bytes(&mut digest, &recognition_config)?;
@@ -295,8 +412,8 @@ fn named_sha256(domain: &[u8]) -> String {
 
 #[derive(Clone, Copy)]
 struct GraphSpec {
+    family: &'static str,
     role: &'static str,
-    plan: &'static str,
     source_sha256: &'static str,
     source_opset: u32,
     weights_sha256: &'static str,
@@ -304,31 +421,43 @@ struct GraphSpec {
 }
 
 impl GraphSpec {
-    const fn detection() -> Self {
+    const fn detection(model_variant: ModelVariant) -> Self {
         Self {
+            family: graph_family(model_variant),
             role: "detection",
-            plan: DETECTION_GRAPH,
-            source_sha256: DETECTION_SOURCE_SHA256,
+            source_sha256: match model_variant {
+                ModelVariant::Small => SMALL_DETECTION_SOURCE_SHA256,
+                ModelVariant::Tiny => TINY_DETECTION_SOURCE_SHA256,
+            },
             source_opset: 14,
-            weights_sha256: DETECTION_WEIGHTS_SHA256,
+            weights_sha256: match model_variant {
+                ModelVariant::Small => SMALL_DETECTION_WEIGHTS_SHA256,
+                ModelVariant::Tiny => TINY_DETECTION_WEIGHTS_SHA256,
+            },
             projection_revision: None,
         }
     }
 
-    const fn recognition() -> Self {
+    const fn recognition(model_variant: ModelVariant) -> Self {
         Self {
+            family: graph_family(model_variant),
             role: "recognition",
-            plan: RECOGNITION_GRAPH,
-            source_sha256: RECOGNITION_SOURCE_SHA256,
+            source_sha256: match model_variant {
+                ModelVariant::Small => SMALL_RECOGNITION_SOURCE_SHA256,
+                ModelVariant::Tiny => TINY_RECOGNITION_SOURCE_SHA256,
+            },
             source_opset: 11,
-            weights_sha256: RECOGNITION_WEIGHTS_SHA256,
+            weights_sha256: match model_variant {
+                ModelVariant::Small => SMALL_RECOGNITION_WEIGHTS_SHA256,
+                ModelVariant::Tiny => TINY_RECOGNITION_WEIGHTS_SHA256,
+            },
             projection_revision: Some(projection::REVISION),
         }
     }
 
     fn graph_identity(self) -> GraphIdentity {
         GraphIdentity::new(
-            FAMILY,
+            self.family,
             self.role,
             "onnx",
             self.source_sha256,
@@ -342,7 +471,7 @@ impl GraphSpec {
             |projection| format!("{REVISION}+{projection}"),
         );
         ModelIdentity::new(
-            format!("{FAMILY}-{}", self.role),
+            format!("{}-{}", self.family, self.role),
             revision,
             self.weights_sha256,
         )
@@ -353,6 +482,7 @@ fn load_graph(
     runtime: &EmbeddedRuntime,
     limits: &InferenceLimits,
     weights_path: &Path,
+    graph_source: &str,
     spec: GraphSpec,
 ) -> UseResult<GraphExecutor> {
     let root = weights_path.parent().ok_or_else(|| {
@@ -366,12 +496,68 @@ fn load_graph(
             .map_err(|error| power_error("open the reviewed OCR weights", error))?,
     );
     weights
-        .verify_integrity(&format!("{FAMILY}-{}", spec.role), spec.weights_sha256)
+        .verify_integrity(
+            &format!("{}-{}", spec.family, spec.role),
+            spec.weights_sha256,
+        )
         .map_err(|error| power_error("verify the reviewed OCR weights", error))?;
-    let plan = GraphPlan::parse(spec.plan, &spec.graph_identity(), &weights, limits)
+    let plan = GraphPlan::parse(graph_source, &spec.graph_identity(), &weights, limits)
         .map_err(|error| power_error("validate the reviewed OCR graph", error))?;
     GraphExecutor::new(plan, weights, runtime.clone())
         .map_err(|error| power_error("materialize the reviewed OCR graph", error))
+}
+
+#[derive(Clone, Copy)]
+enum GraphRole {
+    Detection,
+    Recognition,
+}
+
+const fn graph_family(model_variant: ModelVariant) -> &'static str {
+    match model_variant {
+        ModelVariant::Small => SMALL_FAMILY,
+        ModelVariant::Tiny => TINY_FAMILY,
+    }
+}
+
+fn reviewed_graph_source(assets: &ModelAssets, role: GraphRole) -> UseResult<String> {
+    let (variant, graph, embedded_graph, expected_sha256) = match role {
+        GraphRole::Detection => (
+            assets.profile.detection,
+            &assets.graphs.detection,
+            SMALL_DETECTION_GRAPH,
+            TINY_DETECTION_GRAPH_SHA256,
+        ),
+        GraphRole::Recognition => (
+            assets.profile.recognition,
+            &assets.graphs.recognition,
+            SMALL_RECOGNITION_GRAPH,
+            TINY_RECOGNITION_GRAPH_SHA256,
+        ),
+    };
+    match (variant, graph) {
+        (ModelVariant::Small, ModelGraphAsset::Embedded) => Ok(embedded_graph.to_string()),
+        (ModelVariant::Tiny, ModelGraphAsset::ReviewedFile(path)) => {
+            let bytes = std::fs::read(path).map_err(|error| {
+                model_error(format!(
+                    "Failed to read reviewed PP-OCRv6 graph '{}': {error}",
+                    path.display()
+                ))
+            })?;
+            let actual_sha256 = format!("{:x}", Sha256::digest(&bytes));
+            if actual_sha256 != expected_sha256 {
+                return Err(model_error(format!(
+                    "Reviewed PP-OCRv6 graph '{}' failed integrity verification.",
+                    path.display()
+                )));
+            }
+            String::from_utf8(bytes)
+                .map_err(|_| model_error("Reviewed PP-OCRv6 graph is not UTF-8 JSON."))
+        }
+        _ => Err(model_error(
+            "A PP-OCRv6 graph asset does not match its declared model role variant.",
+        )),
+    }
 }
 
 fn power_error(action: &str, error: impl std::fmt::Display) -> UseError {
@@ -392,8 +578,8 @@ mod tests {
 
     #[test]
     fn reviewed_graph_identity_is_ocr_owned() {
-        let detection = GraphSpec::detection();
-        let recognition = GraphSpec::recognition();
+        let detection = GraphSpec::detection(ModelVariant::Small);
+        let recognition = GraphSpec::recognition(ModelVariant::Small);
         assert_eq!(detection.graph_identity().role, "detection");
         assert_eq!(recognition.graph_identity().role, "recognition");
         assert_eq!(detection.source_opset, 14);
@@ -402,7 +588,7 @@ mod tests {
 
     #[test]
     fn graph_plans_keep_the_reviewed_node_inventory() {
-        let detection: serde_json::Value = serde_json::from_str(DETECTION_GRAPH).unwrap();
+        let detection: serde_json::Value = serde_json::from_str(SMALL_DETECTION_GRAPH).unwrap();
         let recognition: serde_json::Value = serde_json::from_str(RECOGNITION_GRAPH).unwrap();
         assert_eq!(detection["nodes"].as_array().unwrap().len(), 242);
         assert_eq!(recognition["nodes"].as_array().unwrap().len(), 481);
@@ -416,7 +602,7 @@ mod tests {
     #[test]
     fn reviewed_graphs_keep_the_fusible_gated_activation_inventory() {
         assert_eq!(
-            adjacent_single_consumer_hard_sigmoid_mul(DETECTION_GRAPH),
+            adjacent_single_consumer_hard_sigmoid_mul(SMALL_DETECTION_GRAPH),
             13
         );
         assert_eq!(
@@ -519,6 +705,8 @@ mod tests {
             detection_config: detection_config.clone(),
             recognition_weights,
             recognition_config,
+            profile: ModelProfile::new(ModelVariant::Small, ModelVariant::Small),
+            graphs: crate::assets::ModelGraphAssets::embedded(),
             source: OcrInstallSource::Environment,
         };
         let first = session_spec(&assets).unwrap();
@@ -533,8 +721,16 @@ mod tests {
         assert_eq!(first.limits().max_concurrent_requests, 1);
         assert_eq!(first.limits().max_queued_requests, 32);
         assert_eq!(
-            batch_binding().unwrap().weights_sha256,
-            bundle_model_identity().weights_sha256
+            batch_binding(
+                &bundle_model_identity(
+                    ModelProfile::new(ModelVariant::Small, ModelVariant::Small,)
+                )
+                .weights_sha256,
+            )
+            .unwrap()
+            .weights_sha256,
+            bundle_model_identity(ModelProfile::new(ModelVariant::Small, ModelVariant::Small,))
+                .weights_sha256
         );
     }
 
@@ -607,6 +803,31 @@ mod tests {
         assert_official_recognition_projection(&native, &permit, &cancellation);
     }
 
+    #[test]
+    #[ignore = "requires the pinned official PP-OCRv6 native bundle and an explicit accelerator"]
+    fn official_nonzero_recognition_batches_are_repeatable() {
+        let native = NativePpOcrV6::load(&official_assets()).unwrap();
+        let cancellation = CancellationToken::new();
+        let permit = native.begin(&cancellation).unwrap();
+
+        for batch in [1_usize, 8, 128] {
+            let elements = batch * 3 * 48 * 320;
+            let input = (0..elements)
+                .map(|index| ((index % 251) as f32 - 125.0) / 127.0)
+                .collect::<Vec<_>>();
+            let first = native
+                .recognize(input.clone(), [batch, 3, 48, 320], &permit, &cancellation)
+                .unwrap();
+            let repeated = native
+                .recognize(input, [batch, 3, 48, 320], &permit, &cancellation)
+                .unwrap();
+            assert_eq!(
+                first.tensor, repeated.tensor,
+                "non-zero recognition changed for batch {batch}"
+            );
+        }
+    }
+
     fn official_assets() -> ModelAssets {
         let root = std::env::var_os("A3S_PPOCR_V6_MODEL")
             .expect("A3S_PPOCR_V6_MODEL must name the pinned official model bundle");
@@ -617,6 +838,8 @@ mod tests {
             detection_config: root.join("det/inference.yml"),
             recognition_weights: root.join("rec/model.safetensors"),
             recognition_config: root.join("rec/inference.yml"),
+            profile: ModelProfile::new(ModelVariant::Small, ModelVariant::Small),
+            graphs: crate::assets::ModelGraphAssets::embedded(),
             source: OcrInstallSource::Environment,
         }
     }
@@ -652,7 +875,7 @@ mod tests {
         assert_eq!(recognition.receipt.output.item_count, 120);
         assert_eq!(
             recognition.receipt.model.revision,
-            "paddlex-paddle3.0.0+ctc-top1-last-tie-finite-v1"
+            "paddlex-paddle3.0.0+ctc-matmul-bias-softmax-top1-last-tie-finite-v6"
         );
         assert_eq!(
             recognition.receipt.model.weights_sha256,

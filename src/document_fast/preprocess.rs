@@ -1,19 +1,25 @@
 use a3s_use_core::{UseError, UseResult};
 use image::RgbImage;
 
+use super::orientation::TableCropOrientation;
 use super::wired::PixelRect;
 
 pub(super) const INPUT_SIDE: usize = 488;
 const CHANNEL_MEAN: [f32; 3] = [0.485, 0.456, 0.406];
 const CHANNEL_STD: [f32; 3] = [0.229, 0.224, 0.225];
 
-pub(super) fn crop_tensor(image: &RgbImage, region: PixelRect) -> UseResult<Vec<f32>> {
+pub(super) fn crop_tensor(
+    image: &RgbImage,
+    region: PixelRect,
+    orientation: TableCropOrientation,
+) -> UseResult<Vec<f32>> {
     validate_region(image, region)?;
     let mut tensor = vec![0.0_f32; 3 * INPUT_SIDE * INPUT_SIDE];
-    let long_side = region.width.max(region.height) as f32;
+    let (oriented_width, oriented_height) = orientation.oriented_dimensions(region);
+    let long_side = oriented_width.max(oriented_height) as f32;
     let scale = INPUT_SIDE as f32 / long_side;
-    let resized_width = ((region.width as f32 * scale).round() as usize).clamp(1, INPUT_SIDE);
-    let resized_height = ((region.height as f32 * scale).round() as usize).clamp(1, INPUT_SIDE);
+    let resized_width = ((oriented_width as f32 * scale).round() as usize).clamp(1, INPUT_SIDE);
+    let resized_height = ((oriented_height as f32 * scale).round() as usize).clamp(1, INPUT_SIDE);
     let inverse_scale = 1.0_f32 / scale;
     let plane = INPUT_SIDE * INPUT_SIDE;
 
@@ -21,19 +27,25 @@ pub(super) fn crop_tensor(image: &RgbImage, region: PixelRect) -> UseResult<Vec<
         let source_y = (destination_y as f32 + 0.5) * inverse_scale - 0.5;
         let y_floor = source_y.floor();
         let y_fraction = source_y - y_floor;
-        let y0 = clamp_sample(y_floor as i64, region.height);
-        let y1 = clamp_sample(y_floor as i64 + 1, region.height);
+        let y0 = clamp_sample(y_floor as i64, oriented_height);
+        let y1 = clamp_sample(y_floor as i64 + 1, oriented_height);
         for destination_x in 0..resized_width {
             let source_x = (destination_x as f32 + 0.5) * inverse_scale - 0.5;
             let x_floor = source_x.floor();
             let x_fraction = source_x - x_floor;
-            let x0 = clamp_sample(x_floor as i64, region.width);
-            let x1 = clamp_sample(x_floor as i64 + 1, region.width);
+            let x0 = clamp_sample(x_floor as i64, oriented_width);
+            let x1 = clamp_sample(x_floor as i64 + 1, oriented_width);
+            let source_points = [
+                orientation.source_pixel(region, x0, y0),
+                orientation.source_pixel(region, x1, y0),
+                orientation.source_pixel(region, x0, y1),
+                orientation.source_pixel(region, x1, y1),
+            ];
             let samples = [
-                image.get_pixel(region.x + x0, region.y + y0).0,
-                image.get_pixel(region.x + x1, region.y + y0).0,
-                image.get_pixel(region.x + x0, region.y + y1).0,
-                image.get_pixel(region.x + x1, region.y + y1).0,
+                image.get_pixel(source_points[0].0, source_points[0].1).0,
+                image.get_pixel(source_points[1].0, source_points[1].1).0,
+                image.get_pixel(source_points[2].0, source_points[2].1).0,
+                image.get_pixel(source_points[3].0, source_points[3].1).0,
             ];
             let weights = [
                 (1.0 - x_fraction) * (1.0 - y_fraction),
@@ -94,6 +106,7 @@ mod tests {
                 width: 2,
                 height: 2,
             },
+            TableCropOrientation::Upright,
         )
         .unwrap();
         let plane = INPUT_SIDE * INPUT_SIDE;
@@ -113,6 +126,7 @@ mod tests {
                 width: 4,
                 height: 2,
             },
+            TableCropOrientation::Upright,
         )
         .unwrap();
         let padded = 400 * INPUT_SIDE;
@@ -132,8 +146,27 @@ mod tests {
                 width: 2,
                 height: 2,
             },
+            TableCropOrientation::Upright,
         )
         .unwrap_err();
         assert_eq!(error.code, "use.ocr.table_candidate_invalid");
+    }
+
+    #[test]
+    fn rotated_crop_samples_the_quarter_turned_source() {
+        let mut image = RgbImage::new(2, 3);
+        image.put_pixel(0, 2, Rgb([250, 40, 50]));
+        let tensor = crop_tensor(
+            &image,
+            PixelRect {
+                x: 0,
+                y: 0,
+                width: 2,
+                height: 3,
+            },
+            TableCropOrientation::Rotate90,
+        )
+        .unwrap();
+        assert!((tensor[0] - (250.0 / 255.0 - 0.485) / 0.229).abs() < 1e-5);
     }
 }

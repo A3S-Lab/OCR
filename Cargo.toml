@@ -74,11 +74,16 @@ ppocr-v6 = [
     "dep:tar",
 ]
 ppocr-v6-cuda = ["ppocr-v6", "a3s-power/embedded-cuda"]
+ppocr-v6-cpu-optimized = ["ppocr-v6", "a3s-power/embedded-cpu-optimized"]
+ppocr-v6-cpu-bf16-experimental = [
+    "ppocr-v6-cpu-optimized",
+    "a3s-power/embedded-cpu-bf16-experimental",
+]
 mcp = ["dep:rmcp", "dep:serde_json", "tokio/io-std"]
 cli = ["ppocr-v6", "mcp", "dep:clap"]
 
 [dependencies]
-a3s-power = { version = "=0.8.0", git = "https://github.com/A3S-Lab/Power.git", rev = "2939668e8ad38e4d3f564144d01c2a5020aa39de", default-features = false, features = ["embedded-inference"], optional = true }
+a3s-power = { version = "=0.8.0", git = "https://github.com/A3S-Lab/Power.git", rev = "0e1733697113b34d74d2e24d9c4baf7a756b60b2", default-features = false, features = ["embedded-inference"], optional = true }
 a3s-use-core = "0.2.0"
 anyhow = { version = "1", optional = true }
 async-trait = "0.1"
@@ -88,7 +93,7 @@ clap = { version = "4", features = ["derive"], optional = true }
 clipper2 = { version = "=0.5.3", default-features = false, optional = true }
 fs2 = { version = "0.4", optional = true }
 image = { version = "=0.25.5", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"], optional = true }
-imageproc = { version = "=0.25.0", default-features = false, optional = true }
+imageproc = { version = "=0.25.1", default-features = false, optional = true }
 rayon = { version = "1", optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"], optional = true }
 rmcp = { version = "=0.8.5", default-features = false, features = ["base64", "macros", "server", "transport-io"], optional = true }

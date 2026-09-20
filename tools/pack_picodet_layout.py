@@ -22,17 +22,11 @@ from safetensors.numpy import save_file
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from picodet_layout_source import (
-    CLASS_COUNT,
-    INPUT_SIDE,
-    LOCATION_COUNT,
-    MODEL_ARCHIVE_SHA256,
-    MODEL_JSON_SHA256,
-    MODEL_NAME,
-    MODEL_PARAMS_SHA256,
-    MODEL_YAML_SHA256,
-    RAW_WIDTH,
+    PicodetLayoutProfile,
+    ReviewedPicodetLayoutSource,
     require_source,
     sha256,
+    source_for_profile,
 )
 
 
@@ -52,8 +46,9 @@ def value_index(value: Any) -> int:
 
 
 class Converter:
-    def __init__(self, root: Path) -> None:
-        self.model, self.params, self.config = require_source(root)
+    def __init__(self, root: Path, source: ReviewedPicodetLayoutSource) -> None:
+        self.source = source
+        self.model, self.params, self.config = require_source(root, source)
         paddle.enable_static()
         self.executor = paddle.static.Executor(paddle.CPUPlace())
         self.program, feeds, _ = paddle.static.load_inference_model(
@@ -91,9 +86,13 @@ class Converter:
         if divide.name() != "pd_op.divide":
             raise ValueError("reviewed PicoDet source scaling boundary changed")
         raw_boxes = divide.operands_source()[0]
-        if list(raw_boxes.shape) != [-1, LOCATION_COUNT, 4]:
+        if list(raw_boxes.shape) != [-1, self.source.location_count, 4]:
             raise ValueError("reviewed PicoDet raw box shape changed")
-        if list(scores.shape) != [-1, CLASS_COUNT, LOCATION_COUNT]:
+        if list(scores.shape) != [
+            -1,
+            self.source.class_count,
+            self.source.location_count,
+        ]:
             raise ValueError("reviewed PicoDet raw score shape changed")
         return raw_boxes, scores
 
@@ -476,18 +475,32 @@ class Converter:
         ]
         plan = {
             "schemaVersion": 1,
-            "family": "picodet-l-layout-3cls",
+            "family": self.source.family,
             "role": "layout-raw-head",
             "source": {
                 "format": "paddle-pir",
-                "sha256": MODEL_JSON_SHA256,
+                "sha256": self.source.model_json_sha256,
                 "opset": 3,
             },
-            "inputs": [{"name": "image", "shape": ["batch", 3, INPUT_SIDE, INPUT_SIDE]}],
+            "inputs": [
+                {
+                    "name": "image",
+                    "shape": [
+                        "batch",
+                        3,
+                        self.source.input_side,
+                        self.source.input_side,
+                    ],
+                }
+            ],
             "outputs": [
                 {
                     "name": raw_output,
-                    "shape": ["batch", LOCATION_COUNT, RAW_WIDTH],
+                    "shape": [
+                        "batch",
+                        self.source.location_count,
+                        self.source.raw_width,
+                    ],
                 }
             ],
             "initializers": initializers,
@@ -499,12 +512,12 @@ class Converter:
             json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         manifest = {
-            "model": MODEL_NAME,
-            "archiveSha256": MODEL_ARCHIVE_SHA256,
+            "model": self.source.model_name,
+            "archiveSha256": self.source.model_archive_sha256,
             "source": {
-                "inference.json": MODEL_JSON_SHA256,
-                "inference.pdiparams": MODEL_PARAMS_SHA256,
-                "inference.yml": MODEL_YAML_SHA256,
+                "inference.json": self.source.model_json_sha256,
+                "inference.pdiparams": self.source.model_params_sha256,
+                "inference.yml": self.source.model_yaml_sha256,
             },
             "generated": {
                 "graph.json": sha256(output / "graph.json"),
@@ -518,10 +531,19 @@ class Converter:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--profile",
+        choices=[profile.value for profile in PicodetLayoutProfile],
+        default=PicodetLayoutProfile.LARGE.value,
+        help="reviewed model contract to validate and lower",
+    )
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
-    Converter(arguments.source.resolve()).convert(arguments.output.resolve())
+    profile = PicodetLayoutProfile(arguments.profile)
+    Converter(
+        arguments.source.resolve(), source_for_profile(profile)
+    ).convert(arguments.output.resolve())
 
 
 if __name__ == "__main__":
